@@ -73,7 +73,7 @@ module.exports = do ->
       catch e
         collection.parseable = false
 
-  utils.sluggifyLabel = (str, other_names=[])->
+  utils.sluggifyLabel = (str, other_names=[], character_limit=30)->
     utils.sluggify(str, {
         preventDuplicates: other_names
         lowerCase: false
@@ -82,6 +82,7 @@ module.exports = do ->
         lrstrip: true
         incrementorPadding: 3
         validXmlTag: true
+        characterLimit: character_limit
       })
 
   utils.isValidXmlTag = (str)->

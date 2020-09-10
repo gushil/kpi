@@ -4,10 +4,6 @@ defaultSurveyDetails
 These values will be populated in the form builder and the user
 will have the option to turn them on or off.
 
-When exported, if the checkbox was selected, the "asJson" value
-gets passed to the CSV builder and appended to the end of the
-survey.
-
 Details pulled from ODK documents / google docs. Notably this one:
   https://docs.google.com/spreadsheet/ccc?key=0AgpC5gsTSm_4dDRVOEprRkVuSFZUWTlvclJ6UFRvdFE#gid=0
 ###
@@ -24,66 +20,47 @@ module.exports = do ->
       label: "start time"
       description: "Records when the survey was begun"
       default: false
-      asJson:
-        type: "start"
-        name: "start"
     end_time:
       name: "end"
       label: "end time"
       description: "records when the survey was marked as completed"
       default: false
-      asJson:
-        type: "end"
-        name: "end"
     today:
       name: "today"
       label: "today"
       description: "includes today's date"
       default: false
-      asJson:
-        type: "today"
-        name: "today"
     username:
       name: "username"
       label: "username"
       description: "includes interviewer's username"
       default: false
-      asJson:
-        type: "username"
-        name: "username"
     simserial:
       name: "simserial"
       label: "sim serial"
       description: "records the serial number of the network sim card"
       default: false
-      asJson:
-        type: "simserial"
-        name: "simserial"
     subscriberid:
       name: "subscriberid"
       label: "subscriber id"
       description: "records the subscriber id of the sim card"
       default: false
-      asJson:
-        type: "subscriberid"
-        name: "subscriberid"
     deviceid:
       name: "deviceid"
       label: "device id"
       aliases: ["imei"]
       description: "Records the internal device ID number (works on Android phones)"
       default: false
-      asJson:
-        type: "deviceid"
-        name: "deviceid"
     phoneNumber:
       name: "phonenumber"
       label: "phone number"
       description: "Records the device's phone number, when available"
       default: false
-      asJson:
-        type: "phonenumber"
-        name: "phonenumber"
+    audit:
+      name: "audit"
+      label: "audit"
+      description: "Records the behavior of enumerators as they navigate through a form"
+      default: false
 
   do ->
     class SurveyDetailSchemaItem extends Backbone.Model
@@ -111,12 +88,21 @@ module.exports = do ->
     geotrace:
       label:
         value: "Record a line"
+      required:
+        value: false
+        _hideUnlessChanged: true
     geoshape:
       label:
         value: "Record an area"
+      required:
+        value: false
+        _hideUnlessChanged: true
     geopoint:
       label:
         value: "Record your current location"
+      required:
+        value: false
+        _hideUnlessChanged: true
     image:
       label:
         value: "Upload an image file"
@@ -132,6 +118,9 @@ module.exports = do ->
     note:
       label:
         value: "This note can be read out loud"
+      required:
+        value: false
+        _hideUnlessChanged: true
     integer:
       label:
         value: "Enter a number"
@@ -148,8 +137,19 @@ module.exports = do ->
       label:
         value: "Enter a number within a specified range"
     calculate:
+      calculation:
+        value: ""
       label:
         value: "calculation"
+      required:
+        value: false
+        _hideUnlessChanged: true
+    hidden:
+      label:
+        value: "hidden"
+      required:
+        value: false
+        _hideUnlessChanged: true
     datetime:
       label:
         value: "Enter a date and time"
@@ -180,6 +180,12 @@ module.exports = do ->
         defaultValue: 1
       }
     }
+    image: {
+      'max-pixels': {
+        type: configs.paramTypes.number
+        defaultValue: 1024
+      }
+    }
     select_one: {
       randomize: {
         type: configs.paramTypes.boolean
@@ -202,12 +208,14 @@ module.exports = do ->
     "name",
     "bind::oc:itemgroup",
     "bind::oc:briefdescription",
-    'bind::oc:description',
-    'select_one_from_file_filename',
-    'appearance',
+    "bind::oc:description",
+    "select_one_from_file_filename",
+    "appearance",
     "type",
+    "name",
     "label",
     "hint",
+    "guidance_hint",
     "required",
     "relevant",
     "constraint",
@@ -216,8 +224,9 @@ module.exports = do ->
     "bind::oc:contactdata", 
     "instance::oc:contactdata",
     "default",
-    'calculation',
-    'trigger'
+    "calculation",
+    "trigger",
+    "constraint"
   ]
 
   configs.lookupRowType = do->
@@ -240,6 +249,7 @@ module.exports = do ->
       ["video", "Video", isMedia: true], # Can use phone camera to record video
       ["file", "File"],
       ["calculate", "Calculate"],
+      ["hidden", "Hidden"],
       ["select_one", "Select", orOtherOption: true, specifyChoice: true],
       ["score", "Score"],
       ["score__row", "Score Row"],
@@ -283,6 +293,8 @@ module.exports = do ->
     hint:
       value: ""
       _hideUnlessChanged: true
+    guidance_hint:
+      value: ""
     required:
       value: "false"
       _hideUnlessChanged: true
@@ -291,6 +303,7 @@ module.exports = do ->
       _hideUnlessChanged: true
     default:
       value: ""
+      _hideUnlessChanged: true
     constraint:
       value: ""
       _hideUnlessChanged: true

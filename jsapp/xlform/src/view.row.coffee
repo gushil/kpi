@@ -268,7 +268,7 @@ module.exports = do ->
       @
     _renderRow: ->
       @$el.html $viewTemplates.$$render('row.xlfRowView', @surveyView)
-      @$label = @$('.card__header-title')
+      @$label = @$('.js-card-label')
       @$hint = @$('.card__header-hint')
       @$card = @$('.card')
       @$header = @$('.card__header')
@@ -286,9 +286,9 @@ module.exports = do ->
           questionType: questionType
         }).render().insertInDOMAfter(@$header)
 
-      if questionType is 'calculate'
+      if questionType is 'calculate' or questionType is 'hidden'
         @$hint.hide()
-        @$label.prop('placeholder', '')
+        @$label.prop('placeholder', '') if questionType is 'calculate'
 
       if 'getList' of @model and (cl = @model.getList())
         @$card.addClass('card--selectquestion card--expandedchoices')
@@ -299,6 +299,10 @@ module.exports = do ->
       @defaultRowDetailParent = @cardSettingsWrap.find('.card__settings__fields--question-options').eq(0)
       for [key, val] in @model.attributesArray() when key in ['label', 'hint', 'type']
         view = new $viewRowDetail.DetailView(model: val, rowView: @)
+        if key == 'label' and @model.get('type').get('value') == 'calculate'
+          view.model = @model.get('calculation')
+          @model.finalize()
+          val.set('value', '')
         view.render().insertInDOM(@)
       if @model.getValue('required')
         @$card.addClass('card--required')
@@ -311,6 +315,7 @@ module.exports = do ->
       if show and !@_settingsExpanded
         @_expandedRender()
         @$card.addClass('card--expanded-settings')
+        @hideMultioptions?()
         @_settingsExpanded = true
       else if !show and @_settingsExpanded
         @$card.removeClass('card--expanded-settings')
@@ -333,7 +338,7 @@ module.exports = do ->
 
     add_row_to_question_library: (evt) =>
       evt.stopPropagation()
-      @ngScope?.add_row_to_question_library @model
+      @ngScope?.add_row_to_question_library @model, @model.collection._parent._initialParams
 
   class GroupView extends BaseRowView
     className: "survey__row survey__row--group  xlf-row-view xlf-row-view--depr"
@@ -358,7 +363,7 @@ module.exports = do ->
     render: ->
       if !@already_rendered
         @$el.html $viewTemplates.row.groupView(@model)
-        @$label = @$('.card__header-title')
+        @$label = @$('.js-card-label')
         @$rows = @$('.group__rows').eq(0)
         @$card = @$('.card')
         @$header = @$('.card__header,.group__header').eq(0)
@@ -384,6 +389,16 @@ module.exports = do ->
         if key in ["name", "_isRepeat", "appearance", "relevant"] or key.match(/^.+::.+/)
           new $viewRowDetail.DetailView(model: val, rowView: @).render().insertInDOM(@)
 
+      @model.on 'add', (row) =>
+        if row.constructor.key == 'group'
+          $appearanceField = @$('.xlf-dv-appearance').eq(0)
+          $appearanceField.hide()
+          $appearanceField.find('input:checkbox').prop('checked', false)
+          appearanceModel = @model.get('appearance')
+          if appearanceModel.getValue()
+            alertify.warning(_t("You can't display nested groups on the same screen - the setting has been removed from the parent group"))
+          appearanceModel.set('value', '')
+
       @model.on 'remove', (row) =>
         if row.constructor.key == 'group' && !@hasNestedGroups()
           @$('.xlf-dv-appearance').eq(0).show()
@@ -404,6 +419,9 @@ module.exports = do ->
             @mandatorySetting = new $viewMandatorySetting.MandatorySettingView({
               model: @model.get('required')
             }).render().insertInDOM(@)
+        else if key is '_isRepeat' and @model.getValue('type') is 'kobomatrix'
+          # don't display repeat checkbox for matrix groups
+          continue
         else
           if questionType is 'select_one_from_file'
             new $viewRowDetail.DetailView(model: val, rowView: @).render().insertInDOM(@)
@@ -428,6 +446,12 @@ module.exports = do ->
             parameters: @model.getParameters(),
             questionType: questionType
           }).render().insertInDOM(@)
+
+      if questionType is 'file'
+        @acceptedFilesView = new $acceptedFilesView.AcceptedFilesView({
+          rowView: @,
+          acceptedFiles: @model.getAcceptedFiles()
+        }).render().insertInDOM(@)
 
       return @
 
@@ -458,13 +482,17 @@ module.exports = do ->
       @$el.html $viewTemplates.row.koboMatrixView()
       @matrix = @$('.card__kobomatrix')
       renderKobomatrix(@, @matrix)
-      @$label = @$('.card__header-title')
+      @$label = @$('.js-card-label')
       @$card = @$('.card')
       @$header = @$('.card__header')
       context = {warnings: []}
 
       for [key, val] in @model.attributesArray() when key is 'label' or key is 'type'
         view = new $viewRowDetail.DetailView(model: val, rowView: @)
+        if key == 'label' and @model.get('type').get('value') == 'calculate'
+          view.model = @model.get('calculation')
+          @model.finalize()
+          val.set('value', '')
         view.render().insertInDOM(@)
       @
 

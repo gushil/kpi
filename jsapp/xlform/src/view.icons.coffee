@@ -1,87 +1,40 @@
 _ = require 'underscore'
 Backbone = require 'backbone'
+constants = require '../../js/constants'
 
 module.exports = do ->
   _t = require("utils").t
 
-  iconDetails = [
-    # row 1
-      label: _t("Select One")
-      faClass: "dot-circle-o"
-      grouping: "r1"
-      id: "select_one"
-    ,
-      label: _t("Select Multiple")
-      faClass: "list-ul"
-      grouping: "r1"
-      id: "select_multiple"
-    ,
-      label: _t("Text")
-      faClass: "lato-text"
-      grouping: "r1"
-      id: "text"
-    ,
-      label: _t("Integer")
-      faClass: "lato-integer"
-      grouping: "r1"
-      id: "integer"
-    ,
+  addIconToRow = (typeDef, group) =>
+    iconDetails.push({
+      label: typeDef.label,
+      faClass: typeDef.faIcon.replace("fa-", ""),
+      grouping: group,
+      id: typeDef.id
+    })
+    return
 
-    # row 2
-      label: _t("Decimal")
-      faClass: "lato-decimal"
-      grouping: "r2"
-      id: "decimal"
-    ,
-      label: _t("Calculate")
-      faClass: "lato-calculate"
-      grouping: "r2"
-      id: "calculate"
-    ,
-      label: _t("Date")
-      faClass: "calendar"
-      grouping: "r2"
-      id: "date"
-    ,
-      label: _t("Note")
-      faClass: "bars"
-      grouping: "r2"
-      id: "note"
-    ,
-
-    # r3
-      label: _t("File")
-      faClass: "file"
-      grouping: "r3"
-      id: "file"
-    ,
-      label: _t("Image")
-      faClass: "picture-o"
-      grouping: "r3"
-      id: "image"
-    ,
-      label: _t("Audio")
-      faClass: "volume-up"
-      grouping: "r3"
-      id: "audio"
-    ,
-      label: _t("Video")
-      faClass: "video-camera"
-      grouping: "r3"
-      id: "video"
-    ,
-
-    # r4
-      label: _t("Select One (External List)")
-      faClass: "circle"
-      grouping: "r4"
-      id: "select_one_from_file"
-    ,
-
-    # r5
-    # r6
-    ]
-
+  iconDetails = []
+  # row 1
+  addIconToRow(constants.QUESTION_TYPES.get("select_one"),  "r1")
+  addIconToRow(constants.QUESTION_TYPES.get("select_multiple"), "r1")
+  addIconToRow(constants.QUESTION_TYPES.get("text"), "r1")
+  addIconToRow(constants.QUESTION_TYPES.get("integer"), "r1")
+  # row 2
+  addIconToRow(constants.QUESTION_TYPES.get("decimal"), "r2")
+  addIconToRow(constants.QUESTION_TYPES.get("calculate"), "r2")
+  addIconToRow(constants.QUESTION_TYPES.get("date"), "r2")
+  addIconToRow(constants.QUESTION_TYPES.get("note"), "r2")
+  # row 3
+  addIconToRow(constants.QUESTION_TYPES.get("file"), "r3")
+  addIconToRow(constants.QUESTION_TYPES.get("image"), "r3")
+  addIconToRow(constants.QUESTION_TYPES.get("audio"), "r3")
+  addIconToRow(constants.QUESTION_TYPES.get("video"), "r3")
+  # row 4
+  addIconToRow(constants.QUESTION_TYPES.get("select_one_from_file"), "r4")
+  # row 5
+  # row 6
+  
   class QtypeIcon extends Backbone.Model
     defaults:
       faClass: "question-circle"

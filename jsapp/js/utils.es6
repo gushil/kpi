@@ -14,6 +14,8 @@ import moment from 'moment';
 import alertify from 'alertifyjs';
 import {Cookies} from 'react-cookie';
 import { CrossStorageClient } from 'cross-storage';
+// imporitng whole constants, as we override ROOT_URL in tests
+import constants from 'js/constants';
 
 export const LANGUAGE_COOKIE_NAME = 'django_language';
 
@@ -24,6 +26,16 @@ alertify.defaults.notifier.position = 'bottom-left';
 alertify.defaults.notifier.closeButton = true;
 
 const cookies = new Cookies();
+const modelUtils = require('../xlform/src/model.utils');
+
+const SLUGGIFY_LABEL_OPTIONS = {
+  lowerCase: false,
+  preventDuplicateUnderscores: true,
+  stripSpaces: true,
+  lrstrip: true,
+  incrementorPadding: 3,
+  validXmlTag: true
+};
 
 export function notify(msg, atype='success') {
   alertify.notify(msg, atype);
@@ -44,13 +56,12 @@ export function formatDate(timeStr) {
   return _m.format('ll');
 }
 
-export var anonUsername = 'AnonymousUser';
 export function getAnonymousUserPermission(permissions) {
   return permissions.filter(function(perm){
     if (perm.user__username === undefined) {
       perm.user__username = perm.user.match(/\/users\/(.*)\//)[1];
     }
-    return perm.user__username === anonUsername;
+    return perm.user__username === constants.ANON_USERNAME;
   })[0];
 }
 
@@ -103,6 +114,12 @@ export function unnullifyTranslations(surveyDataJSON, assetContent) {
       surveyData.survey.forEach((surveyRow) => {
         translatedProps.forEach((translatedProp) => {
           if (typeof surveyRow[translatedProp] !== 'undefined') {
+            if (typeof surveyData.settings[0] !== 'undefined'
+                && typeof surveyData.settings[0].style === 'string'
+                && surveyData.settings[0].style.includes('theme-grid')
+                && surveyRow.type === 'begin_group') {
+              delete surveyRow[translatedProp];
+            }
             surveyRow[`${translatedProp}::${defaultLang}`] = surveyRow[translatedProp];
             delete surveyRow[translatedProp];
           }
@@ -127,7 +144,7 @@ export function unnullifyTranslations(surveyDataJSON, assetContent) {
  * saving the form.
  * @param {Array<string|null>} [translations]
  * @param {Array<string>} translatedProps
- * @param {object} survey
+ * @param {Array<object>} survey
  * @param {object} baseSurvey
  * @return {NullifiedTranslations}
  */
@@ -207,6 +224,19 @@ export function redirectTo(href) {
   window.location.href = href;
 }
 
+// works universally for v1 and v2 urls
+export function getUsernameFromUrl(userUrl) {
+  return userUrl.match(/\/users\/(.*)\//)[1];
+}
+
+export function buildUserUrl(username) {
+  if (username.startsWith(window.location.protocol)) {
+    console.error("buildUserUrl() called with URL instead of username (incomplete v2 migration)");
+    return username;
+  }
+  return `${constants.ROOT_URL}/api/v2/users/${username}/`;
+}
+
 export function parsePermissions(owner, permissions) {
   var users = [];
   var perms = {};
@@ -215,9 +245,14 @@ export function parsePermissions(owner, permissions) {
   }
   permissions.map((perm) => {
     perm.user__username = perm.user.match(/\/users\/(.*)\//)[1];
+    const codename = perm.permission.match(/\/permissions\/(.+)\//);
+    if (codename !== null) {
+      console.error("parsePermissions(): converting new-style permission URL to codename (incomplete v2 migration)");
+      perm.permission = codename[1];
+    }
     return perm;
   }).filter((perm)=> {
-    return ( perm.user__username !== owner && perm.user__username !== anonUsername);
+    return ( perm.user__username !== owner && perm.user__username !== constants.ANON_USERNAME);
   }).forEach((perm)=> {
     if(users.indexOf(perm.user__username) === -1) {
       users.push(perm.user__username);
@@ -258,16 +293,12 @@ var __strings = [];
 
 
 /*a global gettext function*/
-let _gettext;
-if (window.gettext) {
-  _gettext = window.gettext;
-} else {
-  _gettext = function(s){
-    return s;
-  };
-}
 export function t(str) {
-  return _gettext(str);
+  if (window.gettext) {
+    return window.gettext(str);
+  } else {
+    return str;
+  }
 }
 
 
@@ -394,6 +425,47 @@ export function validFileTypes() {
     '' // Keep this to fix issue with IE Edge sending an empty MIME type
   ];
   return VALID_ASSET_UPLOAD_FILE_TYPES.join(',');
+}
+
+/*
+ * Syncs the `choice_filter` of each cascading question to any changes made to
+ * dependent cascading question labels
+ */
+export function syncCascadeChoiceNames(params) {
+  let content = {};
+  if (params.content) {
+    content = JSON.parse(params.content);
+  }
+  if (params.source) {
+    content = JSON.parse(params.source);
+  }
+
+  if (!content.survey) {
+    return params;
+  }
+
+  for(var i = 0; i < content.survey.length; i++) {
+    var sluggifiedLabel;
+    if (content.survey[i].name !== undefined && content.survey[i].label !== undefined) {
+      sluggifiedLabel = modelUtils.sluggify(content.survey[i].label, SLUGGIFY_LABEL_OPTIONS);
+      content.survey[i].name = sluggifiedLabel;
+    }
+    if (content.survey[i].choice_filter !== undefined && content.survey[i - 1].label !== undefined) {
+      var choiceQuestion = '' + content.survey[i].choice_filter.split('=')[0];
+      sluggifiedLabel = modelUtils.sluggify(content.survey[i - 1].label, SLUGGIFY_LABEL_OPTIONS);
+      var choiceLabel = '=${' + sluggifiedLabel + '}';
+      content.survey[i].choice_filter = choiceQuestion + choiceLabel;
+    }
+  }
+
+  if (params.content) {
+    params.content = JSON.stringify(content);
+  }
+  if (params.source) {
+    params.source = JSON.stringify(content);
+  }
+  return params;
+
 }
 
 export function koboMatrixParser(params) {
@@ -527,7 +599,6 @@ export function getCrossStorageClient() {
 export function updateCrossStorageTimeOut() {
   crossStorageClient.onConnect().then(function() {
     const newTimeoutMoment = moment().add(CROSS_STORAGE_IDLE_LOGOUT_TIME, 's');
-    // console.log('updateCrossStorageTimeOut', newTimeoutMoment.valueOf());
     crossStorageClient.set(CROSS_STORAGE_TIMEOUT_KEY, newTimeoutMoment.valueOf());
   });
 }
@@ -629,4 +700,16 @@ export function processArrayMiddleOut(array, startIndex, direction){
 
 export function getLibraryFilterCacheName() {
   return 'kpi.library.filter-style';
+}
+
+export function renderCheckbox(id, label, isImportant) {
+  let additionalClass = '';
+  if (isImportant) {
+    additionalClass += 'alertify-toggle-important';
+  }
+  return `<div class="alertify-toggle checkbox ${additionalClass}"><label class="checkbox__wrapper"><input type="checkbox" class="checkbox__input" id="${id}"><span class="checkbox__label">${label}</span></label></div>`;
+};
+
+export function launchPrinting() {
+  window.print();
 }

@@ -3,10 +3,10 @@ import ReactDOM from 'react-dom';
 import reactMixin from 'react-mixin';
 import autoBind from 'react-autobind';
 import Reflux from 'reflux';
-import actions from '../actions';
-import stores from '../stores';
-import bem from '../bem';
-import searches from '../searches';
+import {actions} from '../actions';
+import {stores} from '../stores';
+import {bem} from '../bem';
+import {searches} from '../searches';
 import ui from '../ui';
 import mixins from '../mixins';
 
@@ -125,11 +125,13 @@ class AssetNavigatorListView extends React.Component {
                   </ol>
                 }
 
-                <bem.LibList__tags>
-                  {(item.tags || []).map((tg, i)=>{
-                    return <bem.LibList__tag key={i}>{tg}</bem.LibList__tag>;
-                  })}
-                </bem.LibList__tags>
+                { stores.pageState.state.assetNavExpanded &&
+                  <bem.LibList__tags>
+                    {(item.tags || []).map((tg, i)=>{
+                      return <bem.LibList__tag key={i}>{tg}</bem.LibList__tag>;
+                    })}
+                  </bem.LibList__tags>
+                }
               </bem.LibList__item>
             );
           })}
@@ -200,6 +202,8 @@ class AssetNavigator extends Reflux.Component {
               searchContext={this.state.searchContext}
             />
           </bem.LibNav__search>
+          <ListTagFilter searchContext={this.state.searchContext} />
+          <ListCollectionFilter searchContext={this.state.searchContext} />
           <ListExpandToggle searchContext={this.state.searchContext} />
         </bem.LibNav__header>
 

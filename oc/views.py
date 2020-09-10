@@ -8,12 +8,12 @@ from requests import Response
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout as auth_logout
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.views import login as auth_login_view, logout as auth_logout_view
+from django.contrib.auth.views import LoginView as auth_login_view, LogoutView as auth_logout_view
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponseNotFound
 from django.shortcuts import redirect, render, resolve_url
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import serializers
-from urlparse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse
 from tldextract import extract
 
 from djangooidc.oidc import OIDCClients, OIDCError

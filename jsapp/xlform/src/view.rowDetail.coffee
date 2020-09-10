@@ -342,7 +342,7 @@ module.exports = do ->
       if @model._parent.constructor.key == 'group'
         viewRowDetail.Templates.textbox @cid, @model.key, _t("Layout Group Name"), 'text', 'Enter layout group name'
       else
-        viewRowDetail.Templates.textbox @cid, @model.key, _t("Item Name"), 'text', 'Enter variable name'
+        viewRowDetail.Templates.textbox @cid, @model.key, _t("Item Name"), 'text', 'Enter variable name', '40'
     afterRender: ->
       @listenForInputChange(transformFn: (value)=>
         value_chars = value.split('')
@@ -350,7 +350,7 @@ module.exports = do ->
           value_chars.unshift('_')
 
         @model.set 'value', value
-        @model.deduplicate @model.getSurvey()
+        @model.deduplicate @model.getSurvey(), 36
       )
       update_view = () => @$el.find('input').eq(0).val(@model.get("value") || '')
       update_view()
@@ -1011,7 +1011,7 @@ module.exports = do ->
   viewRowDetail.DetailViewMixins.trigger =
     getOptions: () ->
       currentQuestion = @model._parent
-      non_selectable = ['datetime', 'time', 'note', 'group', 'kobomatrix', 'repeat', 'rank', 'score']
+      non_selectable = ['datetime', 'time', 'note', 'group', 'kobomatrix', 'repeat', 'rank', 'score', 'calculate']
       
       questions = []
       currentQuestion.getSurvey().forEachRow (question) =>
