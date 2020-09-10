@@ -7,6 +7,7 @@ from io import BytesIO
 
 import six
 import xlsxwriter
+
 from django.conf import settings as django_settings
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.fields import GenericRelation
@@ -434,7 +435,11 @@ class XlsExportable:
         u'image'
     ]
     
-    def ordered_xlsform_content(self, kobo_specific_types=False):
+    def ordered_xlsform_content(self,
+                                kobo_specific_types=False,
+                                append=None):
+        # currently, this method depends on "FormpackXLSFormUtils"
+        content = copy.deepcopy(self.content)
         if append:
             self._append(content, **append)
         self._survey_prepare_custom_col_value(content)
@@ -1526,8 +1531,8 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils):
             xml = survey.to_xml()
 
             details.update({
-                u'status': u'success',
-                u'warnings': warnings,
+                'status': 'success',
+                'warnings': warnings,
             })
         
         except Exception as err:
@@ -1568,4 +1573,4 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils):
 
             xml = str(soup)
 
-        return (xml, details)
+        return xml, details

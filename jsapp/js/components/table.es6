@@ -1118,7 +1118,7 @@ export class DataTable extends React.Component {
               {t('Loading...')}
             </span>
           }
-          noDataText={t('Your filters returned no submissions.')} 
+          noDataText={t('Your filters returned no submissions.')}
           pageText={t('Page')}
           ofText={t('of')}
           rowsText={t('rows')}

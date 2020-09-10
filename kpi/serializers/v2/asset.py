@@ -157,6 +157,8 @@ class AssetSerializer(serializers.HyperlinkedModelSerializer):
             subdomain_userIds = KeycloakModel.objects.filter(
                 subdomain=subdomain).values_list('user_id', flat=True)
             # TODO: remove this restriction?
+            # fields['parent'].queryset = fields['parent'].queryset.filter(
+            #     owner=user)
             fields['parent'].queryset = fields['parent'].queryset.filter(
                 owner__in=subdomain_userIds)
         # Honor requests to exclude fields

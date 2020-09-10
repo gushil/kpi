@@ -9,7 +9,6 @@ from kpi.constants import PERM_VIEW_ASSET
 from kpi.fields import RelativePrefixHyperlinkedRelatedField, WritableJSONField
 from kpi.models import Asset, AssetSnapshot
 
-
 class AssetSnapshotSerializer(serializers.HyperlinkedModelSerializer):
     url = HyperlinkedIdentityField(
          lookup_field='uid',
@@ -74,7 +73,6 @@ class AssetSnapshotSerializer(serializers.HyperlinkedModelSerializer):
             if not asset.owner.id in subdomain_userIds:
                 # The client is not allowed to snapshot this asset
                 raise exceptions.PermissionDenied
-
 
     def create(self, validated_data):
         """

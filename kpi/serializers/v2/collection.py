@@ -108,7 +108,6 @@ class CollectionSerializer(serializers.HyperlinkedModelSerializer):
             return 'owned'
 
         kc_user = None
-        kc_owner = None
         try:
             kc_user = KeycloakModel.objects.get(user=request.user)
             kc_owner = KeycloakModel.objects.get(user=obj.owner)
@@ -120,8 +119,6 @@ class CollectionSerializer(serializers.HyperlinkedModelSerializer):
                 return 'subdomain'
 
         # `obj.permissions.filter(...).exists()` would be cleaner, but it'd
-        # cost a query. This ugly loop takes advantage of having already called
-        # `prefetch_related()`
         for permission in obj.permissions.all():
             if not permission.deny and permission.user == request.user:
                 return 'shared'

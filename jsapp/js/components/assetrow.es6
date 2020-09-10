@@ -416,8 +416,6 @@ class AssetRow extends React.Component {
               <TagInput uid={this.props.uid} tags={this.props.tags} />
             </bem.AssetRow__cell>
           }
-          
-          
         </bem.AssetRow>
       );
   }

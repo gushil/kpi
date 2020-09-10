@@ -51,7 +51,6 @@ if os.getenv("USE_X_FORWARDED_HOST", "False") == "True":
 if os.environ.get('SESSION_COOKIE_DOMAIN'):
     SESSION_COOKIE_DOMAIN = os.environ['SESSION_COOKIE_DOMAIN']
     SESSION_COOKIE_NAME = 'kobonaut'
-    SESSION_COOKIE_AGE = 60*60*24 # Session age is 24 hour
     SESSION_SAVE_EVERY_REQUEST = True # Renew session every request made
 
 # Instances of this model will be treated as allowed origins; see
@@ -63,6 +62,7 @@ CORS_ALLOW_CREDENTIALS = True
 # -- https://docs.djangoproject.com/en/2.2/ref/settings/#csrf-cookie-httponly
 CSRF_COOKIE_HTTPONLY = True
 # SESSION_COOKIE_HTTPONLY is more useful, but it defaults to True.
+SESSION_COOKIE_AGE = 60*60*24 # Session age is 24 hour
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = (os.environ.get('DJANGO_DEBUG', 'True') == 'True')
@@ -714,6 +714,7 @@ KEYCLOAK_ADMIN_CLIENT_SECRET = os.environ.get('KEYCLOAK_ADMIN_CLIENT_SECRET', '3
 if KEYCLOAK_AUTH_URI != '' and KEYCLOAK_CLIENT_ID != '' and KEYCLOAK_CLIENT_SECRET != '' and PUBLIC_URI_FOR_KEYCLOAK != '':
     from bossoidc.settings import *
     configure_oidc('{}/auth/realms/{}'.format(KEYCLOAK_AUTH_URI, KEYCLOAK_DEFAULT_REALM), KEYCLOAK_CLIENT_ID, PUBLIC_URI_FOR_KEYCLOAK, client_secret=KEYCLOAK_CLIENT_SECRET)
+
 SESSION_ENGINE = "redis_sessions.session"
 SESSION_REDIS = RedisHelper.config(default="redis://redis_cache:6380/2")
 
