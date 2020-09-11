@@ -299,10 +299,6 @@ module.exports = do ->
       @defaultRowDetailParent = @cardSettingsWrap.find('.card__settings__fields--question-options').eq(0)
       for [key, val] in @model.attributesArray() when key in ['label', 'hint', 'type']
         view = new $viewRowDetail.DetailView(model: val, rowView: @)
-        if key == 'label' and @model.get('type').get('value') == 'calculate'
-          view.model = @model.get('calculation')
-          @model.finalize()
-          val.set('value', '')
         view.render().insertInDOM(@)
       if @model.getValue('required')
         @$card.addClass('card--required')
@@ -412,7 +408,7 @@ module.exports = do ->
       questionType = @model.get('type').get('typeId')
 
       # don't display columns that start with a $
-      hiddenFields = ['label', 'hint', 'type', 'select_from_list_name', 'kobo--matrix_list', 'parameters', 'tags', 'bind::oc:contactdata', 'instance::oc:contactdata']
+      hiddenFields = ['label', 'hint', 'type', 'select_from_list_name', 'kobo--matrix_list', 'parameters', 'tags', 'bind::oc:contactdata', 'instance::oc:contactdata', 'guidance_hint']
       for [key, val] in @model.attributesArray() when !key.match(/^\$/) and key not in hiddenFields
         if key is 'required'
           if questionType isnt 'note'
@@ -489,10 +485,6 @@ module.exports = do ->
 
       for [key, val] in @model.attributesArray() when key is 'label' or key is 'type'
         view = new $viewRowDetail.DetailView(model: val, rowView: @)
-        if key == 'label' and @model.get('type').get('value') == 'calculate'
-          view.model = @model.get('calculation')
-          @model.finalize()
-          val.set('value', '')
         view.render().insertInDOM(@)
       @
 

@@ -171,7 +171,8 @@ module.exports = do ->
         type: rowType
 
       if rowType is 'calculate'
-        rowDetails.calculation = questionLabelValue
+        rowDetails.calculation = ''
+        rowDetails.label = questionLabelValue
       else
         rowDetails.label = questionLabelValue
 
