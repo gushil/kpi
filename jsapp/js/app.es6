@@ -132,10 +132,9 @@ class App extends React.Component {
       { element: '.questiontypelist__item', event: 'click' },
       { element: '.group__header__buttons__button', event: 'click' },
       { element: '.card__settings', event: 'click' },
-      { element: 'body', event: 'keydown' }
+      { element: 'body', event: 'keyup' }
     ].forEach(function(elementEvent) {
       addCustomEventListener(elementEvent.element, elementEvent.event, function() {
-        console.log('addCustomEventListener handler');
         crossStorageCheckAndUpdate();
       });
     });
