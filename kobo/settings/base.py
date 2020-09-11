@@ -53,16 +53,12 @@ if os.environ.get('SESSION_COOKIE_DOMAIN'):
     SESSION_COOKIE_NAME = 'kobonaut'
     SESSION_SAVE_EVERY_REQUEST = True # Renew session every request made
 
+SESSION_COOKIE_AGE = 60*60*24 # Session age is 24 hour
+
 # Instances of this model will be treated as allowed origins; see
 # https://github.com/ottoyiu/django-cors-headers#cors_model
 CORS_ALLOWED_ORIGIN_REGEXES = (r'^(https?://)?([A-Za-z0-9-]+\.){1,4}openclinica\.io$', r'^(https?://)?([A-Za-z0-9-]+\.){1,4}openclinica-dev\.io$')
 CORS_ALLOW_CREDENTIALS = True
-# "Although the setting offers little practical benefit, it's sometimes
-# required by security auditors."
-# -- https://docs.djangoproject.com/en/2.2/ref/settings/#csrf-cookie-httponly
-CSRF_COOKIE_HTTPONLY = True
-# SESSION_COOKIE_HTTPONLY is more useful, but it defaults to True.
-SESSION_COOKIE_AGE = 60*60*24 # Session age is 24 hour
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = (os.environ.get('DJANGO_DEBUG', 'True') == 'True')
