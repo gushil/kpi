@@ -17,6 +17,14 @@
         overflow: hidden;
         margin-top: 0;
       }
+
+      .input-error {
+        color: $cool-red;
+    
+        input[type="text"] {
+          border-color: $cool-red;
+        }
+      }
     }
   }
 }

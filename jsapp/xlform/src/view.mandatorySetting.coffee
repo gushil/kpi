@@ -1,4 +1,5 @@
 _ = require 'underscore'
+_t = require('utils').t
 Backbone = require 'backbone'
 $configs = require './model.configs'
 $baseView = require './view.pluggedIn.backboneView'
@@ -30,11 +31,37 @@ module.exports = do ->
       @$el.appendTo(rowView.defaultRowDetailParent)
       return
 
+    showMessage: () ->
+      fieldClass = 'input-error'
+      message = "This field is required"
+      customEl = @$el.find('.js-mandatory-setting-custom-text')
+      $customEl = $(customEl)
+      $customEl.closest('label').addClass(fieldClass)
+      if $customEl.siblings('.message').length is 0
+        $message = $('<div/>').addClass('message').text(_t(message))
+        $customEl.after($message)
+    
+    hideMessage: () ->
+      fieldClass = 'input-error'
+      customEl = @$el.find('.js-mandatory-setting-custom-text')
+      $customEl = $(customEl)
+      $customEl.closest('label').removeClass(fieldClass)
+      $customEl.siblings('.message').remove()
+    
+    showOrHideCondition: () ->
+      customEl = @$el.find('.js-mandatory-setting-custom-text')
+      $customEl = $(customEl)
+      if $customEl.val() == ''
+        @showMessage()
+      else
+        @hideMessage()
+    
     onRadioChange: (evt) ->
       val = evt.currentTarget.value
       if val is 'custom'
         @setNewValue('')
         @$el.find('.js-mandatory-setting-custom-text').focus()
+        @showOrHideCondition()
       else
         @setNewValue(val)
       return
@@ -46,11 +73,13 @@ module.exports = do ->
         val = evt.currentTarget.value
         @setNewValue(val)
         @$el.find('.js-mandatory-setting-custom-text').focus()
+        @showOrHideCondition()
       return
 
     onCustomTextBlur: (evt) ->
       val = evt.currentTarget.value
       @setNewValue(val)
+      @showOrHideCondition()
       return
 
     getChangedValue: ->
