@@ -92,15 +92,12 @@ module.exports = do ->
       @c = $("<code><label>#{_t("Value:")}</label> <input type=\"text\" placeholder=\"AUTOMATIC\"  class=\"js-cancel-select-row\"></input></code>")
       @i = $("<code><label>#{_t("Image:")}</label> <input type=\"text\" placeholder=\"None\"  class=\"js-cancel-select-row\"></input></code>")
       @d = $('<div>')
-      @optionImageField = 'media::image'
+      @optionImageField = 'image'
       if @model
         @p.val @model.get("label") || 'Empty'
         @$el.attr("data-option-id", @model.cid)
-        $('input', @c).val @model.get("name")
-        if not @model.get(@optionImageField)?
-          if @model.get('image')? and @model.get('image') != ''
-            @optionImageField = 'image'
-        $('input', @i).val @model.get(@optionImageField)
+        $('span', @c).html @model.get("name")
+        $('span', @i).html @model.get(@optionImageField)
         @model.set('setManually', true)
       else
         @model = new $choices.Option()

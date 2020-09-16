@@ -863,7 +863,16 @@ class Asset(ObjectPermissionMixin,
                 del content['survey'][survey_col_idx]['readonly']
             else:
                 content['survey'][survey_col_idx]['oc_readonly'] = 'false'
-                    
+
+    def _adjust_content_media_column(self, content):
+        survey = content.get('survey', [])
+        media_columns = ['media::audio', 'media::image', 'media::video']
+        for survey_col_idx in range(len(survey)):
+            survey_col = survey[survey_col_idx]
+            for media_column in media_columns:
+                if media_column in survey_col:
+                    content['survey'][survey_col_idx][media_column[7:]] = survey_col[media_column]
+                    del content['survey'][survey_col_idx][media_column]
 
     def _revert_custom_column(self, content):
         survey = content.get('survey', [])
@@ -882,6 +891,7 @@ class Asset(ObjectPermissionMixin,
         self._adjust_content_custom_column(self.content)
         self._standardize(self.content)
         self._revert_custom_column(self.content)
+        self._adjust_content_media_column(self.content)
         self._make_default_translation_first(self.content)
         self._strip_empty_rows(self.content)
         self._assign_kuids(self.content)
