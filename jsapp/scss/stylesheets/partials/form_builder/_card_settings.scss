@@ -115,6 +115,13 @@
     }
   }
 
+  &.xlf-dv-trigger {
+    select {
+      max-width: 85%;
+      padding: 4px;
+    }
+  }
+
   input[type="text"] {
     width: 85%;
     padding: 2px;
