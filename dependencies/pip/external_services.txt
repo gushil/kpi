@@ -38,7 +38,7 @@ django-amazon-ses==2.1.1  # via -r dependencies/pip/requirements.in
 django-braces==1.13.0     # via -r dependencies/pip/requirements.in
 django-celery-beat==1.5.0  # via -r dependencies/pip/requirements.in
 django-constance[database]==2.4.0  # via -r dependencies/pip/requirements.in
-django-cookies-samesite==0.6.6  # via -r dependencies/pip/requirements.in
+django-cookies-samesite==0.7.0  # via -r dependencies/pip/requirements.in
 django-cors-headers==3.1.1  # via -r dependencies/pip/requirements.in
 django-csp==3.7           # via -r dependencies/pip/requirements.in
 django-debug-toolbar==2.1  # via -r dependencies/pip/requirements.in
