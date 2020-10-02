@@ -868,7 +868,7 @@ module.exports = do ->
           if (@model.get 'value') != ''
             @makeFieldCheckCondition({
               checkIfNotEmpty: true,
-              message: "This field is not empty"
+              message: "This field needs to be empty"
             })
         else
           @$el.removeClass('hidden')
