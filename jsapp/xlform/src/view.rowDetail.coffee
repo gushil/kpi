@@ -970,8 +970,8 @@ module.exports = do ->
             @model.set 'value', $select.val()
             if $select.val() == 'contactdata'
               addSelectContactDataType()
-              constraint_value = @rowView.model.attributes.constraint.get('value')
-              constraint_message_value = @rowView.model.attributes.constraint_message.get('value')
+              constraint_value = @rowView.model.attributes.constraint.getValue()
+              constraint_message_value = @rowView.model.attributes.constraint_message.getValue()
               if (constraint_value != '') or (constraint_message_value != '')
                 showMessage()
 
