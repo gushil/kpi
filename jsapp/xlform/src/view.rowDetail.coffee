@@ -170,6 +170,7 @@ module.exports = do ->
       fieldClass = opts.fieldClass || 'input-error'
       
       $el.off 'blur'
+      $el.off 'keyup'
       $el.closest('div').removeClass(fieldClass)
       $el.siblings('.message').remove()
 
@@ -865,6 +866,7 @@ module.exports = do ->
         @$el.siblings(".message").remove();
         @$el.closest('div').removeClass("input-error")
         if senderValue in ['clinicaldata', 'contactdata']
+          @removeRequired()
           if (@model.get 'value') != ''
             @makeFieldCheckCondition({
               checkIfNotEmpty: true,
@@ -873,12 +875,15 @@ module.exports = do ->
         else
           @$el.removeClass('hidden')
           @makeRequired()
+      else
+        @makeRequired()
     html: ->
       @fieldTab = "active"
       @$el.addClass("card__settings__fields--#{@fieldTab}")
       viewRowDetail.Templates.textbox @cid, @model.key, _t("Item Group"), 'text', 'Enter data set name'
     afterRender: ->
       @listenForInputChange()
+      @makeRequired()
 
   viewRowDetail.DetailViewMixins.oc_briefdescription =
     html: ->
