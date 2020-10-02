@@ -867,11 +867,10 @@ module.exports = do ->
         @$el.closest('div').removeClass("input-error")
         if senderValue in ['clinicaldata', 'contactdata']
           @removeRequired()
-          if (@model.get 'value') != ''
-            @makeFieldCheckCondition({
-              checkIfNotEmpty: true,
-              message: "This field needs to be empty"
-            })
+          @makeFieldCheckCondition({
+            checkIfNotEmpty: true,
+            message: "This field needs to be empty"
+          })
         else
           @$el.removeClass('hidden')
           @makeRequired()
