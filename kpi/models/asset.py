@@ -1492,7 +1492,8 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils):
                         del survey_col['select_one_from_file_filename']
 
         if 'survey_header' not in content:
-            content['survey_header'] = self.surveyCols
+            content['survey_header'] = [{ col : "" for col in self.surveyCols}]
+
 
     def generate_xml_from_source(self,
                                  source,
