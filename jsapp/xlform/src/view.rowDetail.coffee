@@ -962,9 +962,10 @@ module.exports = do ->
 
         $select.change () =>
           Backbone.trigger('ocCustomEvent', { sender: @model, value: $select.val() })
+          if $select.siblings(".#{@contact_data_type_class_name}").length > 0
+            $select.siblings(".#{@contact_data_type_class_name}").remove()
           if $select.val() == 'No'
             @model.set 'value', ''
-            $select.siblings(".#{@contact_data_type_class_name}").remove();
             hideMessage()
           else
             @model.set 'value', $select.val()
