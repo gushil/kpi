@@ -347,7 +347,7 @@ export default assign({
           });
         })
         .catch((resp) => {
-          var errorMsg = `${t('Your changes could not be saved, likely because of a lost internet connection.')}&nbsp;${t('Keep this window open and try saving again while using a better connection.')}`;
+          var errorMsg = `${t('Your changes could not be saved, likely because of a lost internet connection.')}&nbsp;${t('Keep this window open and try saving again while using a better connection.')}&nbsp;${t('Please contact your administrator if this message persists.')}`;
           if (resp.statusText !== 'error') {
             errorMsg = resp.statusText;
           }
