@@ -518,7 +518,10 @@ class XlsExportable:
                     elif survey_col['type'] == 'end_repeat':
                         survey_col['type'] = 'end repeat'
                     elif survey_col['type'] == 'select_one_from_file':
-                        survey_col['type'] = 'select_one_from_file' + ' ' + survey_col['select_one_from_file_filename']
+                        select_one_filename = 'codelist.csv'
+                        if 'select_one_from_file_filename' in survey_col and survey_col['select_one_from_file_filename'].strip() != '':
+                            select_one_filename = survey_col['select_one_from_file_filename']
+                        survey_col['type'] = 'select_one_from_file' + ' ' + select_one_filename
 
                 if 'select_one_from_file_filename' in survey_col:
                     del survey_col['select_one_from_file_filename']
