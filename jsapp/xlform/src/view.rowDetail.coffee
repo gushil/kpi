@@ -338,6 +338,7 @@ module.exports = do ->
 
   viewRowDetail.DetailViewMixins.name =
     html: ->
+      @fieldMaxLength = 36
       @fieldTab = "active"
       @$el.addClass("card__settings__fields--#{@fieldTab}")
       if @model._parent.constructor.key == 'group'
@@ -351,12 +352,13 @@ module.exports = do ->
           value_chars.unshift('_')
 
         @model.set 'value', value
-        @model.deduplicate @model.getSurvey(), 36
+        @model.deduplicate @model.getSurvey(), @fieldMaxLength
       )
       update_view = () => @$el.find('input').eq(0).val(@model.get("value") || '')
       update_view()
 
       @model._parent.get('label').on 'change:value', update_view
+      @model.set 'value', @model.deduplicate @model.getSurvey(), @fieldMaxLength
       @makeRequired()
   # insertInDom: (rowView)->
     #   # default behavior...
