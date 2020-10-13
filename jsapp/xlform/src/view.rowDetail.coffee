@@ -871,7 +871,7 @@ module.exports = do ->
           @removeRequired()
           @makeFieldCheckCondition({
             checkIfNotEmpty: true,
-            message: "This field needs to be empty"
+            message: 'This field must be empty for external "clinicaldata" or "contactdata" items'
           })
         else
           @$el.removeClass('hidden')
