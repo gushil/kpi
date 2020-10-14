@@ -1486,6 +1486,9 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils):
                 if 'label' in survey_col:
                     survey_col['label'] = survey_col['label'][0]
 
+                if 'hint' in survey_col:
+                    survey_col['hint'] = survey_col['hint'][0]
+
                 if 'type' in survey_col:
                     if 'select_one' == survey_col['type'] and 'select_from_list_name' in survey_col.keys():
                         survey_col['type'] = "{0} {1}".format(survey_col['type'], survey_col['select_from_list_name'])
