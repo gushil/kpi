@@ -1567,16 +1567,28 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils):
             })
         
         if xml != '':
+
+            def bind_is_calculate_and_has_external_clinicaldata(tag):
+                return tag.name == 'bind' \
+                    and tag.has_attr('calculate') \
+                    and tag.has_attr('oc:external') \
+                    and tag['oc:external'] == 'clinicaldata'
+
             soup = BeautifulSoup(xml, 'xml')
-            all_instance = soup.find_all('instance')
-            instance_count = len(all_instance)
+            soup_find_clinicaldata= soup.find_all(bind_is_calculate_and_has_external_clinicaldata)
+            clinicaldata_count = len(soup_find_clinicaldata)
+            soup_find_all_instance = soup.find_all('instance')
+            instance_count = len(soup_find_all_instance)
 
             oc_clinicaldata_soup = BeautifulSoup('<instance id="clinicaldata" src="{}"/>'.format(django_settings.ENKETO_FORM_OC_INSTANCE_URL), 'xml')
-            if instance_count == 0:
-                if soup.find('model') is not None:
-                    soup.model.insert(1, oc_clinicaldata_soup.instance)
-            else:
-                all_instance[instance_count - 1].insert_after(oc_clinicaldata_soup.instance)
+            if clinicaldata_count > 0:
+                if instance_count == 0:
+                    if soup.find('model') is not None:
+                        soup.model.insert(1, oc_clinicaldata_soup.instance)
+                else:
+                    soup_find_instance = soup.find_all('instance')
+                    instance_count = len(soup_find_instance)
+                    soup_find_instance[instance_count - 1].insert_after(oc_clinicaldata_soup.instance)
             
             soup_body = soup.find('h:body')
             if 'class' in soup_body.attrs:
