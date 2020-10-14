@@ -1490,9 +1490,14 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils):
                     if 'select_one' == survey_col['type'] and 'select_from_list_name' in survey_col.keys():
                         survey_col['type'] = "{0} {1}".format(survey_col['type'], survey_col['select_from_list_name'])
                         del survey_col['select_from_list_name']
-                    elif 'select_one_from_file' == survey_col['type'] and 'select_one_from_file_filename' in survey_col.keys():
-                        survey_col['type'] = "{0} {1}".format(survey_col['type'], survey_col['select_one_from_file_filename'])
-                        del survey_col['select_one_from_file_filename']
+                    elif 'select_one_from_file' == survey_col['type']:
+                        select_one_from_file_filename = 'codelist.csv'
+                        if 'select_one_from_file_filename' in survey_col.keys():
+                            select_one_from_file_filename = survey_col['select_one_from_file_filename']
+                            if not select_one_from_file_filename.endswith(('.csv', '.xml')):
+                                select_one_from_file_filename = '{}.csv'.format(select_one_from_file_filename)
+                            del survey_col['select_one_from_file_filename']
+                        survey_col['type'] = "{0} {1}".format(survey_col['type'], select_one_from_file_filename)
 
         if 'survey_header' not in content:
             content['survey_header'] = [{ col : "" for col in self.surveyCols}]
