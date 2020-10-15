@@ -451,13 +451,13 @@ module.exports = do ->
       return i
 
     cancelSortable: (ui) ->
-      console.log 'cancelSortable'
       sortable_elements = ui.item.data('sortable_elements')
       ui.item.data('sortable_elements', null)
       @formEditorEl.sortable 'cancel'
       group_rows = @formEditorEl.find('.group__rows')
-      group_rows.each (index) =>
-        $(group_rows[index]).sortable 'cancel'
+      if group_rows? and group_rows.length > 0
+        group_rows.each (index) =>
+          $(group_rows[index]).sortable 'cancel'
       
       if ui.item.hasClass('survey__row--group')
         ui.item.find('.survey__row--selected.hidden').removeClass('hidden')
@@ -481,23 +481,15 @@ module.exports = do ->
 
         @survey.trigger evt.type
 
-      sortable_activate_check_esc = () =>
+      sortable_activate_check_esc = (ui) =>
+        @sortCancelled = false
         @onEscapeKeydown = () =>
           @sortCancelled = true
-          console.log 'esc pressed'
-          console.log '@sortCancelled', @sortCancelled
+          @cancelSortable(ui)
 
-      sortable_deactivate_check_esc = () =>
-        @onEscapeKeydown = () =>
-          @sortCancelled = false
-          console.log 'esc pressed'
-          console.log '@sortCancelled', @sortCancelled
 
       sortable_stop = (evt, ui) =>
-        if @sortCancelled
-          @cancelSortable(ui)
-          sortable_deactivate_check_esc()
-        else
+        if not @sortCancelled
           elements = ui.item.data('sortable_elements')
           elements_array = _.toArray(elements)
           elements_before = []
@@ -511,17 +503,16 @@ module.exports = do ->
           if elements_after.length > 0
             ui.item.after(elements_after)
           ui.item.closest('.survey-editor__list').find('.survey__row--selected.hidden').removeClass('hidden')
-          for el in elements
-            row_id = $(el).attr('data-row-id')
-            $row = $("li.survey__row--selected:not('.hidden')[data-row-id='#{row_id}']")
-            $row.trigger('survey__row-sortablestop')
+          if elements? and elements.length > 0
+            for el in elements
+              row_id = $(el).attr('data-row-id')
+              $row = $("li.survey__row--selected:not('.hidden')[data-row-id='#{row_id}']")
+              $row.trigger('survey__row-sortablestop')
           @survey.trigger 'sortablestop'
           if not ui.item.data('is_multi_select')
             ui.item.closest('.survey-editor__list').find('.survey__row--selected').removeClass('survey__row--selected')
 
       sortable_helper = (evt, item) =>
-        sortable_activate_check_esc()
-        @sortCancelled = false
         item.data('is_multi_select', true)
         if not item.hasClass('survey__row--selected')
           item.closest('.survey-editor__list').find('.survey__row--selected').removeClass('survey__row--selected')
@@ -558,6 +549,8 @@ module.exports = do ->
           activate: sortable_activate_deactivate
           deactivate: sortable_activate_deactivate
           helper: sortable_helper
+          change: (evt, ui) =>
+            sortable_activate_check_esc(ui)
           receive: (evt, ui) =>
             itemUid = ui.item.data().uid
             if @ngScope.handleItem and itemUid
@@ -588,6 +581,8 @@ module.exports = do ->
           activate: sortable_activate_deactivate
           deactivate: sortable_activate_deactivate
           helper: sortable_helper
+          change: (evt, ui) =>
+            sortable_activate_check_esc(ui)
           receive: (evt, ui) =>
             itemUid = ui.item.data().uid
             if @ngScope.handleItem and itemUid
