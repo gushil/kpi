@@ -544,6 +544,7 @@ module.exports = do ->
         select_multiple: ['minimal', 'columns', 'columns-pack', 'columns-4', 'columns no-buttons', 'columns-pack no-buttons', 'columns-4 no-buttons', 'image-map']
         image: ['draw', 'annotate', 'signature']
         date: ['month-year', 'year']
+        integer: ['analog-scale horizontal', 'analog-scale horizontal no-ticks', 'analog-scale vertical', 'analog-scale vertical no-ticks', 'analog-scale vertical show-scale']
 
       types[@model_type()]
     html: ->
