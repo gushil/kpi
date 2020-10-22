@@ -886,54 +886,33 @@ class Asset(ObjectPermissionMixin,
                     translated[translated_idx] = non_dc_media_column
     
     def _adjust_content_media_column_before_standardize(self, content):
-        if 'translations' not in content:
-            survey = content.get('survey', [])
-
-            survey_col_key_list = []
+        
+        def _adjust_media_columns(survey, non_dc_cols):
             for survey_col_idx in range(len(survey)):
                 survey_col = survey[survey_col_idx]
-                survey_col_key_list = survey_col_key_list + list(survey_col.keys())
+                survey_col_keys = list(survey_col.keys())
+                for survey_col_key in survey_col_keys:
+                    if survey_col_key in non_dc_cols:
+                        survey_col["oc_{}".format(survey_col_key)] = survey_col[survey_col_key]
+                        del survey_col[survey_col_key]
+        
+        survey = content.get('survey', [])
 
-            media_columns = {"audio": "media::audio", "image": "media::image", "video": 'media::video'}
-            for media_column_key in media_columns.keys():
-                non_dc_col = media_column_key
-                dc_col = media_columns[media_column_key]
-                
-                non_dc_cols = [s for s in survey_col_key_list if s.startswith(non_dc_col)]
+        survey_col_key_list = []
+        for survey_col_idx in range(len(survey)):
+            survey_col = survey[survey_col_idx]
+            survey_col_key_list = survey_col_key_list + list(survey_col.keys())
 
-                if len(non_dc_cols) > 0:
-                    for survey_col_idx in range(len(survey)):
-                        survey_col = survey[survey_col_idx]
-                        survey_col_keys = list(survey_col.keys())
-                        for survey_col_key in survey_col_keys:
-                            if survey_col_key in non_dc_cols:
-                                survey_col["oc_{}".format(survey_col_key)] = survey_col[survey_col_key]
-                                del survey_col[survey_col_key]
-        else:
-            survey = content.get('survey', [])
+        media_columns = {"audio": "media::audio", "image": "media::image", "video": 'media::video'}
 
-            survey_col_key_list = []
-            for survey_col_idx in range(len(survey)):
-                survey_col = survey[survey_col_idx]
-                survey_col_key_list = survey_col_key_list + list(survey_col.keys())
+        for media_column_key in media_columns.keys():
+            non_dc_col = media_column_key
+            non_dc_cols = [s for s in survey_col_key_list if s.startswith(non_dc_col)]
 
-            media_columns = {"audio": "media::audio", "image": "media::image", "video": 'media::video'}
-            for media_column_key in media_columns.keys():
-                non_dc_col = media_column_key
-                dc_col = media_columns[media_column_key]
-                
-                non_dc_cols = [s for s in survey_col_key_list if s.startswith(non_dc_col)]
-                dc_cols = [s for s in survey_col_key_list if s.startswith(dc_col)]
+            if len(non_dc_cols) > 0:
+                _adjust_media_columns(survey, non_dc_cols)
 
-                if len(non_dc_cols) > 0:
-                    for survey_col_idx in range(len(survey)):
-                        survey_col = survey[survey_col_idx]
-                        survey_col_keys = list(survey_col.keys())
-                        for survey_col_key in survey_col_keys:
-                            if survey_col_key in non_dc_cols:
-                                survey_col["oc_{}".format(survey_col_key)] = survey_col[survey_col_key]
-                                del survey_col[survey_col_key]
-
+        if 'translations' in content:
             translated = content.get('translated', [])
             non_dc_media_columns = ['audio', 'image', 'video']
             for translated_idx in range(len(translated)):
@@ -957,17 +936,11 @@ class Asset(ObjectPermissionMixin,
         asset.save(adjust_content=False)
         """
         self._adjust_content_custom_column(self.content)
-        #logging.warning('_adjust_content_custom_column {}'.format(self.content))
         self._adjust_content_media_column_before_standardize(self.content)
-        #logging.warning('_adjust_content_media_column_before_standardize {}'.format(self.content))
         self._standardize(self.content)
-        #logging.warning('_standardize {}'.format(self.content))
         self._adjust_content_media_column(self.content)
-        #logging.warning('_adjust_content_media_column {}'.format(self.content))
         self._revert_custom_column(self.content)
-        self._adjust_content_media_column(self.content)
         self._make_default_translation_first(self.content)
-        #logging.warning('_make_default_translation_first {}'.format(self.content))
         self._strip_empty_rows(self.content)
         self._assign_kuids(self.content)
         self._autoname(self.content)
