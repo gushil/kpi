@@ -352,13 +352,12 @@ module.exports = do ->
           value_chars.unshift('_')
 
         @model.set 'value', value
-        @model.deduplicate @model.getSurvey(), @fieldMaxLength
+        @model.deduplicate @model.getSurvey(), @model.getSurvey().rowItemNameMaxLength
       )
       update_view = () => @$el.find('input').eq(0).val(@model.get("value") || '')
       update_view()
 
       @model._parent.get('label').on 'change:value', update_view
-      @model.set 'value', @model.deduplicate @model.getSurvey(), @fieldMaxLength
       @makeRequired()
   # insertInDom: (rowView)->
     #   # default behavior...
