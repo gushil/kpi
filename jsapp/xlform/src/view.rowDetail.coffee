@@ -899,7 +899,7 @@ module.exports = do ->
     getOptions: () ->
       types =
         text: ['contactdata']
-        calculate: ['clinicaldata', 'contactdata']
+        calculate: ['clinicaldata']
       types[@model_type()]
     html: ->
       @fieldTab = "active"
