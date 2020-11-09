@@ -125,7 +125,6 @@ module.exports = do ->
         else
           @_ensure_row_list_is_copied(row)
           name_detail = row.get('name')
-          console.log 'deduplicate insertSurvey insert a question'
           name_detail.set 'value', name_detail.deduplicate(@)
           target.rows.add(
             row.toJSON(),
