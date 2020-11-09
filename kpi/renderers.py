@@ -31,6 +31,8 @@ class SSJsonRenderer(renderers.JSONRenderer):
 class XMLRenderer(DRFXMLRenderer):
 
     def render(self, data, accepted_media_type=None, renderer_context=None, relationship=None):
+        if renderer_context.get('request').method == 'HEAD':
+            return None
         if hasattr(renderer_context.get("view"), "get_object"):
             obj = renderer_context.get("view").get_object()
             # If `relationship` is passed among arguments, retrieve `xml` from this relationship.

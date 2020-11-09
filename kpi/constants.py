@@ -70,3 +70,5 @@ PERM_DELETE_COLLECTION = 'delete_collection'
 
 # KC INTERNAL
 PERM_FROM_KC_ONLY = 'from_kc_only'
+
+X_OPENROSA_ACCEPT_CONTENT_LENGTH = "X-OpenRosa-Accept-Content-Length"

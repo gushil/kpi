@@ -695,6 +695,7 @@ MONGO_CONNECTION = MongoClient(
     MONGO_CONNECTION_URL, j=True, tz_aware=True, connect=False)
 MONGO_DB = MONGO_CONNECTION[MONGO_DATABASE['NAME']]
 
+X_OPENROSA_ACCEPT_CONTENT_LENGTH_DEFAULT = os.environ.get('X_OPENROSA_ACCEPT_CONTENT_LENGTH_DEFAULT', '100000000')
 OC_BUILD_URL = os.environ.get('OC_BUILD_URL', '')
 
 KEYCLOAK_AUTH_URI = os.environ.get('KEYCLOAK_AUTH_URI', 'https://auth.openclinica-dev.io')
