@@ -82,7 +82,7 @@ export var dataInterface;
     },
     keycloakLogout: ()=> {
       var d = new $.Deferred();
-      $ajax({ url: `${rootUrl}/openid/logout` }).done(function(args) {
+      $ajax({ url: `${ROOT_URL}/openid/logout` }).done(function(args) {
         d.resolve();
       }).fail(function (resp, etype, emessage) {
         if (resp.status === 200) {
@@ -95,7 +95,7 @@ export var dataInterface;
     },
     checkKeycloakStatus: ()=> {
       var d = new $.Deferred();
-      $ajax({ url: `${rootUrl}` }).done(function(args) {
+      $ajax({ url: `${ROOT_URL}` }).done(function(args) {
         console.log('checkKeycloakStatus resp', resp);
         d.resolve();
       }).fail(function (resp, etype, emessage) {
