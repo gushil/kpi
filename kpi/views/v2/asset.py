@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import exceptions, renderers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework_extensions.mixins import NestedViewSetMixin
 from bossoidc.models import Keycloak as KeycloakModel
 
@@ -190,7 +191,7 @@ class AssetViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Asset.objects.all()
 
     lookup_field = 'uid'
-    permission_classes = (IsOwnerOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (KpiObjectPermissionsFilter, SearchFilter)
 
     renderer_classes = (renderers.BrowsableAPIRenderer,
