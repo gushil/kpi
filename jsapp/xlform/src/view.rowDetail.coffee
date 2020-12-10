@@ -341,6 +341,11 @@ module.exports = do ->
       @fieldMaxLength = 36
       @fieldTab = "active"
       @$el.addClass("card__settings__fields--#{@fieldTab}")
+      @model.set 'value', (@model.deduplicate @model.getSurvey(), @model.getSurvey().rowItemNameMaxLength)
+      rowItemNameMaxLength = @model.getSurvey().rowItemNameMaxLength
+      model_value = @model.get 'value'
+      if (@model.get('value').length > rowItemNameMaxLength) and (model_value.charAt(model_value.length - 4) != '_')
+        @model.set 'value', @model.get('value').slice(0, rowItemNameMaxLength)
       if @model._parent.constructor.key == 'group'
         viewRowDetail.Templates.textbox @cid, @model.key, _t("Layout Group Name"), 'text', 'Enter layout group name'
       else
