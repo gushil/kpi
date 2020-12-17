@@ -105,51 +105,37 @@ module.exports = do ->
         _hideUnlessChanged: true
     image:
       label:
-        value: "Upload an image file"
+        value: ""
     video:
       label:
-        value: "Upload a video file"
+        value: ""
     audio:
       label:
-        value: "Upload an audio file"
+        value: ""
     file:
       label:
-        value: "Upload a file"
+        value: ""
     note:
       label:
-        value: "This note can be read out loud"
-      required:
-        value: false
-        _hideUnlessChanged: true
+        value: ""
     integer:
       label:
-        value: "Enter a number"
+        value: ""
     barcode:
       label:
         value: "Use the camera to scan a barcode"
     decimal:
       label:
-        value: "Enter a number"
+        value: ""
     date:
       label:
-        value: "Enter a date"
+        value: ""
     range:
       label:
         value: "Enter a number within a specified range"
     calculate:
-      calculation:
+      label:
         value: ""
-      label:
-        value: "calculation"
-      required:
-        value: false
-        _hideUnlessChanged: true
-    hidden:
-      label:
-        value: "hidden"
-      required:
-        value: false
-        _hideUnlessChanged: true
     datetime:
       label:
         value: "Enter a date and time"

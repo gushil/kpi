@@ -286,9 +286,9 @@ module.exports = do ->
           questionType: questionType
         }).render().insertInDOMAfter(@$header)
 
-      if questionType is 'calculate' or questionType is 'hidden'
+      if questionType is 'calculate'
         @$hint.hide()
-        @$label.prop('placeholder', '') if questionType is 'calculate'
+        @$label.prop('placeholder', _t('Label not needed for Calculate questions'))
 
       if 'getList' of @model and (cl = @model.getList())
         @$card.addClass('card--selectquestion card--expandedchoices')
