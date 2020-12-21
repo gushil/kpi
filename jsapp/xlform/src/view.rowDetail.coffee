@@ -362,7 +362,8 @@ module.exports = do ->
       update_view = () => @$el.find('input').eq(0).val(@model.get("value") || '')
       update_view()
 
-      @model._parent.get('label').on 'change:value', update_view
+      if @model._parent.get('label')?
+        @model._parent.get('label').on 'change:value', update_view
       @makeRequired()
   # insertInDom: (rowView)->
     #   # default behavior...
@@ -1033,9 +1034,15 @@ module.exports = do ->
 
       options = []
       options = _.map(questions, (row) ->
+        
+        try
+          labelValue = row.getValue('label')
+        catch e
+          labelValue = ''
+
         return {
           value: "${#{row.getValue('name')}}"
-          text: "#{row.getValue('label')} (${#{row.getValue('name')}})"
+          text: "#{labelValue} (${#{row.getValue('name')}})"
         }
       )
       # add placeholder message/option
