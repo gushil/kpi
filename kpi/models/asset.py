@@ -1485,7 +1485,7 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils):
                 survey_col_keys = list(survey_col.keys())
                 for survey_col_key in survey_col_keys:
                     if survey_col_key in non_dc_cols:
-                        survey_col["{}".format(media_columns[survey_col_key])] = survey_col[survey_col_key]
+                        survey_col["{}".format(media_columns[survey_col_key])] = survey_col[survey_col_key][0]
                         del survey_col[survey_col_key]
 
         survey = content.get('survey', [])
@@ -1508,7 +1508,7 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils):
             for translated_idx in range(len(translated)):
                 for non_dc_media_column in non_dc_media_columns:
                     if non_dc_media_column == translated[translated_idx]:
-                        translated[translated_idx] = "{}".format(media_columns[non_dc_media_column])
+                        translated[translated_idx] = u"{}".format(media_columns[non_dc_media_column])
 
     def _prepare_for_xml_pyxform_generation(self, content, id_string):
         if 'settings' in content:
