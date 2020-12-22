@@ -1598,8 +1598,6 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils, OCFormUti
                 if len(translated) > 0:
                     for translated_column in translated:
                         if translated_column in survey_col:
-                            # logging.warning("translated_column {}".format(translated_column))
-                            # logging.warning("translated_column value {}".format(survey_col[translated_column]))
                             translated_value = survey_col[translated_column]
                             del survey_col[translated_column]
                             for translation in translations:
@@ -1639,7 +1637,6 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils, OCFormUti
         self._strip_kuids(source_copy)
         self._settings_ensure_required_columns(source_copy)
         self._adjust_content_media_column_before_generate_xml(source_copy)
-        # logging.warning("_adjust_content_media_column_before_generate_xml {}".format(source_copy))
 
         warnings = []
         details = {}
@@ -1656,11 +1653,9 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils, OCFormUti
 
         except PyXFormError as err:
             self._prepare_for_xml_pyxform_generation(source_copy, id_string=id_string)
-            # logging.warning("_prepare_for_xml_pyxform_generation {}".format(source_copy))
+
             survey_json = xls2json.workbook_to_json(source_copy)
-            # logging.warning("workbook_to_json {}".format(survey_json))
             survey = builder.create_survey_element_from_dict(survey_json)
-            # logging.warning("create_survey_element_from_dict {}".format(survey))
             xml = survey.to_xml()
 
             details.update({
