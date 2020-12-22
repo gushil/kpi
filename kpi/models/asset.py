@@ -1527,6 +1527,7 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils, OCFormUti
             if 'id_string' not in settings.keys():
                 settings['id_string'] = id_string
 
+            settings['name'] = 'data'
             content['settings'] = [settings]
 
         if 'settings_header' not in content:
@@ -1570,14 +1571,15 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils, OCFormUti
 
         if 'survey' in content:
             survey = content['survey']
+            translated = content.get('translated', [])
 
             for survey_col_idx in range(len(survey)):
                 survey_col = survey[survey_col_idx]
 
-                if 'label' in survey_col:
+                if 'label' in survey_col and len(translated) > 0 and 'label' not in translated and type(survey_col['label']) is list:
                     survey_col['label'] = survey_col['label'][0]
 
-                if 'hint' in survey_col:
+                if 'hint' in survey_col and len(translated) > 0 and 'hint' not in translated and type(survey_col['hint']) is list:
                     survey_col['hint'] = survey_col['hint'][0]
 
                 if 'type' in survey_col:
@@ -1593,11 +1595,19 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils, OCFormUti
                             del survey_col['select_one_from_file_filename']
                         survey_col['type'] = "{0} {1}".format(survey_col['type'], select_one_from_file_filename)
 
-                media_columns = ["audio", "image", "video", "media::audio", "media::image", "media::video"]
-                for media_column in media_columns:
-                    if media_column in survey_col and type(survey_col[media_column]) is list and translations is not None:
-                        for translation in translations:
-                            survey_col['{}::{}'.format(media_column, translation)] = survey_col[media_column][translations.index(translation)]
+                if len(translated) > 0:
+                    for translated_column in translated:
+                        if translated_column in survey_col:
+                            # logging.warning("translated_column {}".format(translated_column))
+                            # logging.warning("translated_column value {}".format(survey_col[translated_column]))
+                            translated_value = survey_col[translated_column]
+                            del survey_col[translated_column]
+                            for translation in translations:
+                                column_value = translated_value[translations.index(translation)]
+                                if translations.index(translation) == 0:
+                                    survey_col['{}'.format(translated_column, translation)] = u"{}".format(column_value)
+                                else:
+                                    survey_col['{}::{}'.format(translated_column, translation)] = u"{}".format(column_value)
 
         if 'survey_header' not in content:
             content['survey_header'] = [{ col : "" for col in self.surveyCols}]
@@ -1629,6 +1639,7 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils, OCFormUti
         self._strip_kuids(source_copy)
         self._settings_ensure_required_columns(source_copy)
         self._adjust_content_media_column_before_generate_xml(source_copy)
+        # logging.warning("_adjust_content_media_column_before_generate_xml {}".format(source_copy))
 
         warnings = []
         details = {}
@@ -1645,9 +1656,11 @@ class AssetSnapshot(models.Model, XlsExportable, FormpackXLSFormUtils, OCFormUti
 
         except PyXFormError as err:
             self._prepare_for_xml_pyxform_generation(source_copy, id_string=id_string)
-
+            # logging.warning("_prepare_for_xml_pyxform_generation {}".format(source_copy))
             survey_json = xls2json.workbook_to_json(source_copy)
+            # logging.warning("workbook_to_json {}".format(survey_json))
             survey = builder.create_survey_element_from_dict(survey_json)
+            # logging.warning("create_survey_element_from_dict {}".format(survey))
             xml = survey.to_xml()
 
             details.update({
