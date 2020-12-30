@@ -523,7 +523,9 @@ class XlsExportable:
         if append:
             self._append(content, **append)
         self._survey_prepare_custom_col_value(content)
+        self._adjust_content_media_column_before_standardize(content)
         self._standardize(content)
+        self._adjust_content_media_column(content)
         self._survey_revert_custom_col_value(content)
         if not kobo_specific_types:
             self._expand_kobo_qs(content)
