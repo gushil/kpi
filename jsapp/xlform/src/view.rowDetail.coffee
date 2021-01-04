@@ -341,6 +341,11 @@ module.exports = do ->
       @fieldMaxLength = 36
       @fieldTab = "active"
       @$el.addClass("card__settings__fields--#{@fieldTab}")
+      @model.set 'value', (@model.deduplicate @model.getSurvey(), @model.getSurvey().rowItemNameMaxLength)
+      rowItemNameMaxLength = @model.getSurvey().rowItemNameMaxLength
+      model_value = @model.get 'value'
+      if (@model.get('value').length > rowItemNameMaxLength) and (model_value.charAt(model_value.length - 4) != '_')
+        @model.set 'value', @model.get('value').slice(0, rowItemNameMaxLength)
       if @model._parent.constructor.key == 'group'
         viewRowDetail.Templates.textbox @cid, @model.key, _t("Layout Group Name"), 'text', 'Enter layout group name'
       else
@@ -357,7 +362,8 @@ module.exports = do ->
       update_view = () => @$el.find('input').eq(0).val(@model.get("value") || '')
       update_view()
 
-      @model._parent.get('label').on 'change:value', update_view
+      if @model._parent.get('label')?
+        @model._parent.get('label').on 'change:value', update_view
       @makeRequired()
   # insertInDom: (rowView)->
     #   # default behavior...
@@ -1028,9 +1034,15 @@ module.exports = do ->
 
       options = []
       options = _.map(questions, (row) ->
+        
+        try
+          labelValue = row.getValue('label')
+        catch e
+          labelValue = ''
+
         return {
           value: "${#{row.getValue('name')}}"
-          text: "#{row.getValue('label')} (${#{row.getValue('name')}})"
+          text: "#{labelValue} (${#{row.getValue('name')}})"
         }
       )
       # add placeholder message/option

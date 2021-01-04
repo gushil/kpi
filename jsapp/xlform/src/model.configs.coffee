@@ -119,37 +119,37 @@ module.exports = do ->
         value: "Record your current location"
     image:
       label:
-        value: "Upload an image file"
+        value: ""
     video:
       label:
-        value: "Upload a video file"
+        value: ""
     audio:
       label:
-        value: "Upload an audio file"
+        value: ""
     file:
       label:
-        value: "Upload a file"
+        value: ""
     note:
       label:
-        value: "This note can be read out loud"
+        value: ""
     integer:
       label:
-        value: "Enter a number"
+        value: ""
     barcode:
       label:
         value: "Use the camera to scan a barcode"
     decimal:
       label:
-        value: "Enter a number"
+        value: ""
     date:
       label:
-        value: "Enter a date"
+        value: ""
     range:
       label:
         value: "Enter a number within a specified range"
     calculate:
       label:
-        value: "calculation"
+        value: ""
     datetime:
       label:
         value: "Enter a date and time"

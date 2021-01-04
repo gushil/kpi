@@ -62,7 +62,7 @@ module.exports = do ->
             <div class="noop card__indicator__icon"><i class="fa fa-fw card__header-icon"></i></div>
           </div>
           <div class="card__text">
-            <input type="text" placeholder="#{_t("Item label is required")}" class="card__header-title js-cancel-select-row js-cancel-sort">
+            <input type="text" placeholder="#{_t("Enter question label (required for item to be visible)")}" class="card__header-title js-cancel-select-row js-cancel-sort">
             <input type="text" placeholder="#{_t("Enter question hint (optional)")}" class="card__header-hint js-cancel-select-row js-cancel-sort">
           </div>
           <div class="card__buttons">

@@ -105,8 +105,6 @@ module.exports = do ->
       # if question name not provided by user, use default one for type or general one
       if @question_name
         questionLabelValue = @question_name.replace(/\t/g, ' ')
-      else if rowType is 'calculate'
-        questionLabelValue = $configs.defaultsForType[rowType].label.value
       else
         questionLabelValue = ''
 
@@ -117,6 +115,9 @@ module.exports = do ->
 
       if questionLabelValue != ''
         rowDetails.name = questionLabelValue.toLowerCase().replace(/ /g,"_").replace(/\W/g, '')
+      else
+        if rowType is 'calculate'
+          rowDetails.name = 'calculation'
 
       options = {}
       if (rowBefore = @options.spawnedFromView?.model)
