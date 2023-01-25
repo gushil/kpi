@@ -16,6 +16,9 @@ fi
 echo 'Synchronizing database.'
 # python manage.py syncdb --noinput
 
+echo 'Running fake migrations.'
+python manage.py migrate auth 0007 --fake --noinput
+python manage.py migrate auth 0008 --fake --noinput
 echo 'Running migrations.'
 python manage.py migrate --noinput
 
