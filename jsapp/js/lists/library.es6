@@ -21,6 +21,7 @@ import {
   getLibraryFilterCacheName
 } from '../utils';
 
+var libraryManagementSupportUrl = 'https://docs.openclinica.com/oc4/help-index/form-designer/library-management/';
 class LibrarySearchableList extends React.Component {
   constructor(props) {
     super(props);
@@ -128,6 +129,14 @@ class LibrarySearchableList extends React.Component {
             'display-all-tags': this.state.showAllTags,
           }}
         >
+          <bem.Library__actionIcon
+              m='libraryHelp'
+              href={libraryManagementSupportUrl}
+              target='_blank'
+              data-tip={t('Learn more about Library Management')}
+              >
+            <i className='k-icon-help'/>
+          </bem.Library__actionIcon>
           <bem.Library__actionIcon
               m='tagsToggle'
               onClick={this.clickShowAllTagsToggle}

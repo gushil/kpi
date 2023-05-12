@@ -36,7 +36,7 @@ import {dataInterface} from '../dataInterface';
 const ErrorMessage = bem.create('error-message');
 const ErrorMessage__strong = bem.create('error-message__header', '<strong>');
 
-var formDesignerSupportUrl = 'https://docs.openclinica.com/oc4/design-study/form-designer';
+var formDesignerSupportUrl = 'https://docs.openclinica.com/oc4/help-index/form-designer/';
 
 const UNSAVED_CHANGES_WARNING = t('You have unsaved changes. Leave form without saving?');
 
@@ -889,6 +889,17 @@ export default assign({
 
           <bem.FormBuilderHeader__cell m='spacer'/>
 
+          <bem.FormBuilderHeader__cell>
+            <a
+              class="formdesigner-support-url"
+              href={formDesignerSupportUrl}
+              target='_blank'
+              data-tip={t('Learn more about Form Designer')}
+            >
+              <i className='k-icon k-icon-help'/>
+            </a>
+          </bem.FormBuilderHeader__cell>
+
           <bem.FormBuilderHeader__cell m='verticalRule'/>
 
           <bem.FormBuilderHeader__cell>
@@ -944,13 +955,6 @@ export default assign({
             <bem.FormBuilderAside__row>
               <bem.FormBuilderAside__header>
                 {t('Form style')}
-                <a
-                  href={formDesignerSupportUrl}
-                  target='_blank'
-                  data-tip={t('Learn more about Form Designer')}
-                >
-                  <i className='k-icon k-icon-help'/>
-                </a>
               </bem.FormBuilderAside__header>
 
               <label

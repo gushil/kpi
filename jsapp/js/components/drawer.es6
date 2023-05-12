@@ -155,16 +155,7 @@ class Drawer extends Reflux.Component {
 
         <bem.KDrawer__secondaryIcons>
           { stores.session.currentAccount &&
-            (this.isLibrary() 
-            ? 
-            <a href='https://docs.openclinica.com/oc4/design-study/content-library'
-              className='k-drawer__link'
-              target='_blank'
-              data-tip={t('Learn more about content library management')}
-            >
-              <i className='k-icon k-icon-help' />
-            </a>
-            :
+            (!this.isLibrary() && 
             <a href='https://docs.openclinica.com/oc4/design-study/form-designer'
               className='k-drawer__link'
               target='_blank'

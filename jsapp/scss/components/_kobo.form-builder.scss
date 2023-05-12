@@ -214,6 +214,19 @@ $t-form-builder-aside-open: 200ms;
       margin-left: 5px;
     }
 
+    .formdesigner-support-url {
+      color: #8a8ea3;
+
+      &:hover {
+        color: $black;
+      }
+      
+      i {
+        font-size: 32px;
+        vertical-align: middle;
+      }
+    }
+
     // second row
     &.formBuilder-header__cell--toolsButtons {
       margin: 0 10px;
