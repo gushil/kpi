@@ -399,6 +399,37 @@ export default assign({
       this.app.survey.settings.set('form_id', this.state.settings__form_id);
     }
 
+    const consentRows = this.app.survey.rows.filter(function(row) { return row.getValue('bind::oc:external') === 'signature' });
+    if (consentRows.length > 0) {
+      if (consentRows.length > 1) {
+        var errorMsg = `${t('Consent forms can have only one signature item.')}`;
+        alertify.defaults.theme.ok = 'ajs-cancel';
+        let dialog = alertify.dialog('alert');
+        let opts = {
+          title: t('Error saving form'),
+          message: errorMsg,
+          label: t('Dismiss'),
+        };
+        dialog.set(opts).show();
+        return;
+      } else {
+        const consentRow = consentRows[0];
+        const consentRowChoiceValue = consentRow.getConsentItemChoiceValue()
+        if (consentRowChoiceValue !== '1') {
+          errorMsg = `${t('Consent items must have a value of "1"')}`;
+          alertify.defaults.theme.ok = 'ajs-cancel';
+          let dialog = alertify.dialog('alert');
+          let opts = {
+            title: t('Error saving form'),
+            message: errorMsg,
+            label: t('Dismiss'),
+          };
+          dialog.set(opts).show();
+          return;
+        }
+      }
+    }
+
     let surveyJSON = surveyToValidJson(this.app.survey)
     if (this.state.asset) {
       surveyJSON = unnullifyTranslations(surveyJSON, this.state.asset.content);

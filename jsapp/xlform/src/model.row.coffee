@@ -49,6 +49,34 @@ module.exports = do ->
     isInGroup: ->
       @_parent?._parent?.constructor.kls is "Group"
 
+    getConsentItemChoices: () ->
+      listChoices = []
+      modelTypeValueArr = @getValue('type').split(' ')
+      modelType = modelTypeValueArr[0]
+      if modelTypeValueArr.length is 2
+        listName = modelTypeValueArr[1]
+        listChoices = @getSurvey().choices?.find((choice) -> choice.getValue('name') is listName)
+        listChoices
+        
+    isConsentItem: () ->
+      isConsent = false
+
+      listChoices = @getConsentItemChoices()
+      listChoicesNames = listChoices?.options?._parent?.getNames()
+      isConsent = listChoices?.options?.length is 1 and listChoicesNames?[0] is '1'
+        
+      isConsent
+
+    getConsentItemChoiceValue: () ->
+      choiceValue = null
+
+      listChoices = @getConsentItemChoices()
+      if listChoices?.options?.length > 0
+        listChoicesNames = listChoices?.options?._parent?.getNames()
+        choiceValue = listChoicesNames?[0]
+
+      choiceValue
+
     detach: (opts)->
       if @_parent
         @_parent.remove @, opts
