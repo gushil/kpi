@@ -2,6 +2,7 @@
 # 😬
 import copy
 import traceback
+import uuid
 
 from django.db import models
 from django.conf import settings as django_settings
@@ -361,19 +362,25 @@ class AssetSnapshot(
         except Exception as err:
             err_message = str(err)
             err_traceback = traceback.format_exc()
-            logging.error('Failed to generate xform for asset\n' + err_traceback, extra={
-                'src': source,
-                'id_string': id_string,
-                'uid': self.uid,
-                '_msg': err_message,
-                'warnings': warnings,
-            })
+            error_id = str(uuid.uuid4())
+            logging.error(
+                'Failed to generate xform for asset (error_id=%s)\n%s',
+                error_id,
+                err_traceback,
+                extra={
+                    'src': source,
+                    'id_string': id_string,
+                    'uid': self.uid,
+                    '_msg': err_message,
+                    'warnings': warnings,
+                },
+            )
             xml = ''
             details.update({
                 'status': 'failure',
                 'error_type': type(err).__name__,
                 'error': err_message,
-                'traceback': err_traceback,
+                'error_id': error_id,
                 'warnings': warnings,
             })
 
