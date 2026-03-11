@@ -1,6 +1,7 @@
 # coding: utf-8
 # 😬
 import copy
+import traceback
 
 from django.db import models
 from django.conf import settings as django_settings
@@ -148,7 +149,7 @@ class AssetSnapshot(
                 self.owner = self.asset.owner
         _note = self.details.pop('note', None)
         _source = copy.deepcopy(self.source)
-        
+
         self._adjust_content_media_column_before_standardize(_source)
         self._standardize(_source)
         self._adjust_content_media_column(_source)
@@ -188,7 +189,7 @@ class AssetSnapshot(
 
         self.source = _source
         return super().save(*args, **kwargs)
-    
+
     def _adjust_content_media_column_before_generate_xml(self, content):
 
         media_columns = {"audio": "media::audio", "image": "media::image", "video": 'media::video'}
@@ -253,15 +254,6 @@ class AssetSnapshot(
             if all(x is None for x in translations):
                 del content['translations']
 
-        if 'choices' in content:
-            choices = content['choices']
-
-            for choice_col_idx in range(len(choices)):
-                choice_col = choices[choice_col_idx]
-
-                if 'label' in choice_col:
-                    choice_col['label'] = choice_col['label'][0]
-
         if 'choices_header' not in content:
             content['choices_header'] = [
                 {
@@ -272,7 +264,6 @@ class AssetSnapshot(
                 }
             ]
 
-
         if 'survey' in content:
             survey = content['survey']
             translated = content.get('translated', [])
@@ -280,14 +271,8 @@ class AssetSnapshot(
             for survey_col_idx in range(len(survey)):
                 survey_col = survey[survey_col_idx]
 
-                if 'label' in survey_col and len(translated) > 0 and 'label' not in translated and type(survey_col['label']) is list:
-                    survey_col['label'] = survey_col['label'][0]
-
-                if 'hint' in survey_col and len(translated) > 0 and 'hint' not in translated and type(survey_col['hint']) is list:
-                    survey_col['hint'] = survey_col['hint'][0]
-
                 if 'type' in survey_col:
-                    if 'select_one' == survey_col['type'] and 'select_from_list_name' in survey_col.keys():
+                    if ('select_one' == survey_col['type'] or 'select_multiple' == survey_col['type']) and 'select_from_list_name' in survey_col.keys():
                         survey_col['type'] = "{0} {1}".format(survey_col['type'], survey_col['select_from_list_name'])
                         del survey_col['select_from_list_name']
                     elif 'select_one_from_file' == survey_col['type']:
@@ -313,6 +298,13 @@ class AssetSnapshot(
 
         if 'survey_header' not in content:
             content['survey_header'] = [{ col : "" for col in self.surveyCols}]
+
+        # Safety net: ensure no list values remain in any row before pyxform processes them
+        for section in ('survey', 'choices'):
+            for row in content.get(section, []):
+                for key in list(row.keys()):
+                    if isinstance(row[key], list):
+                        row[key] = row[key][0] if row[key] else ''
 
     def generate_xml_from_source(self,
                                  source,
@@ -358,31 +350,19 @@ class AssetSnapshot(
         warnings = []
         details = {}
         try:
-            xml = FormPack({'content': source_copy},
-                           root_node_name=root_node_name,
-                           id_string=id_string,
-                           title=form_title)[0].to_xml(warnings=warnings)
-
-            details.update({
-                'status': 'success',
-                'warnings': warnings,
-            })
-
-        except PyXFormError as err:
             self._prepare_for_xml_pyxform_generation(source_copy, id_string=id_string)
 
             survey_json = xls2json.workbook_to_json(source_copy)
             survey = builder.create_survey_element_from_dict(survey_json)
-            xml = survey.to_xml()
+            xml = survey.to_xml(validate=False, warnings=warnings)
 
             details.update({
                 u'status': u'success',
                 u'warnings': warnings,
             })
-
         except Exception as err:
             err_message = str(err)
-            logging.error('Failed to generate xform for asset', extra={
+            logging.error('Failed to generate xform for asset\n' + traceback.format_exc(), extra={
                 'src': source,
                 'id_string': id_string,
                 'uid': self.uid,
@@ -394,6 +374,7 @@ class AssetSnapshot(
                 'status': 'failure',
                 'error_type': type(err).__name__,
                 'error': err_message,
+                'traceback': traceback.format_exc(),
                 'warnings': warnings,
             })
 
@@ -420,7 +401,7 @@ class AssetSnapshot(
                     soup_find_instance = soup.find_all('instance')
                     instance_count = len(soup_find_instance)
                     soup_find_instance[instance_count - 1].insert_after(oc_clinicaldata_soup.instance)
-            
+
             soup_body = soup.find('h:body')
             if 'class' in soup_body.attrs:
                 if 'no-text-transform' not in soup_body['class']:
