@@ -131,8 +131,6 @@ class AssetSnapshotViewSet(OpenRosaViewSetMixin, NoUpdateModelViewSet):
             except AssetSnapshot.DoesNotExist:
                 raise e
 
-            user = get_database_user(self.request.user)
-
             if self.request.method == 'GET':
                 return snapshot
             else:
