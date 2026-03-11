@@ -360,7 +360,8 @@ class AssetSnapshot(
             })
         except Exception as err:
             err_message = str(err)
-            logging.error('Failed to generate xform for asset\n' + traceback.format_exc(), extra={
+            err_traceback = traceback.format_exc()
+            logging.error('Failed to generate xform for asset\n' + err_traceback, extra={
                 'src': source,
                 'id_string': id_string,
                 'uid': self.uid,
@@ -372,7 +373,7 @@ class AssetSnapshot(
                 'status': 'failure',
                 'error_type': type(err).__name__,
                 'error': err_message,
-                'traceback': traceback.format_exc(),
+                'traceback': err_traceback,
                 'warnings': warnings,
             })
 
