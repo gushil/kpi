@@ -136,9 +136,7 @@ class AssetSnapshotSerializer(serializers.HyperlinkedModelSerializer):
             })
 
         if asset:
-            if not user.has_perm(PERM_VIEW_ASSET, asset):
-                # The client is not allowed to snapshot this asset
-                raise exceptions.PermissionDenied
+            self.check_subdomain_permission(asset)
             if not source:
                 attrs.pop('source', None)
         elif source:

@@ -86,11 +86,11 @@ class AssetSnapshotViewSet(OpenRosaViewSetMixin, NoUpdateModelViewSet):
                 owned_snapshots = queryset.filter(owner=user)
             return owned_snapshots | RelatedAssetPermissionsFilter(
                 ).filter_queryset(self.request, queryset, view=self)
-        
+
     def retrieve(self, request, *args, **kwargs):
         if request.method == 'HEAD':
             return Response(None, headers={
-                X_OPENROSA_ACCEPT_CONTENT_LENGTH : 
+                X_OPENROSA_ACCEPT_CONTENT_LENGTH :
                     settings.X_OPENROSA_ACCEPT_CONTENT_LENGTH_DEFAULT
             })
 
@@ -133,12 +133,7 @@ class AssetSnapshotViewSet(OpenRosaViewSetMixin, NoUpdateModelViewSet):
 
             user = get_database_user(self.request.user)
 
-            if (
-                self.request.method == 'GET'
-                and user_has_project_view_asset_perm(
-                    snapshot.asset, user, PERM_VIEW_ASSET
-                )
-            ):
+            if self.request.method == 'GET':
                 return snapshot
             else:
                 # Access to user is still denied, raise 404
