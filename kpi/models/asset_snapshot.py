@@ -7,10 +7,8 @@ from django.db import models
 from django.conf import settings as django_settings
 from rest_framework.reverse import reverse
 
-from formpack import FormPack
 from bs4 import BeautifulSoup
 from pyxform import builder, xls2json
-from pyxform.errors import PyXFormError
 
 from kpi.fields import KpiUidField
 from kpi.interfaces.open_rosa import OpenRosaFormListInterface
