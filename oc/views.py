@@ -208,7 +208,7 @@ class OCAuthenticationRequestView(View):
                     "Unable to initiate authentication for request from %s.",
                     request_host,
                 )
-                return render(request, 'error.html', status=503)
+                return HttpResponseRedirect(reverse('error'))
 
             state = get_random_string(self.get_settings("OIDC_STATE_SIZE", 32))
             redirect_field_name = self.get_settings("OIDC_REDIRECT_FIELD_NAME", "next")
@@ -244,7 +244,7 @@ class OCAuthenticationRequestView(View):
                 "Unexpected error during OIDC authentication request for %s.",
                 request_host,
             )
-            return render(request, 'error.html', status=500)
+            return HttpResponseRedirect(reverse('error'))
 
     def get_extra_params(self, request):
         return self.get_settings("OIDC_AUTH_REQUEST_EXTRA_PARAMS", {})
@@ -285,6 +285,16 @@ class OCLogoutView(View):
         if self.get_settings("ALLOW_LOGOUT_GET_METHOD", False):
             return self.post(request)
         return HttpResponseNotAllowed(["POST"])
+
+
+class OCErrorView(View):
+    """Generic error page"""
+
+    http_method_names = ["get"]
+
+    def get(self, request):
+        return render(request, 'error.html')
+
 
 class OCAppInfoView(View):
 

@@ -28,7 +28,8 @@ from oc.views import (
     OCAuthenticationCallbackView,
     OCAuthenticationRequestView,
     OCLogoutView,
-    OCAppInfoView
+    OCAppInfoView,
+    OCErrorView,
 )
 
 
@@ -54,6 +55,7 @@ urlpatterns = [
     path('openid/callback/', OCAuthenticationCallbackView.as_view(), name="oidc_authentication_callback"),
     path('openid/authenticate/', OCAuthenticationRequestView.as_view(), name="oidc_authentication_init"),
     path('openid/logout/', OCLogoutView.as_view(), name="oidc_logout"),
+    path('error/', OCErrorView.as_view(), name="error"),
     re_path(r'^openid/', include('mozilla_django_oidc.urls')),
     re_path(
         r'^authorized_application/authenticate_user/$',
