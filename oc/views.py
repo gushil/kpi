@@ -9,7 +9,7 @@ from django.core.exceptions import SuspiciousOperation
 from django.http import HttpResponseRedirect, HttpResponseNotAllowed, JsonResponse, HttpResponseNotFound
 from django.urls import reverse
 from django.utils.crypto import get_random_string
-from django.shortcuts import resolve_url
+from django.shortcuts import render, resolve_url
 
 try:
     from django.utils.http import url_has_allowed_host_and_scheme
@@ -28,6 +28,7 @@ from mozilla_django_oidc.utils import (
 )
 
 from oc.backend import get_client_secret, get_realm_name
+from kpi.utils.log import logging as kpi_logging
 
 
 class OCAuthenticationCallbackView(View):
@@ -196,38 +197,53 @@ class OCAuthenticationRequestView(View):
     def get(self, request):
         """OIDC client authentication initialization HTTP endpoint"""
 
-        if self.OIDC_OP_AUTH_ENDPOINT is None:
-            self.configure(request)
+        try:
+            if self.OIDC_OP_AUTH_ENDPOINT is None:
+                self.configure(request)
 
-        state = get_random_string(self.get_settings("OIDC_STATE_SIZE", 32))
-        redirect_field_name = self.get_settings("OIDC_REDIRECT_FIELD_NAME", "next")
-        reverse_url = self.get_settings(
-            "OIDC_AUTHENTICATION_CALLBACK_URL", "oidc_authentication_callback"
-        )
+            if self.OIDC_OP_AUTH_ENDPOINT is None:
+                kpi_logging.warning(
+                    "OIDC authentication endpoint is not configured. "
+                    "Unable to initiate authentication for request from %s.",
+                    request.get_host(),
+                )
+                return render(request, 'error.html', status=503)
 
-        params = {
-            "response_type": "code",
-            "scope": self.get_settings("OIDC_RP_SCOPES", "openid email"),
-            "client_id": self.OIDC_RP_CLIENT_ID,
-            "redirect_uri": absolutify(request, reverse(reverse_url)),
-            "state": state,
-        }
+            state = get_random_string(self.get_settings("OIDC_STATE_SIZE", 32))
+            redirect_field_name = self.get_settings("OIDC_REDIRECT_FIELD_NAME", "next")
+            reverse_url = self.get_settings(
+                "OIDC_AUTHENTICATION_CALLBACK_URL", "oidc_authentication_callback"
+            )
 
-        params.update(self.get_extra_params(request))
+            params = {
+                "response_type": "code",
+                "scope": self.get_settings("OIDC_RP_SCOPES", "openid email"),
+                "client_id": self.OIDC_RP_CLIENT_ID,
+                "redirect_uri": absolutify(request, reverse(reverse_url)),
+                "state": state,
+            }
 
-        if self.get_settings("OIDC_USE_NONCE", True):
-            nonce = get_random_string(self.get_settings("OIDC_NONCE_SIZE", 32))
-            params.update({"nonce": nonce})
+            params.update(self.get_extra_params(request))
 
-        add_state_and_nonce_to_session(request, state, params)
+            if self.get_settings("OIDC_USE_NONCE", True):
+                nonce = get_random_string(self.get_settings("OIDC_NONCE_SIZE", 32))
+                params.update({"nonce": nonce})
 
-        request.session["oidc_login_next"] = get_next_url(request, redirect_field_name)
+            add_state_and_nonce_to_session(request, state, params)
 
-        query = urlencode(params)
-        redirect_url = "{url}?{query}".format(
-            url=self.OIDC_OP_AUTH_ENDPOINT, query=query
-        )
-        return HttpResponseRedirect(redirect_url)
+            request.session["oidc_login_next"] = get_next_url(request, redirect_field_name)
+
+            query = urlencode(params)
+            redirect_url = "{url}?{query}".format(
+                url=self.OIDC_OP_AUTH_ENDPOINT, query=query
+            )
+            return HttpResponseRedirect(redirect_url)
+        except Exception:
+            kpi_logging.exception(
+                "Unexpected error during OIDC authentication request for %s.",
+                request.get_host(),
+            )
+            return render(request, 'error.html', status=500)
 
     def get_extra_params(self, request):
         return self.get_settings("OIDC_AUTH_REQUEST_EXTRA_PARAMS", {})
