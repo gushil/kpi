@@ -197,6 +197,7 @@ class OCAuthenticationRequestView(View):
     def get(self, request):
         """OIDC client authentication initialization HTTP endpoint"""
 
+        request_host = request.META.get('HTTP_HOST', 'unknown')
         try:
             if self.OIDC_OP_AUTH_ENDPOINT is None:
                 self.configure(request)
@@ -205,7 +206,7 @@ class OCAuthenticationRequestView(View):
                 kpi_logging.warning(
                     "OIDC authentication endpoint is not configured. "
                     "Unable to initiate authentication for request from %s.",
-                    request.get_host(),
+                    request_host,
                 )
                 return render(request, 'error.html', status=503)
 
@@ -241,7 +242,7 @@ class OCAuthenticationRequestView(View):
         except Exception:
             kpi_logging.exception(
                 "Unexpected error during OIDC authentication request for %s.",
-                request.get_host(),
+                request_host,
             )
             return render(request, 'error.html', status=500)
 
