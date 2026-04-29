@@ -32,10 +32,6 @@ else
     fi
 fi
 
-# Wait for databases to be up & running before going further
-/bin/bash "${INIT_PATH}/wait_for_mongo.bash"
-/bin/bash "${INIT_PATH}/wait_for_postgres.bash"
-
 echo 'Running fake migrations.'
 gosu "${UWSGI_USER}" python manage.py migrate bossoidc2 0002_auto_20201110_2129 --fake --noinput
 gosu "${UWSGI_USER}" python manage.py migrate bossoidc2 0002_keycloak_subdomain --fake --noinput
