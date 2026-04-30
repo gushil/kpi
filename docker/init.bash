@@ -13,6 +13,31 @@ if [[ -z $DATABASE_URL ]]; then
     exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Readiness helpers — poll with exponential backoff (max 30 s between retries,
+# up to 60 attempts ≈ ~10 minutes worst-case) before running migrations so
+# that transient DB unavailability at container start doesn't crash the init
+# process under set -e.
+# ---------------------------------------------------------------------------
+
+wait_for_postgres() {
+    local host port retries=60 wait=2
+    host=$(python3 -c "import os,urllib.parse; u=urllib.parse.urlparse(os.environ['DATABASE_URL']); print(u.hostname)")
+    port=$(python3 -c "import os,urllib.parse; u=urllib.parse.urlparse(os.environ['DATABASE_URL']); print(u.port or 5432)")
+    echo "Waiting for PostgreSQL at ${host}:${port}…"
+    until pg_isready -h "${host}" -p "${port}" -q; do
+        retries=$(( retries - 1 ))
+        if [[ ${retries} -le 0 ]]; then
+            echo "PostgreSQL at ${host}:${port} did not become ready in time. Aborting."
+            exit 1
+        fi
+        echo "PostgreSQL not ready — retrying in ${wait}s… (${retries} attempts left)"
+        sleep "${wait}"
+        wait=$(( wait < 30 ? wait * 2 : 30 ))
+    done
+    echo "PostgreSQL is ready."
+}
+
 # Handle Python dependencies BEFORE attempting any `manage.py` commands
 KPI_WEB_SERVER="${KPI_WEB_SERVER:-uWSGI}"
 if [[ "${KPI_WEB_SERVER,,}" == 'uwsgi' ]]; then
@@ -31,6 +56,8 @@ else
         cp "dependencies/pip/dev_requirements.txt" "${TMP_DIR}/pip_dependencies.txt"
     fi
 fi
+
+wait_for_postgres
 
 echo 'Running migrations...'
 gosu "${UWSGI_USER}" python manage.py migrate --noinput
