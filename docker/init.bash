@@ -15,8 +15,12 @@ run_manage() {
 # Helper to check whether database table exist
 check_table() {
     local table="$1"
-    run_manage shell -c \
-        "from django.db import connection; exit(0 if '$table' in connection.introspection.table_names() else 1)"
+    local result
+    result=$(run_manage dbshell 2>/dev/null <<EOF
+SELECT COUNT(*) FROM information_schema.tables WHERE table_name='${table}';
+EOF
+)
+    echo "${result}" | grep -qE '^ *1$'
 }
 
 echo 'KPI initializing…'
@@ -52,6 +56,19 @@ fi
 if check_table "bossoidc_keycloak"; then
     echo "Table bossoidc_keycloak exists — running fake migration for bossoidc2…"
     run_manage migrate bossoidc2 0003_keycloak_usertype --fake --noinput
+fi
+
+# Fix schema drift: oauth2_provider 0005 may have been recorded as applied without
+# actually creating the `created`/`updated` columns on oauth2_provider_application.
+# Adding them here is idempotent (IF NOT EXISTS) and unblocks 0006.
+echo 'Repairing oauth2_provider schema drift (if any)...'
+# Before running the ALTER TABLE, check the table exists first
+if check_table "oauth2_provider_application"; then
+    run_manage dbshell <<'EOF'
+ALTER TABLE oauth2_provider_application
+  ADD COLUMN IF NOT EXISTS created timestamp with time zone NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated timestamp with time zone NOT NULL DEFAULT now();
+EOF
 fi
 
 echo 'Running migrations...'
@@ -95,6 +112,8 @@ if [[ ! -d "${KPI_SRC_DIR}/locale" ]] || [[ -z "$(ls -A "${KPI_SRC_DIR}/locale")
     run_manage compilemessages
 fi
 
+echo 'KPI initialization completed.'
+
 if [ -z "${KUBERNETES_SERVICE_HOST}" ]; then
     rm -f /etc/profile.d/pydev_debugger.bash.sh
     if [[ -d /srv/pydev_orig && -n "${KPI_PATH_FROM_ECLIPSE_TO_PYTHON_PAIRS}" ]]; then
@@ -117,5 +136,3 @@ if [ -z "${KUBERNETES_SERVICE_HOST}" ]; then
 
     exec /usr/bin/runsvdir "${SERVICES_DIR}"
 fi
-
-echo 'KPI initialization completed.'
