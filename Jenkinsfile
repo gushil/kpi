@@ -10,7 +10,7 @@ pipeline {
         SLACK_CHANNEL = "#jenkins" // Centralized Slack notification channel
         SERVICE_NAME = "Form Designer"
        }
-       
+
     stages {
         stage('Checkout') {
             steps {
