@@ -12,7 +12,7 @@ run_manage() {
     fi
 }
 
-# Helper to check whether database table exist
+# Helper to check whether a database table exists
 check_table() {
     local table="$1"
     local result
