@@ -3,6 +3,22 @@ set -e
 
 source /etc/profile
 
+# Helper to run commands as UWSGI_USER if defined, otherwise run directly
+run_manage() {
+    if [[ -n "${UWSGI_USER}" ]]; then
+        gosu "${UWSGI_USER}" python manage.py "$@"
+    else
+        python manage.py "$@"
+    fi
+}
+
+# Helper to check whether database table exist
+check_table() {
+    local table="$1"
+    run_manage shell -c \
+        "from django.db import connection; exit(0 if '$table' in connection.introspection.table_names() else 1)"
+}
+
 echo 'KPI initializing…'
 
 cd "${KPI_SRC_DIR}"
@@ -32,11 +48,17 @@ else
     fi
 fi
 
+# Add a fake migration entry per app whose table already exists
+if check_table "bossoidc_keycloak"; then
+    echo "Table bossoidc_keycloak exists — running fake migration for bossoidc2…"
+    run_manage migrate bossoidc2 0003_keycloak_usertype --fake --noinput
+fi
+
 echo 'Running migrations...'
-gosu "${UWSGI_USER}" python manage.py migrate --noinput
+run_manage migrate --noinput
 
 echo 'Creating superuser…'
-gosu "${UWSGI_USER}" python manage.py create_kobo_superuser
+run_manage create_kobo_superuser
 
 if [[ ! -d "${KPI_SRC_DIR}/staticfiles" ]] || ! python "${KPI_SRC_DIR}/docker/check_kpi_prefix_outdated.py"; then
     if [[ "${FRONTEND_DEV_MODE}" == "host" ]]; then
@@ -59,7 +81,7 @@ if [[ ! -d "${KPI_SRC_DIR}/staticfiles" ]] || ! python "${KPI_SRC_DIR}/docker/ch
         npm run build
 
         echo "Building static files from live code…"
-        python manage.py collectstatic --noinput
+        run_manage collectstatic --noinput
     fi
 fi
 
@@ -70,7 +92,7 @@ if [[ ! -d "${KPI_SRC_DIR}/locale" ]] || [[ -z "$(ls -A "${KPI_SRC_DIR}/locale")
     echo "Fetching translations…"
     git submodule init
     git submodule update --remote
-    python manage.py compilemessages
+    run_manage compilemessages
 fi
 
 if [ -z "${KUBERNETES_SERVICE_HOST}" ]; then
@@ -83,13 +105,15 @@ if [ -z "${KUBERNETES_SERVICE_HOST}" ]; then
     echo 'Cleaning up Celery PIDs…'
     rm -f /tmp/celery*.pid
 
-    echo 'Restore permissions on Celery logs folder'
-    chown -R "${UWSGI_USER}:${UWSGI_GROUP}" "${KPI_LOGS_DIR}"
+    if [[ -n "${UWSGI_USER}" && -n "${UWSGI_GROUP}" ]]; then
+        echo 'Restore permissions on Celery logs folder'
+        chown -R "${UWSGI_USER}:${UWSGI_GROUP}" "${KPI_LOGS_DIR}"  
 
-    # This can take a while when starting a container with lots of media files.
-    # Maybe we should add a disclaimer as we do in KoBoCAT to let the users
-    # do it themselves
-    chown -R "${UWSGI_USER}:${UWSGI_GROUP}" "${KPI_MEDIA_DIR}"
+        # This can take a while when starting a container with lots of media files.
+        # Maybe we should add a disclaimer as we do in KoBoCAT to let the users
+        # do it themselves
+        chown -R "${UWSGI_USER}:${UWSGI_GROUP}" "${KPI_MEDIA_DIR}"
+    fi
 
     exec /usr/bin/runsvdir "${SERVICES_DIR}"
 fi
