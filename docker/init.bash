@@ -3,6 +3,10 @@ set -e
 
 source /etc/profile
 
+# Set KPI_PREFIX to / if not explicitly set
+# This env variable will be used by check_kpi_prefix_outdated.py
+export KPI_PREFIX="${KPI_PREFIX:-/}"
+
 # Helper to run commands as UWSGI_USER if defined, otherwise run directly
 run_manage() {
     if [[ -n "${UWSGI_USER}" ]]; then
