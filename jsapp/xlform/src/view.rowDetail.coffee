@@ -13,6 +13,87 @@ $viewTemplates = require './view.templates'
 module.exports = do ->
   viewRowDetail = {}
 
+  parseAppearanceValue = (value, questionType) ->
+    cleaned = ((value or '').trim().replace(/\s*\bw\d+\b\s*/g, ' ')).trim()
+
+    if cleaned is 'likert'
+      if questionType is 'select_one'
+        return { card: 'likert-scale', columnCount: null, customText: null }
+      else
+        return { card: 'custom', columnCount: null, customText: 'likert' }
+    if cleaned is 'autocomplete'
+      return { card: 'search', columnCount: null, customText: null }
+    if cleaned is 'image-map'
+      return { card: 'hotspot-image', columnCount: null, customText: null }
+    if cleaned is 'columns-pack no-buttons'
+      return { card: 'image-grid-labels-only', columnCount: null, customText: null }
+    if cleaned is 'columns-pack'
+      return { card: 'image-grid', columnCount: null, customText: null }
+    m = cleaned.match(/^columns-(\d+) no-buttons$/)
+    if m
+      n = parseInt(m[1], 10)
+      if 2 <= n <= 10
+        return { card: 'columns-labels-only', columnCount: n, customText: null }
+      else
+        return { card: 'custom', columnCount: null, customText: cleaned }
+    if cleaned is 'columns no-buttons'
+      return { card: 'columns-labels-only', columnCount: null, customText: null }
+    m = cleaned.match(/^columns-(\d+)$/)
+    if m
+      n = parseInt(m[1], 10)
+      if 2 <= n <= 10
+        return { card: 'columns-buttons', columnCount: n, customText: null }
+      else
+        return { card: 'custom', columnCount: null, customText: cleaned }
+    if cleaned is 'columns'
+      return { card: 'columns-buttons', columnCount: null, customText: null }
+    if cleaned is 'minimal'
+      return { card: 'dropdown', columnCount: null, customText: null }
+    if cleaned is ''
+      defaultCard = if questionType is 'select_multiple' then 'checkbox-list' else 'radio-list'
+      return { card: defaultCard, columnCount: null, customText: null }
+    if cleaned is 'other'
+      return { card: 'custom', columnCount: null, customText: '' }
+    { card: 'custom', columnCount: null, customText: cleaned }
+
+  buildModelValue = (card, columnCount, customText) ->
+    switch card
+      when 'radio-list', 'checkbox-list' then ''
+      when 'dropdown'      then 'minimal'
+      when 'columns-buttons'
+        if columnCount? then "columns-#{columnCount}" else 'columns'
+      when 'columns-labels-only'
+        if columnCount? then "columns-#{columnCount} no-buttons" else 'columns no-buttons'
+      when 'image-grid'             then 'columns-pack'
+      when 'image-grid-labels-only' then 'columns-pack no-buttons'
+      when 'likert-scale'           then 'likert'
+      when 'search'                 then 'autocomplete'
+      when 'hotspot-image'          then 'image-map'
+      when 'custom'
+        text = ((customText or '').trim())
+        if text then text else 'other'
+      else ''
+
+  buildPillText = (card, columnCount, customText) ->
+    switch card
+      when 'radio-list'             then t('Radio list')
+      when 'checkbox-list'          then t('Checkbox list')
+      when 'dropdown'               then t('Dropdown')
+      when 'image-grid'             then t('Image grid')
+      when 'image-grid-labels-only' then t('Image grid (labels only)')
+      when 'likert-scale'           then t('Likert scale')
+      when 'search'                 then t('Search')
+      when 'hotspot-image'          then t('Hotspot image')
+      when 'columns-buttons'
+        suffix = if columnCount? then "#{columnCount} cols" else t('Automatic')
+        "#{t('Columns (buttons)')} · #{suffix}"
+      when 'columns-labels-only'
+        suffix = if columnCount? then "#{columnCount} cols" else t('Automatic')
+        "#{t('Columns (labels only)')} · #{suffix}"
+      when 'custom'
+        if customText then "#{t('Custom')}: #{customText}" else t('Custom')
+      else ''
+
   class viewRowDetail.DetailView extends Backbone.View
     ###
     The DetailView class is a base class for details
@@ -1560,5 +1641,9 @@ module.exports = do ->
           if value == 'select'
             value = ''
           @model.set 'value', value
+
+  viewRowDetail.parseAppearanceValue = parseAppearanceValue
+  viewRowDetail.buildModelValue = buildModelValue
+  viewRowDetail.buildPillText = buildPillText
 
   viewRowDetail
