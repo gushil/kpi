@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none">
+  <!-- FD Appearance icon: Dropdown (select_one minimal) -->
+  <rect x="3" y="10" width="46" height="14" rx="3" stroke="#444" stroke-width="1.5"/>
+      <rect x="7" y="14" width="22" height="5" rx="1.5" fill="#444" opacity="0.2"/>
+      <path d="M40 15 L44 15 L42 19 Z" fill="#444"/>
+</svg>
