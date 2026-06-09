@@ -948,9 +948,7 @@ module.exports = do ->
       if @isCardGridType()
         @_insertInDOM rowView.appearanceRowDetailParent
       else
-        target = rowView.defaultRowDetailParent
-        if rowView.primaryRowDetailParentRight? and @modelKey in ['oc_description', 'oc_external']
-          target = rowView.primaryRowDetailParentRight
+        target = if rowView.primaryRowDetailParentRight? then rowView.primaryRowDetailParentRight else rowView.defaultRowDetailParent
         @_insertInDOM target
 
     model_is_group: (model) ->
@@ -993,6 +991,7 @@ module.exports = do ->
       if @isCardGridType()
         @_afterRenderCardGrid()
       else
+        @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0).hide()
         @_afterRenderLegacy()
 
     # -------------------------------------------------------------------------
