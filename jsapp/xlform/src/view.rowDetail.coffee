@@ -143,7 +143,6 @@ module.exports = do ->
       ]
 
       rightColumnKeys = [
-        'appearance'
         'oc_description'
         'oc_external'
       ]
