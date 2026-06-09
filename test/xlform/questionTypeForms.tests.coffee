@@ -45,33 +45,36 @@ do ->
         expect(types.indexOf('multiline')).not.toBe(-1)
 
     describe 'select_one', ->
-      it 'returns appearance options for select_one', ->
+      it 'select_one uses card grid path (isCardGridType is true)', ->
+        ctx = buildAppearanceMixinCtx('select_one')
+        expect(ctx.isCardGridType()).toBe(true)
+
+      it 'select_one getTypes() returns undefined (card grid path)', ->
         ctx = buildAppearanceMixinCtx('select_one')
         types = ctx.getTypes()
-        expect(Array.isArray(types)).toBe(true)
-        expect(types.indexOf('minimal')).not.toBe(-1)
-        expect(types.indexOf('columns')).not.toBe(-1)
-        expect(types.indexOf('likert')).not.toBe(-1)
+        expect(types).toBeUndefined()
 
-      it 'includes "image-map" for select_one', ->
-        ctx = buildAppearanceMixinCtx('select_one')
-        expect(ctx.getTypes().indexOf('image-map')).not.toBe(-1)
-
-      it 'select_one has at least 5 appearance options', ->
-        ctx = buildAppearanceMixinCtx('select_one')
-        expect(ctx.getTypes().length >= 5).toBe(true)
+      it 'select_one getTypes() returns undefined — text does not use card grid', ->
+        ctx = buildAppearanceMixinCtx('text')
+        expect(ctx.isCardGridType()).toBe(false)
 
     describe 'select_multiple', ->
-      it 'returns appearance options for select_multiple', ->
+      it 'select_multiple uses card grid path (isCardGridType is true)', ->
+        ctx = buildAppearanceMixinCtx('select_multiple')
+        expect(ctx.isCardGridType()).toBe(true)
+
+      it 'select_multiple getTypes() returns undefined (card grid path)', ->
         ctx = buildAppearanceMixinCtx('select_multiple')
         types = ctx.getTypes()
-        expect(Array.isArray(types)).toBe(true)
-        expect(types.indexOf('minimal')).not.toBe(-1)
-        expect(types.indexOf('columns')).not.toBe(-1)
+        expect(types).toBeUndefined()
 
-      it 'includes "image-map" for select_multiple', ->
-        ctx = buildAppearanceMixinCtx('select_multiple')
-        expect(ctx.getTypes().indexOf('image-map')).not.toBe(-1)
+      it 'select_multiple — image does not use card grid', ->
+        ctx = buildAppearanceMixinCtx('image')
+        expect(ctx.isCardGridType()).toBe(false)
+
+      it 'select_multiple — integer does not use card grid', ->
+        ctx = buildAppearanceMixinCtx('integer')
+        expect(ctx.isCardGridType()).toBe(false)
 
     describe 'image', ->
       it 'returns appearance options for image', ->
@@ -123,17 +126,15 @@ do ->
       expect(result.indexOf('<select')).not.toBe(-1)
       expect(result.indexOf('multiline')).not.toBe(-1)
 
-    it 'select_one html() renders a dropdown', ->
+    it 'select_one html() returns empty string (card grid rendered in afterRender)', ->
       ctx = buildAppearanceMixinCtx('select_one')
       result = ctx.html()
-      expect(result.indexOf('<select')).not.toBe(-1)
-      expect(result.indexOf('minimal')).not.toBe(-1)
+      expect(result).toBe('')
 
-    it 'select_multiple html() renders a dropdown', ->
+    it 'select_multiple html() returns empty string (card grid rendered in afterRender)', ->
       ctx = buildAppearanceMixinCtx('select_multiple')
       result = ctx.html()
-      expect(result.indexOf('<select')).not.toBe(-1)
-      expect(result.indexOf('columns')).not.toBe(-1)
+      expect(result).toBe('')
 
     it 'image html() renders a dropdown with draw, annotate, signature', ->
       ctx = buildAppearanceMixinCtx('image')
