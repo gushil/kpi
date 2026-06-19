@@ -528,3 +528,45 @@ do ->
 
     it 'custom with no text → "Custom"', ->
       expect(buildPillText('custom', null, null)).toBe('Custom')
+
+    it 'full-date → "Full date"', ->
+      expect(buildPillText('full-date', null, null)).toBe('Full date')
+
+    it 'month-year → "Month & year"', ->
+      expect(buildPillText('month-year', null, null)).toBe('Month & year')
+
+    it 'year-only → "Year only"', ->
+      expect(buildPillText('year-only', null, null)).toBe('Year only')
+
+  ###############################################################
+  # appearance picker: date type
+  ###############################################################
+  describe 'parseAppearanceValue — date', ->
+    {parseAppearanceValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'empty string → full-date (default)', ->
+      expect(parseAppearanceValue('', 'date')).toEqual { card: 'full-date', columnCount: null, customText: null }
+
+    it 'null → full-date (default)', ->
+      expect(parseAppearanceValue(null, 'date')).toEqual { card: 'full-date', columnCount: null, customText: null }
+
+    it '"month-year" → month-year card', ->
+      expect(parseAppearanceValue('month-year', 'date')).toEqual { card: 'month-year', columnCount: null, customText: null }
+
+    it '"year" → year-only card', ->
+      expect(parseAppearanceValue('year', 'date')).toEqual { card: 'year-only', columnCount: null, customText: null }
+
+    it 'unknown value → custom card', ->
+      expect(parseAppearanceValue('w3 my-class', 'date')).toEqual { card: 'custom', columnCount: null, customText: 'w3 my-class' }
+
+  describe 'buildModelValue — date', ->
+    {buildModelValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'full-date → ""', ->
+      expect(buildModelValue('full-date', null, null)).toBe('')
+
+    it 'month-year → "month-year"', ->
+      expect(buildModelValue('month-year', null, null)).toBe('month-year')
+
+    it 'year-only → "year"', ->
+      expect(buildModelValue('year-only', null, null)).toBe('year')
