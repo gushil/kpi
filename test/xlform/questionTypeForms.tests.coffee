@@ -86,12 +86,10 @@ do ->
         expect(types.indexOf('signature')).not.toBe(-1)
 
     describe 'date', ->
-      it 'returns appearance options for date', ->
+      it 'returns no legacy dropdown options for date (uses card-grid)', ->
         ctx = buildAppearanceMixinCtx('date')
         types = ctx.getTypes()
-        expect(Array.isArray(types)).toBe(true)
-        expect(types.indexOf('month-year')).not.toBe(-1)
-        expect(types.indexOf('year')).not.toBe(-1)
+        expect(types).toBe(undefined)
 
     describe 'integer', ->
       it 'returns appearance options for integer', ->
@@ -143,11 +141,10 @@ do ->
       expect(result.indexOf('draw')).not.toBe(-1)
       expect(result.indexOf('signature')).not.toBe(-1)
 
-    it 'date html() renders a dropdown with month-year, year', ->
+    it 'date html() returns empty string (uses card-grid, no dropdown)', ->
       ctx = buildAppearanceMixinCtx('date')
       result = ctx.html()
-      expect(result.indexOf('<select')).not.toBe(-1)
-      expect(result.indexOf('month-year')).not.toBe(-1)
+      expect(result).toBe('')
 
     it 'integer html() renders a dropdown with analog-scale options', ->
       ctx = buildAppearanceMixinCtx('integer')

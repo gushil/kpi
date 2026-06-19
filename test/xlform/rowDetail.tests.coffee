@@ -557,7 +557,7 @@ do ->
       expect(parseAppearanceValue('year', 'date')).toEqual { card: 'year-only', columnCount: null, customText: null }
 
     it 'unknown value → custom card', ->
-      expect(parseAppearanceValue('w3 my-class', 'date')).toEqual { card: 'custom', columnCount: null, customText: 'w3 my-class' }
+      expect(parseAppearanceValue('my-custom-appearance', 'date')).toEqual { card: 'custom', columnCount: null, customText: 'my-custom-appearance' }
 
   describe 'buildModelValue — date', ->
     {buildModelValue} = require('../../jsapp/xlform/src/view.rowDetail')
