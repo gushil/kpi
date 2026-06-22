@@ -600,3 +600,33 @@ do ->
 
     it 'note-display → "Note"', ->
       expect(buildPillText('note-display', null, null)).toBe('Note')
+
+  ###############################################################
+  # appearance picker: file type
+  ###############################################################
+  describe 'parseAppearanceValue — file', ->
+    {parseAppearanceValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'empty string → file-upload (default)', ->
+      expect(parseAppearanceValue('', 'file')).toEqual { card: 'file-upload', columnCount: null, customText: null }
+
+    it 'null → file-upload (default)', ->
+      expect(parseAppearanceValue(null, 'file')).toEqual { card: 'file-upload', columnCount: null, customText: null }
+
+    it '"default" → file-upload', ->
+      expect(parseAppearanceValue('default', 'file')).toEqual { card: 'file-upload', columnCount: null, customText: null }
+
+    it 'unknown value → custom card', ->
+      expect(parseAppearanceValue('my-custom-appearance', 'file')).toEqual { card: 'custom', columnCount: null, customText: 'my-custom-appearance' }
+
+  describe 'buildModelValue — file', ->
+    {buildModelValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'file-upload → ""', ->
+      expect(buildModelValue('file-upload', null, null)).toBe('')
+
+  describe 'buildPillText — file', ->
+    {buildPillText} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'file-upload → "File upload"', ->
+      expect(buildPillText('file-upload', null, null)).toBe('File upload')
