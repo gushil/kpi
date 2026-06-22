@@ -57,6 +57,10 @@ module.exports = do ->
       if cleaned is 'year'
         return { card: 'year-only',  columnCount: null, customText: null }
       return { card: 'custom', columnCount: null, customText: cleaned }
+    if questionType is 'note'
+      if cleaned is '' or cleaned is 'default'
+        return { card: 'note-display', columnCount: null, customText: null }
+      return { card: 'custom', columnCount: null, customText: cleaned }
     if cleaned is ''
       defaultCard = if questionType is 'select_multiple' then 'checkbox-list' else 'radio-list'
       return { card: defaultCard, columnCount: null, customText: null }
@@ -80,6 +84,7 @@ module.exports = do ->
       when 'full-date'              then ''
       when 'month-year'             then 'month-year'
       when 'year-only'              then 'year'
+      when 'note-display'           then ''
       when 'custom'
         text = ((customText or '').trim())
         if text then text else 'other'
@@ -98,6 +103,7 @@ module.exports = do ->
       when 'full-date'              then t('Full date')
       when 'month-year'             then t('Month & year')
       when 'year-only'              then t('Year only')
+      when 'note-display'           then t('Note')
       when 'columns-buttons'
         suffix = if columnCount? then "#{columnCount} cols" else t('Automatic')
         "#{t('Columns (buttons)')} · #{suffix}"
@@ -866,6 +872,7 @@ module.exports = do ->
     'search': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="3" y="10" width="46" height="14" rx="3" stroke="#444" stroke-width="1.2"/><rect x="7" y="14" width="26" height="5" rx="1.5" fill="#444" opacity="0.15"/><circle cx="40" cy="17" r="3.5" stroke="#444" stroke-width="1.2"/><line x1="43" y1="20" x2="46" y2="23" stroke="#444" stroke-width="1.3"/></svg>'
     'hotspot-image': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="2" y="2" width="48" height="30" rx="3" stroke="#444" stroke-width="1.2"/><rect x="7" y="6" width="16" height="11" rx="2" stroke="#444" stroke-width="1.1"/><rect x="28" y="6" width="16" height="11" rx="2" stroke="#444" stroke-width="1.1"/><rect x="7" y="20" width="12" height="8" rx="2" stroke="#444" stroke-width="1.1"/><rect x="22" y="20" width="12" height="8" rx="2" stroke="#444" stroke-width="1.1"/></svg>'
     'custom': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><path d="M12 8 Q6 8 6 14 L6 20 Q6 26 12 26" stroke="#444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M40 8 Q46 8 46 14 L46 20 Q46 26 40 26" stroke="#444" stroke-width="1.5" fill="none" stroke-linecap="round"/><text x="17" y="22" font-size="12" fill="#378ADD" font-family="Menlo, Consolas, monospace" font-weight="700">&lt;/&gt;</text></svg>'
+    'note-display': '<svg viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="6" width="56" height="32" rx="3" stroke="#888" stroke-width="1.2"/><rect x="14" y="13" width="44" height="4" rx="1" fill="#888" fill-opacity="0.22"/><rect x="14" y="21" width="36" height="4" rx="1" fill="#888" fill-opacity="0.22"/><rect x="14" y="29" width="26" height="4" rx="1" fill="#888" fill-opacity="0.22"/></svg>'
     'full-date': '<svg viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="14" width="18" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="11" y="23" font-size="7" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">DD</text><rect x="27" y="14" width="18" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="36" y="23" font-size="7" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">MM</text><rect x="52" y="14" width="18" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="61" y="23" font-size="6" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">YYYY</text></svg>'
     'month-year': '<svg viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="14" width="20" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="20" y="23" font-size="7" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">MM</text><rect x="42" y="14" width="20" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="52" y="23" font-size="6" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">YYYY</text></svg>'
     'year-only': '<svg viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="14" width="32" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="36" y="23" font-size="6" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">YYYY</text></svg>'
@@ -900,13 +907,18 @@ module.exports = do ->
       { slug: 'year-only',   label: t('Year only') }
       { slug: 'custom',      label: t('Custom') }
     ]
+    note = [
+      { slug: 'note-display', label: t('Note') }
+      { slug: 'custom',       label: t('Custom') }
+    ]
     if questionType is 'date' then date
+    else if questionType is 'note' then note
     else if questionType is 'select_multiple' then select_multiple
     else select_one
 
   viewRowDetail.DetailViewMixins.appearance =
     isCardGridType: ->
-      @model_type() in ['select_one', 'select_multiple', 'date']
+      @model_type() in ['select_one', 'select_multiple', 'date', 'note']
 
     getTypes: ->
       types =

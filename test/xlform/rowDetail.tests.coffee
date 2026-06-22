@@ -570,3 +570,33 @@ do ->
 
     it 'year-only → "year"', ->
       expect(buildModelValue('year-only', null, null)).toBe('year')
+
+  ###############################################################
+  # appearance picker: note type
+  ###############################################################
+  describe 'parseAppearanceValue — note', ->
+    {parseAppearanceValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'empty string → note-display (default)', ->
+      expect(parseAppearanceValue('', 'note')).toEqual { card: 'note-display', columnCount: null, customText: null }
+
+    it 'null → note-display (default)', ->
+      expect(parseAppearanceValue(null, 'note')).toEqual { card: 'note-display', columnCount: null, customText: null }
+
+    it '"default" → note-display', ->
+      expect(parseAppearanceValue('default', 'note')).toEqual { card: 'note-display', columnCount: null, customText: null }
+
+    it 'unknown value → custom card', ->
+      expect(parseAppearanceValue('my-custom-appearance', 'note')).toEqual { card: 'custom', columnCount: null, customText: 'my-custom-appearance' }
+
+  describe 'buildModelValue — note', ->
+    {buildModelValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'note-display → ""', ->
+      expect(buildModelValue('note-display', null, null)).toBe('')
+
+  describe 'buildPillText — note', ->
+    {buildPillText} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'note-display → "Note"', ->
+      expect(buildPillText('note-display', null, null)).toBe('Note')
