@@ -1,5 +1,7 @@
 {expect} = require('../helper/fauxChai')
 
+window.t ?= (str) -> str
+
 $model = require('../../jsapp/xlform/src/_model')
 $configs = require('../../jsapp/xlform/src/model.configs')
 
@@ -355,3 +357,177 @@ do ->
             [survey, row] = buildSurveyWithRow(qtype)
             expect(getDetail(row, 'trigger')).toBeDefined()
     return
+
+  ###############################################################
+  # appearance picker: parseAppearanceValue
+  ###############################################################
+  describe 'parseAppearanceValue', ->
+    {parseAppearanceValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'empty string → radio-list for select_one', ->
+      expect(parseAppearanceValue('', 'select_one')).toEqual { card: 'radio-list', columnCount: null, customText: null }
+
+    it 'empty string → checkbox-list for select_multiple', ->
+      expect(parseAppearanceValue('', 'select_multiple')).toEqual { card: 'checkbox-list', columnCount: null, customText: null }
+
+    it 'null → radio-list for select_one', ->
+      expect(parseAppearanceValue(null, 'select_one')).toEqual { card: 'radio-list', columnCount: null, customText: null }
+
+    it 'minimal → dropdown', ->
+      expect(parseAppearanceValue('minimal', 'select_one')).toEqual { card: 'dropdown', columnCount: null, customText: null }
+
+    it 'columns → columns-buttons, Automatic', ->
+      expect(parseAppearanceValue('columns', 'select_one')).toEqual { card: 'columns-buttons', columnCount: null, customText: null }
+
+    it 'columns-4 → columns-buttons, count=4', ->
+      expect(parseAppearanceValue('columns-4', 'select_one')).toEqual { card: 'columns-buttons', columnCount: 4, customText: null }
+
+    it 'columns-10 → columns-buttons, count=10', ->
+      expect(parseAppearanceValue('columns-10', 'select_one')).toEqual { card: 'columns-buttons', columnCount: 10, customText: null }
+
+    it 'columns-11 → custom (out of range)', ->
+      expect(parseAppearanceValue('columns-11', 'select_one')).toEqual { card: 'custom', columnCount: null, customText: 'columns-11' }
+
+    it 'columns no-buttons → columns-labels-only, Automatic', ->
+      expect(parseAppearanceValue('columns no-buttons', 'select_one')).toEqual { card: 'columns-labels-only', columnCount: null, customText: null }
+
+    it 'columns-3 no-buttons → columns-labels-only, count=3', ->
+      expect(parseAppearanceValue('columns-3 no-buttons', 'select_one')).toEqual { card: 'columns-labels-only', columnCount: 3, customText: null }
+
+    it 'columns-pack → image-grid', ->
+      expect(parseAppearanceValue('columns-pack', 'select_one')).toEqual { card: 'image-grid', columnCount: null, customText: null }
+
+    it 'columns-pack no-buttons → image-grid-labels-only', ->
+      expect(parseAppearanceValue('columns-pack no-buttons', 'select_one')).toEqual { card: 'image-grid-labels-only', columnCount: null, customText: null }
+
+    it 'likert → likert-scale for select_one', ->
+      expect(parseAppearanceValue('likert', 'select_one')).toEqual { card: 'likert-scale', columnCount: null, customText: null }
+
+    it 'likert → custom for select_multiple', ->
+      expect(parseAppearanceValue('likert', 'select_multiple')).toEqual { card: 'custom', columnCount: null, customText: 'likert' }
+
+    it 'autocomplete → search', ->
+      expect(parseAppearanceValue('autocomplete', 'select_one')).toEqual { card: 'search', columnCount: null, customText: null }
+
+    it 'image-map → hotspot-image', ->
+      expect(parseAppearanceValue('image-map', 'select_one')).toEqual { card: 'hotspot-image', columnCount: null, customText: null }
+
+    it 'unrecognised string → custom', ->
+      expect(parseAppearanceValue('compact', 'select_one')).toEqual { card: 'custom', columnCount: null, customText: 'compact' }
+
+    it 'wN token is stripped before parsing', ->
+      expect(parseAppearanceValue('columns-4 w3', 'select_one')).toEqual { card: 'columns-buttons', columnCount: 4, customText: null }
+
+    it 'bare wN → treated as empty after stripping', ->
+      expect(parseAppearanceValue('w3', 'select_one')).toEqual { card: 'radio-list', columnCount: null, customText: null }
+
+    it "'other' → custom with empty customText", ->
+      expect(parseAppearanceValue('other', 'select_one')).toEqual { card: 'custom', columnCount: null, customText: '' }
+
+    it 'columns-2 → columns-buttons, count=2 (lower bound)', ->
+      expect(parseAppearanceValue('columns-2', 'select_one')).toEqual { card: 'columns-buttons', columnCount: 2, customText: null }
+
+    it 'columns-2 no-buttons → columns-labels-only, count=2 (lower bound)', ->
+      expect(parseAppearanceValue('columns-2 no-buttons', 'select_one')).toEqual { card: 'columns-labels-only', columnCount: 2, customText: null }
+
+    it 'columns-1 → custom (below lower bound)', ->
+      expect(parseAppearanceValue('columns-1', 'select_one')).toEqual { card: 'custom', columnCount: null, customText: 'columns-1' }
+
+  ###############################################################
+  # appearance picker: buildModelValue
+  ###############################################################
+  describe 'buildModelValue', ->
+    {buildModelValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'radio-list → empty string', ->
+      expect(buildModelValue('radio-list', null, null)).toBe('')
+
+    it 'checkbox-list → empty string', ->
+      expect(buildModelValue('checkbox-list', null, null)).toBe('')
+
+    it 'dropdown → minimal', ->
+      expect(buildModelValue('dropdown', null, null)).toBe('minimal')
+
+    it 'columns-buttons + null → columns', ->
+      expect(buildModelValue('columns-buttons', null, null)).toBe('columns')
+
+    it 'columns-buttons + 4 → columns-4', ->
+      expect(buildModelValue('columns-buttons', 4, null)).toBe('columns-4')
+
+    it 'columns-labels-only + null → columns no-buttons', ->
+      expect(buildModelValue('columns-labels-only', null, null)).toBe('columns no-buttons')
+
+    it 'columns-labels-only + 6 → columns-6 no-buttons', ->
+      expect(buildModelValue('columns-labels-only', 6, null)).toBe('columns-6 no-buttons')
+
+    it 'image-grid → columns-pack', ->
+      expect(buildModelValue('image-grid', null, null)).toBe('columns-pack')
+
+    it 'image-grid-labels-only → columns-pack no-buttons', ->
+      expect(buildModelValue('image-grid-labels-only', null, null)).toBe('columns-pack no-buttons')
+
+    it 'likert-scale → likert', ->
+      expect(buildModelValue('likert-scale', null, null)).toBe('likert')
+
+    it 'search → autocomplete', ->
+      expect(buildModelValue('search', null, null)).toBe('autocomplete')
+
+    it 'hotspot-image → image-map', ->
+      expect(buildModelValue('hotspot-image', null, null)).toBe('image-map')
+
+    it 'custom with text → raw text', ->
+      expect(buildModelValue('custom', null, 'compact')).toBe('compact')
+
+    it 'custom with empty text → other', ->
+      expect(buildModelValue('custom', null, '')).toBe('other')
+
+    it 'custom with null text → other', ->
+      expect(buildModelValue('custom', null, null)).toBe('other')
+
+  ###############################################################
+  # appearance picker: buildPillText
+  ###############################################################
+  describe 'buildPillText', ->
+    {buildPillText} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'radio-list → "Radio list"', ->
+      expect(buildPillText('radio-list', null, null)).toBe('Radio list')
+
+    it 'checkbox-list → "Checkbox list"', ->
+      expect(buildPillText('checkbox-list', null, null)).toBe('Checkbox list')
+
+    it 'dropdown → "Dropdown"', ->
+      expect(buildPillText('dropdown', null, null)).toBe('Dropdown')
+
+    it 'image-grid → "Image grid"', ->
+      expect(buildPillText('image-grid', null, null)).toBe('Image grid')
+
+    it 'image-grid-labels-only → "Image grid (labels only)"', ->
+      expect(buildPillText('image-grid-labels-only', null, null)).toBe('Image grid (labels only)')
+
+    it 'likert-scale → "Likert scale"', ->
+      expect(buildPillText('likert-scale', null, null)).toBe('Likert scale')
+
+    it 'search → "Search"', ->
+      expect(buildPillText('search', null, null)).toBe('Search')
+
+    it 'hotspot-image → "Hotspot image"', ->
+      expect(buildPillText('hotspot-image', null, null)).toBe('Hotspot image')
+
+    it 'columns-buttons + null → "Columns (buttons) · Automatic"', ->
+      expect(buildPillText('columns-buttons', null, null)).toBe('Columns (buttons) · Automatic')
+
+    it 'columns-buttons + 4 → "Columns (buttons) · 4 cols"', ->
+      expect(buildPillText('columns-buttons', 4, null)).toBe('Columns (buttons) · 4 cols')
+
+    it 'columns-labels-only + null → "Columns (labels only) · Automatic"', ->
+      expect(buildPillText('columns-labels-only', null, null)).toBe('Columns (labels only) · Automatic')
+
+    it 'columns-labels-only + 7 → "Columns (labels only) · 7 cols"', ->
+      expect(buildPillText('columns-labels-only', 7, null)).toBe('Columns (labels only) · 7 cols')
+
+    it 'custom with text → "Custom: compact"', ->
+      expect(buildPillText('custom', null, 'compact')).toBe('Custom: compact')
+
+    it 'custom with no text → "Custom"', ->
+      expect(buildPillText('custom', null, null)).toBe('Custom')

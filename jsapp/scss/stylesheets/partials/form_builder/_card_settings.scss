@@ -320,7 +320,6 @@
   min-width: 0;
 
   // Enforce fixed visual order regardless of DOM insertion order
-  .xlf-dv-appearance      { order: 1; }
   .xlf-dv-oc_description  { order: 2; }
   .xlf-dv-oc_external     { order: 3; }
 }
@@ -361,7 +360,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-left: 32px;
   cursor: pointer;
   user-select: none;
   font-weight: 600;

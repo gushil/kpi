@@ -12,6 +12,87 @@ $viewTemplates = require './view.templates'
 module.exports = do ->
   viewRowDetail = {}
 
+  parseAppearanceValue = (value, questionType) ->
+    cleaned = ((value or '').trim().replace(/\s*\bw\d+\b\s*/g, ' ')).trim()
+
+    if cleaned is 'likert'
+      if questionType is 'select_one'
+        return { card: 'likert-scale', columnCount: null, customText: null }
+      else
+        return { card: 'custom', columnCount: null, customText: 'likert' }
+    if cleaned is 'autocomplete'
+      return { card: 'search', columnCount: null, customText: null }
+    if cleaned is 'image-map'
+      return { card: 'hotspot-image', columnCount: null, customText: null }
+    if cleaned is 'columns-pack no-buttons'
+      return { card: 'image-grid-labels-only', columnCount: null, customText: null }
+    if cleaned is 'columns-pack'
+      return { card: 'image-grid', columnCount: null, customText: null }
+    m = cleaned.match(/^columns-(\d+) no-buttons$/)
+    if m
+      n = parseInt(m[1], 10)
+      if 2 <= n <= 10
+        return { card: 'columns-labels-only', columnCount: n, customText: null }
+      else
+        return { card: 'custom', columnCount: null, customText: cleaned }
+    if cleaned is 'columns no-buttons'
+      return { card: 'columns-labels-only', columnCount: null, customText: null }
+    m = cleaned.match(/^columns-(\d+)$/)
+    if m
+      n = parseInt(m[1], 10)
+      if 2 <= n <= 10
+        return { card: 'columns-buttons', columnCount: n, customText: null }
+      else
+        return { card: 'custom', columnCount: null, customText: cleaned }
+    if cleaned is 'columns'
+      return { card: 'columns-buttons', columnCount: null, customText: null }
+    if cleaned is 'minimal'
+      return { card: 'dropdown', columnCount: null, customText: null }
+    if cleaned is ''
+      defaultCard = if questionType is 'select_multiple' then 'checkbox-list' else 'radio-list'
+      return { card: defaultCard, columnCount: null, customText: null }
+    if cleaned is 'other'
+      return { card: 'custom', columnCount: null, customText: '' }
+    { card: 'custom', columnCount: null, customText: cleaned }
+
+  buildModelValue = (card, columnCount, customText) ->
+    switch card
+      when 'radio-list', 'checkbox-list' then ''
+      when 'dropdown'      then 'minimal'
+      when 'columns-buttons'
+        if columnCount? then "columns-#{columnCount}" else 'columns'
+      when 'columns-labels-only'
+        if columnCount? then "columns-#{columnCount} no-buttons" else 'columns no-buttons'
+      when 'image-grid'             then 'columns-pack'
+      when 'image-grid-labels-only' then 'columns-pack no-buttons'
+      when 'likert-scale'           then 'likert'
+      when 'search'                 then 'autocomplete'
+      when 'hotspot-image'          then 'image-map'
+      when 'custom'
+        text = ((customText or '').trim())
+        if text then text else 'other'
+      else ''
+
+  buildPillText = (card, columnCount, customText) ->
+    switch card
+      when 'radio-list'             then t('Radio list')
+      when 'checkbox-list'          then t('Checkbox list')
+      when 'dropdown'               then t('Dropdown')
+      when 'image-grid'             then t('Image grid')
+      when 'image-grid-labels-only' then t('Image grid (labels only)')
+      when 'likert-scale'           then t('Likert scale')
+      when 'search'                 then t('Search')
+      when 'hotspot-image'          then t('Hotspot image')
+      when 'columns-buttons'
+        suffix = if columnCount? then "#{columnCount} cols" else t('Automatic')
+        "#{t('Columns (buttons)')} · #{suffix}"
+      when 'columns-labels-only'
+        suffix = if columnCount? then "#{columnCount} cols" else t('Automatic')
+        "#{t('Columns (labels only)')} · #{suffix}"
+      when 'custom'
+        if customText then "#{t('Custom')}: #{customText}" else t('Custom')
+      else ''
+
   class viewRowDetail.DetailView extends Backbone.View
     ###
     The DetailView class is a base class for details
@@ -142,7 +223,6 @@ module.exports = do ->
       ]
 
       rightColumnKeys = [
-        'appearance'
         'oc_description'
         'oc_external'
       ]
@@ -778,35 +858,79 @@ module.exports = do ->
           $input.remove()
         changing = false
 
+  APPEARANCE_ICONS =
+    'radio-list': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><circle cx="7" cy="7" r="4" stroke="#444" stroke-width="1.5"/><rect x="14" y="4" width="28" height="5" rx="1.5" fill="#444" opacity="0.2"/><circle cx="7" cy="17" r="4" stroke="#444" stroke-width="1.5"/><rect x="14" y="14" width="24" height="5" rx="1.5" fill="#444" opacity="0.2"/><circle cx="7" cy="27" r="4" stroke="#444" stroke-width="1.5"/><rect x="14" y="24" width="18" height="5" rx="1.5" fill="#444" opacity="0.2"/></svg>'
+    'checkbox-list': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="3" y="3" width="8" height="8" rx="1.5" stroke="#444" stroke-width="1.5"/><rect x="14" y="4" width="28" height="5" rx="1.5" fill="#444" opacity="0.2"/><rect x="3" y="13" width="8" height="8" rx="1.5" stroke="#444" stroke-width="1.5"/><rect x="14" y="14" width="24" height="5" rx="1.5" fill="#444" opacity="0.2"/><rect x="3" y="23" width="8" height="8" rx="1.5" stroke="#444" stroke-width="1.5"/><rect x="14" y="24" width="18" height="5" rx="1.5" fill="#444" opacity="0.2"/></svg>'
+    'dropdown': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="3" y="10" width="46" height="14" rx="3" stroke="#444" stroke-width="1.5"/><rect x="7" y="14" width="22" height="5" rx="1.5" fill="#444" opacity="0.2"/><path d="M40 15 L44 15 L42 19 Z" fill="#444"/></svg>'
+    'columns-buttons': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><circle cx="6" cy="9" r="2.5" stroke="#444" stroke-width="1.1"/><rect x="10" y="7" width="5" height="5" rx="1" fill="#444" opacity="0.2"/><circle cx="20" cy="9" r="2.5" stroke="#444" stroke-width="1.1"/><rect x="24" y="7" width="5" height="5" rx="1" fill="#444" opacity="0.2"/><circle cx="34" cy="9" r="2.5" stroke="#444" stroke-width="1.1"/><rect x="38" y="7" width="5" height="5" rx="1" fill="#444" opacity="0.2"/><circle cx="48" cy="9" r="2.5" stroke="#444" stroke-width="1.1"/><circle cx="6" cy="23" r="2.5" stroke="#444" stroke-width="1.1"/><circle cx="20" cy="23" r="2.5" stroke="#444" stroke-width="1.1"/><circle cx="34" cy="23" r="2.5" stroke="#444" stroke-width="1.1"/><circle cx="48" cy="23" r="2.5" stroke="#444" stroke-width="1.1"/></svg>'
+    'columns-labels-only': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="1" y="6" width="11" height="9" rx="2" stroke="#444" stroke-width="1.1"/><rect x="14" y="6" width="11" height="9" rx="2" stroke="#444" stroke-width="1.1"/><rect x="28" y="6" width="11" height="9" rx="2" stroke="#444" stroke-width="1.1"/><rect x="41" y="6" width="10" height="9" rx="2" stroke="#444" stroke-width="1.1"/><rect x="1" y="19" width="11" height="9" rx="2" stroke="#444" stroke-width="1.1"/><rect x="14" y="19" width="11" height="9" rx="2" stroke="#444" stroke-width="1.1"/><rect x="28" y="19" width="11" height="9" rx="2" stroke="#444" stroke-width="1.1"/><rect x="41" y="19" width="10" height="9" rx="2" stroke="#444" stroke-width="1.1"/></svg>'
+    'image-grid': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="1" y="2" width="14" height="30" rx="2.5" stroke="#444" stroke-width="1.2"/><rect x="3" y="4" width="10" height="14" rx="1.5" fill="#444" opacity="0.15"/><circle cx="6" cy="26" r="1.5" stroke="#444" stroke-width="0.8"/><rect x="19" y="2" width="14" height="30" rx="2.5" stroke="#444" stroke-width="1.2"/><rect x="21" y="4" width="10" height="14" rx="1.5" fill="#444" opacity="0.15"/><circle cx="24" cy="26" r="1.5" stroke="#444" stroke-width="0.8"/><rect x="37" y="2" width="14" height="30" rx="2.5" stroke="#444" stroke-width="1.2"/><rect x="39" y="4" width="10" height="14" rx="1.5" fill="#444" opacity="0.15"/><circle cx="42" cy="26" r="1.5" stroke="#444" stroke-width="0.8"/></svg>'
+    'image-grid-labels-only': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="1" y="2" width="14" height="30" rx="2.5" stroke="#444" stroke-width="1.2"/><rect x="3" y="4" width="10" height="14" rx="1.5" fill="#444" opacity="0.15"/><rect x="19" y="2" width="14" height="30" rx="2.5" stroke="#444" stroke-width="1.2"/><rect x="21" y="4" width="10" height="14" rx="1.5" fill="#444" opacity="0.15"/><rect x="37" y="2" width="14" height="30" rx="2.5" stroke="#444" stroke-width="1.2"/><rect x="39" y="4" width="10" height="14" rx="1.5" fill="#444" opacity="0.15"/></svg>'
+    'likert-scale': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><line x1="5" y1="17" x2="47" y2="17" stroke="#444" stroke-width="1.2"/><circle cx="5" cy="17" r="3" stroke="#444" stroke-width="1.2"/><circle cx="16" cy="17" r="3" stroke="#444" stroke-width="1.2"/><circle cx="26" cy="17" r="3" stroke="#444" stroke-width="1.2"/><circle cx="36" cy="17" r="3" stroke="#444" stroke-width="1.2"/><circle cx="47" cy="17" r="3" stroke="#444" stroke-width="1.2"/></svg>'
+    'search': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="3" y="10" width="46" height="14" rx="3" stroke="#444" stroke-width="1.2"/><rect x="7" y="14" width="26" height="5" rx="1.5" fill="#444" opacity="0.15"/><circle cx="40" cy="17" r="3.5" stroke="#444" stroke-width="1.2"/><line x1="43" y1="20" x2="46" y2="23" stroke="#444" stroke-width="1.3"/></svg>'
+    'hotspot-image': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="2" y="2" width="48" height="30" rx="3" stroke="#444" stroke-width="1.2"/><rect x="7" y="6" width="16" height="11" rx="2" stroke="#444" stroke-width="1.1"/><rect x="28" y="6" width="16" height="11" rx="2" stroke="#444" stroke-width="1.1"/><rect x="7" y="20" width="12" height="8" rx="2" stroke="#444" stroke-width="1.1"/><rect x="22" y="20" width="12" height="8" rx="2" stroke="#444" stroke-width="1.1"/></svg>'
+    'custom': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><path d="M12 8 Q6 8 6 14 L6 20 Q6 26 12 26" stroke="#444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M40 8 Q46 8 46 14 L46 20 Q46 26 40 26" stroke="#444" stroke-width="1.5" fill="none" stroke-linecap="round"/><text x="17" y="22" font-size="12" fill="#378ADD" font-family="Menlo, Consolas, monospace" font-weight="700">&lt;/&gt;</text></svg>'
+
+  getAppearanceCards = (questionType) ->
+    select_one = [
+      { slug: 'radio-list',             label: t('Radio list') }
+      { slug: 'dropdown',               label: t('Dropdown') }
+      { slug: 'columns-buttons',        label: t('Columns (buttons)') }
+      { slug: 'columns-labels-only',    label: t('Columns (labels only)') }
+      { slug: 'image-grid',             label: t('Image grid') }
+      { slug: 'image-grid-labels-only', label: t('Image grid (labels only)') }
+      { slug: 'likert-scale',           label: t('Likert scale') }
+      { slug: 'search',                 label: t('Search') }
+      { slug: 'hotspot-image',          label: t('Hotspot image') }
+      { slug: 'custom',                 label: t('Custom') }
+    ]
+    select_multiple = [
+      { slug: 'checkbox-list',          label: t('Checkbox list') }
+      { slug: 'dropdown',               label: t('Dropdown') }
+      { slug: 'columns-buttons',        label: t('Columns (buttons)') }
+      { slug: 'columns-labels-only',    label: t('Columns (labels only)') }
+      { slug: 'image-grid',             label: t('Image grid') }
+      { slug: 'image-grid-labels-only', label: t('Image grid (labels only)') }
+      { slug: 'search',                 label: t('Search') }
+      { slug: 'hotspot-image',          label: t('Hotspot image') }
+      { slug: 'custom',                 label: t('Custom') }
+    ]
+    if questionType is 'select_multiple' then select_multiple else select_one
+
   viewRowDetail.DetailViewMixins.appearance =
-    getTypes: () ->
+    isCardGridType: ->
+      @model_type() in ['select_one', 'select_multiple']
+
+    getTypes: ->
       types =
         text: ['multiline']
-        select_one: ['minimal', 'columns', 'columns-pack', 'columns-4', 'columns no-buttons', 'columns-pack no-buttons', 'columns-4 no-buttons', 'likert', 'image-map']
-        select_multiple: ['minimal', 'columns', 'columns-pack', 'columns-4', 'columns no-buttons', 'columns-pack no-buttons', 'columns-4 no-buttons', 'image-map']
         image: ['draw', 'annotate', 'signature']
         date: ['month-year', 'year']
         integer: ['analog-scale horizontal', 'analog-scale horizontal no-ticks', 'analog-scale vertical', 'analog-scale vertical no-ticks', 'analog-scale vertical show-scale']
-
       types[@model_type()]
+
     html: ->
-      @$checkbox_samescreen = $('<input/>', { type: "checkbox", id: "checkbox-samescreen", style: 'margin-top: 10px;' })
-      @$label_checkbox_samescreen = $('<span/>', { style: 'margin-left: 4px;' }).text(t('Show all questions in this group on the same screen'))
-      @fieldListStr = 'field-list'
+      @$el.addClass("card__settings__fields--active")
       @$select_width = $('<select/>', { id: "select-width" })
-      @$label_select_width = $('<label/>', { for: 'select-width' }).text(t('Width') + ":")
       @select_width_default_value = ''
-      $('<option />', {value: "select", text: "Width not selected (w4 will be used)"}).appendTo(@$select_width)
+      $('<option />', {value: "select", text: t("Width not selected (w4 will be used)")}).appendTo(@$select_width)
       @width_options = []
       for option in [1..10]
         @width_options.push "w#{option}"
       for width_option in @width_options
         $('<option />', {value: "#{width_option}", text: "#{width_option}"}).appendTo(@$select_width)
+
+      if @isCardGridType()
+        return ''
+
+      @$checkbox_samescreen = $('<input/>', { type: "checkbox", id: "checkbox-samescreen", style: 'margin-top: 10px;' })
+      @$label_checkbox_samescreen = $('<span/>', { style: 'margin-left: 4px;' }).text(t('Show all questions in this group on the same screen'))
+      @fieldListStr = 'field-list'
       @$textbox_other = null
       @is_input_select = false
       @is_input_text_other = false
       @is_checkbox_samescreen = false
-      @$el.addClass("card__settings__fields--active")
+
       if @model_is_group(@model)
         return viewRowDetail.Templates.textbox @cid, @model.key, t("Appearance"), 'text'
       else
@@ -820,36 +944,382 @@ module.exports = do ->
           else
             return viewRowDetail.Templates.textbox @cid, @model.key, t("Appearance"), 'text'
 
+    insertInDOM: (rowView) ->
+      if @isCardGridType()
+        @_insertInDOM rowView.appearanceRowDetailParent
+      else
+        target = rowView.defaultRowDetailParent
+        if rowView.primaryRowDetailParentRight? and @modelKey in ['oc_description', 'oc_external']
+          target = rowView.primaryRowDetailParentRight
+        @_insertInDOM target
+
     model_is_group: (model) ->
       model._parent.constructor.key == 'group'
 
-    model_get_parent_group: () ->
-      perent_group = null
+    model_get_parent_group: ->
+      parent_group = null
       if @model._parent._parent._parent? and @model._parent._parent._parent.constructor.key == 'group'
         parent_group = @model._parent._parent._parent
       parent_group
 
-    model_get_parent_group_appearance: () ->
+    model_get_parent_group_appearance: ->
       parent_group = @model_get_parent_group()
       if parent_group?
         parent_group.get('appearance').getValue()
 
-    model_type: () ->
+    model_type: ->
       @model._parent.getValue('type').split(' ')[0]
 
-    is_form_style_exist: () ->
+    is_form_style_exist: ->
       sessionStorage.getItem('kpi.editable-form.form-style') != ''
 
     is_form_style: (style) ->
       sessionStorage.getItem('kpi.editable-form.form-style').indexOf(style) isnt -1
 
-    is_form_style_pages: () ->
+    is_form_style_pages: ->
       @is_form_style('pages')
 
-    is_form_style_theme_grid: () ->
+    is_form_style_theme_grid: ->
       @is_form_style('theme-grid')
 
-    not_group_inputs_change_handler: () ->
+    get_width_from_model_value: ->
+      modelValue = @model.get 'value'
+      model_width = null
+      for width_option in @width_options
+        model_width = width_option if ((modelValue.indexOf width_option) > -1)
+      model_width
+
+    afterRender: ->
+      if @isCardGridType()
+        @_afterRenderCardGrid()
+      else
+        @_afterRenderLegacy()
+
+    # -------------------------------------------------------------------------
+    # Card grid path (select_one / select_multiple)
+    # -------------------------------------------------------------------------
+
+    _afterRenderCardGrid: ->
+      questionType = @model_type()
+      modelValue = @model.get('value') or ''
+      { card, columnCount, customText } = parseAppearanceValue(modelValue, questionType)
+
+      @_card = card
+      @_columnCount = columnCount
+      @_customText = customText
+
+      $section = @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0)
+      $pill    = $section.find('.js-appearance-pill').eq(0)
+      $toggle  = $section.find('.js-appearance-toggle').eq(0)
+
+      # Build card grid
+      cards = getAppearanceCards(questionType)
+      cardHtml = ''
+      for cardDef in cards
+        selected = if cardDef.slug is card then ' is-selected' else ''
+        cardHtml += """
+          <div class="appearance-card#{selected}" data-card-slug="#{cardDef.slug}">
+            <div class="appearance-card__icon">#{APPEARANCE_ICONS[cardDef.slug]}</div>
+            <div class="appearance-card__label">#{cardDef.label}</div>
+          </div>
+        """
+      @$el.append($('<div/>', { class: 'card__settings__appearance-grid' }).html(cardHtml))
+
+      # Render secondary control for initial state
+      @_renderSecondaryControl(questionType)
+
+      # Width select (theme-grid form style only)
+      if @is_form_style_theme_grid()
+        $width_field = $("""<div class="card__settings__fields__field xlf-dv-width-row">
+          <label for="select-width">#{t('Width')}:</label>
+          <span class="settings__input"></span>
+        </div>""")
+        $width_field.find('.settings__input').append(@$select_width)
+        @$el.append($width_field)
+        width_val = @get_width_from_model_value()
+        @$select_width.val(width_val) if width_val?
+        @$select_width.on 'change', => @_writeModelValue()
+
+      # Card click
+      @$el.on 'click', '.appearance-card', (evt) =>
+        slug = $(evt.currentTarget).data('card-slug')
+        @_card = slug
+        @_columnCount = null unless @_card in ['columns-buttons', 'columns-labels-only']
+        @_customText = null unless @_card is 'custom'
+        @$el.find('.appearance-card').removeClass('is-selected')
+        $(evt.currentTarget).addClass('is-selected')
+        @_renderSecondaryControl(questionType)
+        @_writeModelValue()
+
+      # Initial pill (section starts collapsed)
+      @_refreshPill($pill)
+      $pill.show()
+
+      # Toggle collapse/expand
+      $toggle.off('click.appearanceToggle')
+      $toggle.on 'click.appearanceToggle', =>
+        isCollapsed = $section.hasClass('is-collapsed')
+        if isCollapsed
+          $section.removeClass('is-collapsed')
+          $toggle.attr('aria-expanded', 'true')
+          $pill.hide()
+        else
+          $section.addClass('is-collapsed')
+          $toggle.attr('aria-expanded', 'false')
+          @_refreshPill($pill)
+          $pill.show()
+
+      # Keep pill fresh when model changes from outside (e.g. loading)
+      @model.on 'change:value', =>
+        if $section.hasClass('is-collapsed')
+          val = @model.get('value') or ''
+          { card, columnCount, customText } = parseAppearanceValue(val, questionType)
+          @_card = card
+          @_columnCount = columnCount
+          @_customText = customText
+          @_refreshPill($pill)
+
+    _renderSecondaryControl: (questionType) ->
+      @$el.find('.appearance-columns-control, .appearance-custom-input-wrap').remove()
+
+      if @_card in ['columns-buttons', 'columns-labels-only']
+        segments = [{ label: t('Automatic'), value: null }]
+        for n in [2..10]
+          segments.push { label: "#{n}", value: n }
+
+        segHtml = ''
+        for seg in segments
+          isActive = if @_columnCount is seg.value then ' is-active' else ''
+          dataVal  = if seg.value? then "data-col=\"#{seg.value}\"" else 'data-col="auto"'
+          segHtml += """<span class="appearance-columns-segment#{isActive}" #{dataVal}>#{seg.label}</span>"""
+
+        hintValue = buildModelValue(@_card, @_columnCount, null)
+        $ctrl = $("""
+          <div class="appearance-columns-control">
+            <div class="appearance-columns-control__label">#{t('Columns (#)')}</div>
+            <div class="appearance-columns-control__segments">#{segHtml}</div>
+            <div class="appearance-columns-control__hint"><code>#{hintValue}</code></div>
+          </div>
+        """)
+        @$el.append($ctrl)
+
+        $ctrl.on 'click', '.appearance-columns-segment', (evt) =>
+          $seg = $(evt.currentTarget)
+          raw = $seg.data('col')
+          @_columnCount = if raw is 'auto' then null else parseInt(raw, 10)
+          $ctrl.find('.appearance-columns-segment').removeClass('is-active')
+          $seg.addClass('is-active')
+          hintVal = buildModelValue(@_card, @_columnCount, null)
+          $ctrl.find('.appearance-columns-control__hint code').text(hintVal)
+          @_writeModelValue()
+
+      else if @_card is 'custom'
+        existingText = @_customText or ''
+        $input = $('<input/>', {
+          type: 'text'
+          class: 'appearance-custom-input'
+          value: existingText
+          placeholder: t('e.g. compact, columns-12')
+        })
+        $wrap = $('<div/>', { class: 'appearance-custom-input-wrap' }).append($input)
+        @$el.append($wrap)
+        @add_input_text_change_handler $input, =>
+          @_customText = $input.val().trim() or null
+          @_writeModelValue()
+
+    _writeModelValue: ->
+      value = buildModelValue(@_card, @_columnCount, @_customText)
+      if @is_form_style_theme_grid()
+        width_val = @$select_width.val()
+        if width_val and width_val isnt 'select'
+          value = if value then "#{value} #{width_val}" else width_val
+      @model.set 'value', value
+
+    _refreshPill: ($pill) ->
+      text = buildPillText(@_card, @_columnCount, @_customText)
+      $pill.text(text)
+
+    # -------------------------------------------------------------------------
+    # Legacy path (group, calculate, text, image, date, integer)
+    # Verbatim copy of the original afterRender body.
+    # -------------------------------------------------------------------------
+
+    _afterRenderLegacy: ->
+      modelValue = @model.get 'value'
+      if @model_is_group(@model)
+        $input = @$('input')
+
+        if @is_form_style_theme_grid()
+          $width_field = $("""<div class="card__settings__fields__field xlf-dv-width-row">
+            <label for="select-width">#{t('Width')}:</label>
+            <span class="settings__input"></span>
+          </div>""")
+          $width_field.find('.settings__input').append(@$select_width)
+          @$el.append($width_field)
+
+        if @is_form_style_exist() and @is_form_style_pages()
+          $container_checkbox_samescreen = $('<div/>')
+          $container_checkbox_samescreen.append(@$checkbox_samescreen)
+          $container_checkbox_samescreen.append(@$label_checkbox_samescreen)
+          @$('.settings__input').append($container_checkbox_samescreen)
+          @is_checkbox_samescreen = true
+
+        if modelValue? and modelValue != ''
+          modelValue = modelValue.trim()
+          samescreen_value = null
+          text_input_value = null
+          select_width_value = null
+
+          if @is_same_screen_in_model_value()
+            samescreen_value = @fieldListStr
+            modelValue = modelValue.split(samescreen_value).join('')
+
+          width_model_value = @get_width_from_model_value()
+          if width_model_value?
+            select_width_value = width_model_value
+            modelValue = modelValue.split(select_width_value).join('')
+
+          modelValue = modelValue.trim()
+          if modelValue != ''
+            text_input_value = modelValue
+
+        if samescreen_value?
+          @$checkbox_samescreen.prop('checked', true)
+        if text_input_value?
+          $input.val(text_input_value)
+        if select_width_value?
+          @$select_width.val(select_width_value)
+
+        @add_input_text_change_handler($input, @group_inputs_change_handler)
+
+        @$select_width.off 'change'
+        @$select_width.on 'change', () =>
+          @group_inputs_change_handler()
+
+        @$checkbox_samescreen.off 'change'
+        @$checkbox_samescreen.on 'change', () =>
+          @group_inputs_change_handler()
+
+      else
+        if @is_form_style_theme_grid()
+          $width_field = $("""<div class="card__settings__fields__field xlf-dv-width-row">
+            <label for="select-width">#{t('Width')}:</label>
+            <span class="settings__input"></span>
+          </div>""")
+          $width_field.find('.settings__input').append(@$select_width)
+          @$el.append($width_field)
+
+          parent_column = 4
+          if @model_get_parent_group()? and @model_get_parent_group_appearance() != ''
+            parent_group_appearance = @model_get_parent_group_appearance()
+            if parent_group_appearance.indexOf(' ') == -1
+              if parent_group_appearance in @width_options
+                parent_column = parent_group_appearance.slice(1)
+            else
+              parent_group_appearance_last_value = parent_group_appearance.slice(parent_group_appearance.lastIndexOf(' ') + 1)
+              if parent_group_appearance_last_value in @width_options
+                parent_column = parent_group_appearance_last_value.slice(1)
+
+          parent_column = parseInt parent_column, 10
+          text_parent_columns = "Parent group has #{parent_column} columns"
+          if parent_column == 1
+            text_parent_columns = text_parent_columns.replace('columns', 'column')
+          $help_field = $("""<div class="card__settings__fields__field card__settings__fields__field--help-text-row">
+            <label></label>
+            <span class="settings__input"></span>
+          </div>""")
+          $help_field.find('.settings__input').text(text_parent_columns)
+          @$el.append($help_field)
+
+        $select = @$('select').not('#select-width')
+        if $select.length > 0
+          @$textbox_other = $('<input/>', { class:'text', type: 'text', width: 'auto', style: 'display: block; margin-top: 5px;' })
+
+          updateSelectPlaceholderClass = () =>
+            if $select.val() == 'select'
+              $select.addClass('is-placeholder')
+            else
+              $select.removeClass('is-placeholder')
+
+          if modelValue? and modelValue != ''
+            modelValue = modelValue.trim()
+            select_value = null
+            other_value = null
+            select_width_value = null
+
+            select_model_value = @get_select_value_from_model_value()
+            if select_model_value?
+              select_value = select_model_value
+              modelValue = modelValue.split(select_value).join('')
+
+            width_model_value = @get_width_from_model_value()
+            if width_model_value?
+              select_width_value = width_model_value
+              modelValue = modelValue.split(select_width_value).join('')
+
+            modelValue = modelValue.trim()
+            if modelValue != ''
+              other_value = modelValue
+
+            if select_value?
+              $select.val(select_value)
+            if select_width_value?
+              @$select_width.val(select_width_value)
+            if other_value?
+              $select.val('other')
+              @$textbox_other.insertAfter $select
+              @$textbox_other.val(other_value)
+              @is_input_text_other = true
+              @add_input_text_change_handler(@$textbox_other, @not_group_inputs_change_handler)
+
+          updateSelectPlaceholderClass()
+
+          @$select_width.on 'change', () =>
+            @not_group_inputs_change_handler()
+
+          $select.on 'change', () =>
+            updateSelectPlaceholderClass()
+            if $select.val() == 'other'
+              @$textbox_other.insertAfter $select
+              @is_input_text_other = true
+              @add_input_text_change_handler(@$textbox_other, @not_group_inputs_change_handler)
+            else
+              @$textbox_other.val('')
+              @$textbox_other.remove()
+              @is_input_text_other = false
+              @not_group_inputs_change_handler()
+
+        else
+          $input = @$('input')
+          if modelValue? and modelValue != ''
+            modelValue = modelValue.trim()
+            input_value = null
+            select_width_value = null
+
+            width_model_value = @get_width_from_model_value()
+            if width_model_value?
+              select_width_value = width_model_value
+              modelValue = modelValue.split(select_width_value).join('')
+
+            modelValue = modelValue.trim()
+            if modelValue != ''
+              input_value = modelValue
+
+            if input_value?
+              $input.val(input_value)
+            if select_width_value?
+              @$select_width.val(select_width_value)
+
+          @add_input_text_change_handler($input, @group_inputs_change_handler)
+
+          @$select_width.on 'change', () =>
+            @group_inputs_change_handler()
+
+    # -------------------------------------------------------------------------
+    # Helpers shared by both paths (kept from original)
+    # -------------------------------------------------------------------------
+
+    not_group_inputs_change_handler: ->
       model_set_value = ''
 
       if @is_input_select
@@ -861,7 +1331,7 @@ module.exports = do ->
           select_value = $select.val()
           select_value = '' if select_value == 'select'
           model_set_value = select_value
-      else # input text
+      else
         $input = @$('input')
         input_value = $input.val().trim()
         model_set_value = input_value
@@ -876,7 +1346,7 @@ module.exports = do ->
 
       @model.set 'value', model_set_value
 
-    group_inputs_change_handler: () ->
+    group_inputs_change_handler: ->
       model_set_value = ''
 
       if @is_checkbox_samescreen
@@ -917,18 +1387,11 @@ module.exports = do ->
         else
           handler()
 
-    is_same_screen_in_model_value: () ->
+    is_same_screen_in_model_value: ->
       modelValue = @model.get 'value'
       (modelValue.indexOf @fieldListStr) > -1
 
-    get_width_from_model_value: () ->
-      modelValue = @model.get 'value'
-      model_width = null
-      for width_option in @width_options
-        model_width = width_option if ((modelValue.indexOf width_option) > -1)
-      model_width
-
-    get_select_value_from_model_value: () ->
+    get_select_value_from_model_value: ->
       modelValue = @model.get 'value'
       select_value = null
       select_values = []
@@ -948,177 +1411,6 @@ module.exports = do ->
                 select_value = value
 
       select_value
-
-    afterRender: ->
-      modelValue = @model.get 'value'
-      if @model_is_group(@model)
-        $input = @$('input')
-
-        if @is_form_style_theme_grid()
-          $width_field = $("""<div class="card__settings__fields__field xlf-dv-width-row">
-            <label for="select-width">#{t('Width')}:</label>
-            <span class="settings__input"></span>
-          </div>""")
-          $width_field.find('.settings__input').append(@$select_width)
-          @$el.append($width_field)
-
-        if @is_form_style_exist() and @is_form_style_pages()
-          $container_checkbox_samescreen = $('<div/>')
-          $container_checkbox_samescreen.append(@$checkbox_samescreen)
-          $container_checkbox_samescreen.append(@$label_checkbox_samescreen)
-          @$('.settings__input').append($container_checkbox_samescreen)
-          @is_checkbox_samescreen = true
-
-        if modelValue? and modelValue != '' # Parse existing value
-          modelValue = modelValue.trim()
-          samescreen_value = null
-          text_input_value = null
-          select_width_value = null
-
-          if @is_same_screen_in_model_value()
-            samescreen_value = @fieldListStr
-            modelValue = modelValue.split(samescreen_value).join('') # remove samescreen_value from modelValue
-
-          width_model_value = @get_width_from_model_value()
-          if width_model_value?
-            select_width_value = width_model_value
-            modelValue = modelValue.split(select_width_value).join('') # remove select_width_value from modelValue
-
-          modelValue = modelValue.trim()
-          if modelValue != ''
-            text_input_value = modelValue
-
-        if samescreen_value?
-          @$checkbox_samescreen.prop('checked', true)
-        if text_input_value?
-          $input.val(text_input_value)
-        if select_width_value?
-          @$select_width.val(select_width_value)
-
-        @add_input_text_change_handler($input, @group_inputs_change_handler)
-
-        @$select_width.off 'change'
-        @$select_width.on 'change', () =>
-          @group_inputs_change_handler()
-
-        @$checkbox_samescreen.off 'change'
-        @$checkbox_samescreen.on 'change', () =>
-          @group_inputs_change_handler()
-
-      else # not group. this is question item appearance settings
-        if @is_form_style_theme_grid()
-          $width_field = $("""<div class="card__settings__fields__field xlf-dv-width-row">
-            <label for="select-width">#{t('Width')}:</label>
-            <span class="settings__input"></span>
-          </div>""")
-          $width_field.find('.settings__input').append(@$select_width)
-          @$el.append($width_field)
-
-          parent_column = 4
-          if @model_get_parent_group()? and @model_get_parent_group_appearance() != ''
-            parent_group_appearance = @model_get_parent_group_appearance()
-            if parent_group_appearance.indexOf(' ') == -1 # no space in parent_group_appearance
-              if parent_group_appearance in @width_options
-                parent_column = parent_group_appearance.slice(1)
-            else
-              parent_group_appearance_last_value = parent_group_appearance.slice(parent_group_appearance.lastIndexOf(' ') + 1)
-              if parent_group_appearance_last_value in @width_options
-                parent_column = parent_group_appearance_last_value.slice(1)
-
-          parent_column = parseInt parent_column, 10
-          text_parent_columns = "Parent group has #{parent_column} columns"
-          if parent_column == 1
-            text_parent_columns = text_parent_columns.replace('columns', 'column')
-          $help_field = $("""<div class="card__settings__fields__field card__settings__fields__field--help-text-row">
-            <label></label>
-            <span class="settings__input"></span>
-          </div>""")
-          $help_field.find('.settings__input').text(text_parent_columns)
-          @$el.append($help_field)
-
-        $select = @$('select').not('#select-width')
-        if $select.length > 0 # Question item appearance is dropdown
-          @$textbox_other = $('<input/>', { class:'text', type: 'text', width: 'auto', style: 'display: block; margin-top: 5px;' })
-
-          updateSelectPlaceholderClass = () =>
-            if $select.val() == 'select'
-              $select.addClass('is-placeholder')
-            else
-              $select.removeClass('is-placeholder')
-
-          if modelValue? and modelValue != '' # Parse existing value
-            modelValue = modelValue.trim()
-            select_value = null
-            other_value = null
-            select_width_value = null
-
-            select_model_value = @get_select_value_from_model_value()
-            if select_model_value?
-              select_value = select_model_value
-              modelValue = modelValue.split(select_value).join('') # remove select_value from modelValue
-
-            width_model_value = @get_width_from_model_value()
-            if width_model_value?
-              select_width_value = width_model_value
-              modelValue = modelValue.split(select_width_value).join('') # remove select_width_value from modelValue
-
-            modelValue = modelValue.trim()
-            if modelValue != ''
-              other_value = modelValue
-
-            if select_value?
-              $select.val(select_value)
-            if select_width_value?
-              @$select_width.val(select_width_value)
-            if other_value?
-              $select.val('other')
-              @$textbox_other.insertAfter $select
-              @$textbox_other.val(other_value)
-              @is_input_text_other = true
-              @add_input_text_change_handler(@$textbox_other, @not_group_inputs_change_handler)
-
-          updateSelectPlaceholderClass()
-
-          @$select_width.on 'change', () =>
-            @not_group_inputs_change_handler()
-
-          $select.on 'change', () =>
-            updateSelectPlaceholderClass()
-            if $select.val() == 'other'
-              @$textbox_other.insertAfter $select
-              @is_input_text_other = true
-              @add_input_text_change_handler(@$textbox_other, @not_group_inputs_change_handler)
-            else
-              @$textbox_other.val('')
-              @$textbox_other.remove()
-              @is_input_text_other = false
-              @not_group_inputs_change_handler()
-
-        else # Question item appearance is text input
-          $input = @$('input')
-          if modelValue? and modelValue != '' # Parse existing value
-            modelValue = modelValue.trim()
-            input_value = null
-            select_width_value = null
-
-            width_model_value = @get_width_from_model_value()
-            if width_model_value?
-              select_width_value = width_model_value
-              modelValue = modelValue.split(select_width_value).join('') # remove select_width_value from modelValue
-
-            modelValue = modelValue.trim()
-            if modelValue != ''
-              input_value = modelValue
-
-            if input_value?
-              $input.val(input_value)
-            if select_width_value?
-              @$select_width.val(select_width_value)
-
-          @add_input_text_change_handler($input, @group_inputs_change_handler)
-
-          @$select_width.on 'change', () =>
-            @group_inputs_change_handler()
 
   viewRowDetail.DetailViewMixins.oc_item_group =
     onOcCustomEvent: (ocCustomEventArgs) ->
@@ -1579,5 +1871,9 @@ module.exports = do ->
           if value == 'select'
             value = ''
           @model.set 'value', value
+
+  viewRowDetail.parseAppearanceValue = parseAppearanceValue
+  viewRowDetail.buildModelValue = buildModelValue
+  viewRowDetail.buildPillText = buildPillText
 
   viewRowDetail

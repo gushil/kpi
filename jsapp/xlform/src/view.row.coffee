@@ -692,6 +692,7 @@ module.exports = do ->
       @primaryRowDetailParentLeft = @cardSettingsWrap.find('.js-card-settings-col-left').eq(0)
       @primaryRowDetailParentRight = @cardSettingsWrap.find('.js-card-settings-col-right').eq(0)
       @advancedRowDetailParent = @cardSettingsWrap.find('.js-card-settings-row-options-advanced').eq(0)
+      @appearanceRowDetailParent = @cardSettingsWrap.find('.js-appearance-body').eq(0)
       @defaultRowDetailParent = @primaryRowDetailParentLeft
       @cardSettingsWrap.off('click.advancedToggle')
       @cardSettingsWrap.on 'click.advancedToggle', '.js-card-settings-advanced-toggle', (evt) =>
