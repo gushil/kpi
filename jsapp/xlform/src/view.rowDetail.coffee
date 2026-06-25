@@ -65,6 +65,12 @@ module.exports = do ->
       if cleaned is '' or cleaned is 'default'
         return { card: 'file-upload', columnCount: null, customText: null }
       return { card: 'custom', columnCount: null, customText: cleaned }
+    if questionType is 'text'
+      if cleaned is '' or cleaned is 'default'
+        return { card: 'single-line', columnCount: null, customText: null }
+      if cleaned is 'multiline'
+        return { card: 'paragraph', columnCount: null, customText: null }
+      return { card: 'custom', columnCount: null, customText: cleaned }
     if cleaned is ''
       defaultCard = if questionType is 'select_multiple' then 'checkbox-list' else 'radio-list'
       return { card: defaultCard, columnCount: null, customText: null }
@@ -85,6 +91,8 @@ module.exports = do ->
       when 'likert-scale'           then 'likert'
       when 'search'                 then 'autocomplete'
       when 'hotspot-image'          then 'image-map'
+      when 'single-line'            then 'default'
+      when 'paragraph'              then 'multiline'
       when 'full-date'              then ''
       when 'month-year'             then 'month-year'
       when 'year-only'              then 'year'
@@ -105,6 +113,8 @@ module.exports = do ->
       when 'likert-scale'           then t('Likert scale')
       when 'search'                 then t('Search')
       when 'hotspot-image'          then t('Hotspot image')
+      when 'single-line'            then t('Single line')
+      when 'paragraph'              then t('Paragraph')
       when 'full-date'              then t('Full date')
       when 'month-year'             then t('Month & year')
       when 'year-only'              then t('Year only')
@@ -878,6 +888,8 @@ module.exports = do ->
     'search': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="3" y="10" width="46" height="14" rx="3" stroke="#444" stroke-width="1.2"/><rect x="7" y="14" width="26" height="5" rx="1.5" fill="#444" opacity="0.15"/><circle cx="40" cy="17" r="3.5" stroke="#444" stroke-width="1.2"/><line x1="43" y1="20" x2="46" y2="23" stroke="#444" stroke-width="1.3"/></svg>'
     'hotspot-image': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="2" y="2" width="48" height="30" rx="3" stroke="#444" stroke-width="1.2"/><rect x="7" y="6" width="16" height="11" rx="2" stroke="#444" stroke-width="1.1"/><rect x="28" y="6" width="16" height="11" rx="2" stroke="#444" stroke-width="1.1"/><rect x="7" y="20" width="12" height="8" rx="2" stroke="#444" stroke-width="1.1"/><rect x="22" y="20" width="12" height="8" rx="2" stroke="#444" stroke-width="1.1"/></svg>'
     'custom': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><path d="M12 8 Q6 8 6 14 L6 20 Q6 26 12 26" stroke="#444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M40 8 Q46 8 46 14 L46 20 Q46 26 40 26" stroke="#444" stroke-width="1.5" fill="none" stroke-linecap="round"/><text x="17" y="22" font-size="12" fill="#378ADD" font-family="Menlo, Consolas, monospace" font-weight="700">&lt;/&gt;</text></svg>'
+    'single-line': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="3" y="11" width="46" height="12" rx="2" stroke="#444" stroke-width="1.3"/><text x="8" y="21" font-size="9" fill="#444" font-family="Arial, sans-serif" font-weight="700">abc</text><line x1="24" y1="14" x2="24" y2="21" stroke="#444" stroke-width="1.2" opacity="0.5"/></svg>'
+    'paragraph': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 34" fill="none"><rect x="3" y="3" width="46" height="28" rx="2" stroke="#444" stroke-width="1.3"/><line x1="7" y1="10" x2="42" y2="10" stroke="#444" stroke-width="1.1" opacity="0.6"/><line x1="7" y1="16" x2="45" y2="16" stroke="#444" stroke-width="1.1" opacity="0.6"/><line x1="7" y1="22" x2="38" y2="22" stroke="#444" stroke-width="1.1" opacity="0.6"/><path d="M44 27 L48 27 L48 31" stroke="#444" stroke-width="1.1" fill="none"/></svg>'
     'note-display': '<svg viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="6" width="56" height="32" rx="3" stroke="#888" stroke-width="1.2"/><rect x="14" y="13" width="44" height="4" rx="1" fill="#888" fill-opacity="0.22"/><rect x="14" y="21" width="36" height="4" rx="1" fill="#888" fill-opacity="0.22"/><rect x="14" y="29" width="26" height="4" rx="1" fill="#888" fill-opacity="0.22"/></svg>'
     'file-upload': '<svg viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 4 L17 40 L55 40 L55 14 L45 4 Z" stroke="#888" stroke-width="1.3"/><path d="M45 4 L45 14 L55 14" stroke="#888" stroke-width="1.1" fill="none"/><line x1="36" y1="33" x2="36" y2="22" stroke="#888" stroke-width="1.4" stroke-linecap="round"/><path d="M31 27 L36 22 L41 27" stroke="#888" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
     'full-date': '<svg viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="14" width="18" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="11" y="23" font-size="7" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">DD</text><rect x="27" y="14" width="18" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="36" y="23" font-size="7" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">MM</text><rect x="52" y="14" width="18" height="16" rx="2.5" stroke="#888" stroke-width="1.3"/><text x="61" y="23" font-size="6" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">YYYY</text></svg>'
@@ -922,7 +934,13 @@ module.exports = do ->
       { slug: 'file-upload', label: t('File upload') }
       { slug: 'custom',      label: t('Custom') }
     ]
-    if questionType is 'date' then date
+    text = [
+      { slug: 'single-line', label: t('Single line') }
+      { slug: 'paragraph',   label: t('Paragraph') }
+      { slug: 'custom',      label: t('Custom') }
+    ]
+    if questionType is 'text' then text
+    else if questionType is 'date' then date
     else if questionType is 'note' then note
     else if questionType is 'file' then file
     else if questionType is 'select_multiple' then select_multiple
@@ -930,7 +948,7 @@ module.exports = do ->
 
   viewRowDetail.DetailViewMixins.appearance =
     isCardGridType: ->
-      @model_type() in ['select_one', 'select_multiple', 'date', 'note', 'file']
+      @model_type() in ['select_one', 'select_multiple', 'date', 'note', 'file', 'text']
 
     getTypes: ->
       types =
