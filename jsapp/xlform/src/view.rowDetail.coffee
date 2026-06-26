@@ -5,10 +5,10 @@ $configs = require './model.configs'
 $viewUtils = require './view.utils'
 $icons = require './view.icons'
 $hxl = require './view.rowDetail.hxlDict'
-ResizeSensor = require 'css-element-queries/src/ResizeSensor'
 
 $viewRowDetailSkipLogic = require './view.rowDetail.SkipLogic'
 $viewTemplates = require './view.templates'
+$rowTemplates = require './view.row.templates'
 
 module.exports = do ->
   viewRowDetail = {}
@@ -317,18 +317,18 @@ module.exports = do ->
       #   placeholder_text = t(placeholder_text)
       escaped = @_escapeAttr(placeholder_text)
       if max_length is ''
-        @field """<input type="text" name="#{key}" id="#{cid}" class="#{input_class}" placeholder="#{escaped}" />""", cid, key_label
+        @field """<input type="text" name="#{key}" id="#{cid}" class="#{input_class}" dir="auto" placeholder="#{escaped}" />""", cid, key_label
       else
-        @field """<input type="text" name="#{key}" id="#{cid}" class="#{input_class}" placeholder="#{escaped}" maxlength="#{max_length}" />""", cid, key_label
+        @field """<input type="text" name="#{key}" id="#{cid}" class="#{input_class}" dir="auto" placeholder="#{escaped}" maxlength="#{max_length}" />""", cid, key_label
 
     textarea: (cid, key, key_label = key, input_class = '', placeholder_text='', max_length = '') ->
       # if placeholder_text is not ''
       #   placeholder_text = t(placeholder_text)
       escaped = @_escapeAttr(placeholder_text)
       if max_length is ''
-        @field """<textarea name="#{key}" id="#{cid}" class="#{input_class}" placeholder="#{escaped}" />""", cid, key_label
+        @field """<textarea name="#{key}" id="#{cid}" class="#{input_class}" dir="auto" placeholder="#{escaped}" />""", cid, key_label
       else
-        @field """<textarea name="#{key}" id="#{cid}" class="#{input_class}" placeholder="#{escaped}" maxlength="#{max_length}" />""", cid, key_label
+        @field """<textarea name="#{key}" id="#{cid}" class="#{input_class}" dir="auto" placeholder="#{escaped}" maxlength="#{max_length}" />""", cid, key_label
 
     checkbox: (cid, key, key_label = key, input_label = t("Yes")) ->
       input_label = input_label
@@ -346,7 +346,11 @@ module.exports = do ->
       select = """<select name="#{key}" id="#{cid}">"""
 
       for value in values
-        if typeof value == 'object'
+        if Array.isArray(value)
+          # HACK FIX: we're expecting an array of this structure [['option', 'Description'], ...] in order
+          # to display the option next to some helpful text in a dropdown
+          select += """<option value="#{value[0]}">#{value[0]} (#{value[1]})</option>"""
+        else if typeof value == 'object'
           select += """<option value="#{value.value}">#{value.text}</option>"""
         else
           select += """<option value="#{value}">#{value}</option>"""
@@ -424,6 +428,39 @@ module.exports = do ->
       return
 
 
+  viewRowDetail.DetailViewMixins.file =
+    html: ->
+      @fieldTab = "active"
+      @$el.addClass("card__settings__fields--file")
+      available_files = this.model.getSurvey().availableFiles || []
+      file = available_files[0]
+      if available_files.length is 0
+        return viewRowDetail.Templates.textbox @cid, @model.key, label, 'text'
+      else
+        options = []
+        for file in available_files
+          options.push "<option>#{file.metadata.filename}</option>"
+        uniq = "select-file-#{@cid}"
+        tfile = t("Choices File")
+        return """
+            <label for="#{uniq}">#{tfile}:</label>
+            <div class="settings__input">
+              <select id="#{uniq}">
+                #{options.join('')}
+              </select>
+            </div>
+        """
+
+    afterRender: ->
+      @$el.find('select').eq(0).val(@model.get("value"))
+      @listenForSelectChange(@$('select').eq(0))
+
+    listenForSelectChange: ($select) ->
+      $select.on 'change', (evt) =>
+        targetval = evt.target.value
+        @model.set('value', targetval)
+
+
   viewRowDetail.DetailViewMixins.label =
     html: -> false
     insertInDOM: (rowView)->
@@ -446,31 +483,13 @@ module.exports = do ->
 
       $textarea.css("min-height", 20)
 
-      resizableOpts = {
-        containment: "parent",
-        handles: "s",
-        minHeight: 27
-      }
       if @model.get("value")?
-        setTimeout =>
-          maxLine = 3
-          textareaScrollHeight = $textarea.prop('scrollHeight')
-          textAreaLineHeight = parseInt($textarea.css('line-height'))
-          textAreaSetHeight = Math.min(textareaScrollHeight, (textAreaLineHeight * maxLine)) + 7
-          $textarea.css("height", "")
-          $textarea.css("height", textAreaSetHeight)
-          $textarea.resizable(resizableOpts)
-        , 1
-      else
-        $textarea.resizable(resizableOpts)
-
-      targetNode = $textarea.closest('.card__text')[0]
-      new ResizeSensor(targetNode, =>
-        card_text_width = targetNode.clientWidth
-        $textarea.width(card_text_width)
-        $textarea.siblings('.ui-resizable-s').width(card_text_width)
-        $textarea.closest('.ui-wrapper').width(card_text_width)
-      )
+        maxLine = 3
+        textareaScrollHeight = $textarea.prop('scrollHeight')
+        textAreaLineHeight = parseInt($textarea.css('line-height'))
+        textAreaSetHeight = Math.min(textareaScrollHeight, (textAreaLineHeight * maxLine)) + 7
+        $textarea.css("height", "")
+        $textarea.css("height", textAreaSetHeight)
 
       return
 
@@ -768,12 +787,21 @@ module.exports = do ->
       @$el.addClass('card__settings__fields--active')
       $header = $('<h4/>', { class: 'repeat-count-panel__header' }).text(t('Repeat Count - how many times should this group repeat?'))
       $hint = $('<p/>', { class: 'repeat-count-panel__hint' }).text(t('This group has repeating enabled. Enter an expression to set the number of repeats automatically, or leave blank to allow users to add and remove repeats manually.'))
+      $docLinkAnchor = $('<a/>', {
+        href: $rowTemplates.XPATH_DOCS_URL
+        target: '_blank'
+        rel: 'noopener noreferrer'
+      }).text(t('documentation'))
+      $docLink = $('<p/>', { class: 'panel__doc-link' })
+        .append(document.createTextNode(t('See the') + ' '))
+        .append($docLinkAnchor)
+        .append(document.createTextNode(' ' + t('for more information about xpath expressions.')))
       @$input = $('<input/>', {
         type: 'text'
         class: 'repeat-count-panel__input'
         placeholder: t('e.g. ${NUM_VISITS}')
       })
-      @$el.append($header).append($hint).append(@$input)
+      @$el.append($header).append($hint).append($docLink).append(@$input)
 
       fireChange = =>
         val = @$input.val()
@@ -915,10 +943,13 @@ module.exports = do ->
         integer: ['analog-scale horizontal', 'analog-scale horizontal no-ticks', 'analog-scale vertical', 'analog-scale vertical no-ticks', 'analog-scale vertical show-scale']
       types[@model_type()]
 
+
     html: ->
+      @$el.addClass("card__settings__fields--active")
       @$el.addClass("card__settings__fields--active")
       @$select_width = $('<select/>', { id: "select-width" })
       @select_width_default_value = ''
+      $('<option />', {value: "select", text: t("Width not selected (w4 will be used)")}).appendTo(@$select_width)
       $('<option />', {value: "select", text: t("Width not selected (w4 will be used)")}).appendTo(@$select_width)
       @width_options = []
       for option in [1..10]
@@ -932,10 +963,18 @@ module.exports = do ->
       @$checkbox_samescreen = $('<input/>', { type: "checkbox", id: "checkbox-samescreen", style: 'margin-top: 10px;' })
       @$label_checkbox_samescreen = $('<span/>', { style: 'margin-left: 4px;' }).text(t('Show all questions in this group on the same screen'))
       @fieldListStr = 'field-list'
+
+      if @isCardGridType()
+        return ''
+
+      @$checkbox_samescreen = $('<input/>', { type: "checkbox", id: "checkbox-samescreen", style: 'margin-top: 10px;' })
+      @$label_checkbox_samescreen = $('<span/>', { style: 'margin-left: 4px;' }).text(t('Show all questions in this group on the same screen'))
+      @fieldListStr = 'field-list'
       @$textbox_other = null
       @is_input_select = false
       @is_input_text_other = false
       @is_checkbox_samescreen = false
+
 
       if @model_is_group(@model)
         return viewRowDetail.Templates.textbox @cid, @model.key, t("Appearance"), 'text'
@@ -957,9 +996,18 @@ module.exports = do ->
         target = if rowView.primaryRowDetailParentRight? then rowView.primaryRowDetailParentRight else rowView.defaultRowDetailParent
         @_insertInDOM target
 
+    insertInDOM: (rowView) ->
+      if @isCardGridType()
+        @_insertInDOM rowView.appearanceRowDetailParent
+      else
+        target = if rowView.primaryRowDetailParentRight? then rowView.primaryRowDetailParentRight else rowView.defaultRowDetailParent
+        @_insertInDOM target
+
     model_is_group: (model) ->
       model._parent.constructor.key == 'group'
 
+    model_get_parent_group: ->
+      parent_group = null
     model_get_parent_group: ->
       parent_group = null
       if @model._parent._parent._parent? and @model._parent._parent._parent.constructor.key == 'group'
@@ -967,13 +1015,16 @@ module.exports = do ->
       parent_group
 
     model_get_parent_group_appearance: ->
+    model_get_parent_group_appearance: ->
       parent_group = @model_get_parent_group()
       if parent_group?
         parent_group.get('appearance').getValue()
 
     model_type: ->
+    model_type: ->
       @model._parent.getValue('type').split(' ')[0]
 
+    is_form_style_exist: ->
     is_form_style_exist: ->
       sessionStorage.getItem('kpi.editable-form.form-style') != ''
 
@@ -981,8 +1032,10 @@ module.exports = do ->
       sessionStorage.getItem('kpi.editable-form.form-style').indexOf(style) isnt -1
 
     is_form_style_pages: ->
+    is_form_style_pages: ->
       @is_form_style('pages')
 
+    is_form_style_theme_grid: ->
     is_form_style_theme_grid: ->
       @is_form_style('theme-grid')
 
@@ -1166,9 +1219,13 @@ module.exports = do ->
           $container_checkbox_samescreen = $('<div/>')
           $container_checkbox_samescreen.append(@$checkbox_samescreen)
           $container_checkbox_samescreen.append(@$label_checkbox_samescreen)
-          @$('.settings__input').append($container_checkbox_samescreen)
+          $target = @$('.xlf-dv-width-row .settings__input')
+          if $target.length is 0
+            $target = @$('.settings__input').first()
+          $target.append($container_checkbox_samescreen)
           @is_checkbox_samescreen = true
 
+        if modelValue? and modelValue != ''
         if modelValue? and modelValue != ''
           modelValue = modelValue.trim()
           samescreen_value = null
@@ -1178,10 +1235,12 @@ module.exports = do ->
           if @is_same_screen_in_model_value()
             samescreen_value = @fieldListStr
             modelValue = modelValue.split(samescreen_value).join('')
+            modelValue = modelValue.split(samescreen_value).join('')
 
           width_model_value = @get_width_from_model_value()
           if width_model_value?
             select_width_value = width_model_value
+            modelValue = modelValue.split(select_width_value).join('')
             modelValue = modelValue.split(select_width_value).join('')
 
           modelValue = modelValue.trim()
@@ -1206,6 +1265,7 @@ module.exports = do ->
           @group_inputs_change_handler()
 
       else
+      else
         if @is_form_style_theme_grid()
           $width_field = $("""<div class="card__settings__fields__field xlf-dv-width-row">
             <label for="select-width">#{t('Width')}:</label>
@@ -1217,6 +1277,7 @@ module.exports = do ->
           parent_column = 4
           if @model_get_parent_group()? and @model_get_parent_group_appearance() != ''
             parent_group_appearance = @model_get_parent_group_appearance()
+            if parent_group_appearance.indexOf(' ') == -1
             if parent_group_appearance.indexOf(' ') == -1
               if parent_group_appearance in @width_options
                 parent_column = parent_group_appearance.slice(1)
@@ -1238,6 +1299,7 @@ module.exports = do ->
 
         $select = @$('select').not('#select-width')
         if $select.length > 0
+        if $select.length > 0
           @$textbox_other = $('<input/>', { class:'text', type: 'text', width: 'auto', style: 'display: block; margin-top: 5px;' })
 
           updateSelectPlaceholderClass = () =>
@@ -1246,6 +1308,7 @@ module.exports = do ->
             else
               $select.removeClass('is-placeholder')
 
+          if modelValue? and modelValue != ''
           if modelValue? and modelValue != ''
             modelValue = modelValue.trim()
             select_value = null
@@ -1256,10 +1319,12 @@ module.exports = do ->
             if select_model_value?
               select_value = select_model_value
               modelValue = modelValue.split(select_value).join('')
+              modelValue = modelValue.split(select_value).join('')
 
             width_model_value = @get_width_from_model_value()
             if width_model_value?
               select_width_value = width_model_value
+              modelValue = modelValue.split(select_width_value).join('')
               modelValue = modelValue.split(select_width_value).join('')
 
             modelValue = modelValue.trim()
@@ -1295,7 +1360,9 @@ module.exports = do ->
               @not_group_inputs_change_handler()
 
         else
+        else
           $input = @$('input')
+          if modelValue? and modelValue != ''
           if modelValue? and modelValue != ''
             modelValue = modelValue.trim()
             input_value = null
@@ -1304,6 +1371,7 @@ module.exports = do ->
             width_model_value = @get_width_from_model_value()
             if width_model_value?
               select_width_value = width_model_value
+              modelValue = modelValue.split(select_width_value).join('')
               modelValue = modelValue.split(select_width_value).join('')
 
             modelValue = modelValue.trim()
@@ -1319,6 +1387,103 @@ module.exports = do ->
 
           @$select_width.on 'change', () =>
             @group_inputs_change_handler()
+
+    # -------------------------------------------------------------------------
+    # Helpers shared by both paths (kept from original)
+    # -------------------------------------------------------------------------
+
+    not_group_inputs_change_handler: ->
+      model_set_value = ''
+
+      if @is_input_select
+        if @is_input_text_other
+          textbox_other_value = @$textbox_other.val().trim()
+          model_set_value = textbox_other_value
+        else
+          $select = @$('select').not('#select-width')
+          select_value = $select.val()
+          select_value = '' if select_value == 'select'
+          model_set_value = select_value
+      else
+        $input = @$('input')
+        input_value = $input.val().trim()
+        model_set_value = input_value
+
+      select_width_value = @$select_width.val()
+      select_width_value = @select_width_default_value if select_width_value == 'select'
+      if model_set_value != ''
+        if select_width_value != ''
+          model_set_value += " #{select_width_value}"
+      else
+        model_set_value = select_width_value
+
+      @model.set 'value', model_set_value
+
+    group_inputs_change_handler: ->
+      model_set_value = ''
+
+      if @is_checkbox_samescreen
+        show_samescreen = @$checkbox_samescreen.prop('checked')
+        if show_samescreen
+          model_set_value = @fieldListStr
+
+      $input = @$('input')
+      input_value = $input.val().trim()
+      if model_set_value != ''
+        if input_value != ''
+          model_set_value += " #{input_value}"
+      else
+        model_set_value = input_value
+
+      select_width_value = @$select_width.val()
+      select_width_value = @select_width_default_value if select_width_value == 'select'
+      if model_set_value != ''
+        if select_width_value != ''
+          model_set_value += " #{select_width_value}"
+      else
+        model_set_value = select_width_value
+
+      @model.set 'value', model_set_value
+
+    add_input_text_change_handler: ($input, handler) ->
+      handler = handler.bind @
+      $input.off 'change'
+      $input.on 'change', () =>
+        handler()
+      $input.off 'blur'
+      $input.on 'blur', () =>
+        handler()
+      $input.off 'keyup'
+      $input.on 'keyup', (evt) =>
+        if evt.key is 'Enter' or evt.keyCode is 13
+          $input.blur()
+        else
+          handler()
+
+    is_same_screen_in_model_value: ->
+      modelValue = @model.get 'value'
+      (modelValue.indexOf @fieldListStr) > -1
+
+    get_select_value_from_model_value: ->
+      modelValue = @model.get 'value'
+      select_value = null
+      select_values = []
+      for type in @getTypes()
+        select_values.push(type) if ((modelValue.indexOf type) > -1)
+
+      if select_values.length > 0
+        if select_values.length == 1
+          select_value = select_values[0]
+        else
+          for value in select_values
+            if ((modelValue.indexOf value) > -1)
+              if select_value?
+                if select_value.length < value.length
+                  select_value = value
+              else
+                select_value = value
+
+      select_value
 
     # -------------------------------------------------------------------------
     # Helpers shared by both paths (kept from original)
@@ -1876,6 +2041,10 @@ module.exports = do ->
           if value == 'select'
             value = ''
           @model.set 'value', value
+
+  viewRowDetail.parseAppearanceValue = parseAppearanceValue
+  viewRowDetail.buildModelValue = buildModelValue
+  viewRowDetail.buildPillText = buildPillText
 
   viewRowDetail.parseAppearanceValue = parseAppearanceValue
   viewRowDetail.buildModelValue = buildModelValue

@@ -2,6 +2,8 @@
 
 window.t ?= (str) -> str
 
+window.t ?= (str) -> str
+
 $model = require('../../jsapp/xlform/src/_model')
 $configs = require('../../jsapp/xlform/src/model.configs')
 
@@ -177,6 +179,7 @@ do ->
       for key in ['bind::oc:itemgroup', 'bind::oc:briefdescription',
                   'bind::oc:description', 'bind::oc:external']
         expect(getDetail(@row, key).getSurvey()).toBe(@survey)
+      return
 
   ###############################################################
   # model.base.RowDetail — change:value event propagation
@@ -326,6 +329,7 @@ do ->
           it 'required defaults to "false"', ->
             [survey, row] = buildSurveyWithRow(qtype)
             expect(getDetail(row, 'required').get('value')).toBe('false')
+
 
           it 'readonly defaults to ""', ->
             [survey, row] = buildSurveyWithRow(qtype)

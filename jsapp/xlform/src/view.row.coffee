@@ -11,25 +11,25 @@ $viewParams = require('./view.params')
 $viewMandatorySetting = require('./view.mandatorySetting')
 $acceptedFilesView = require('./view.acceptedFiles')
 $viewRowDetail = require('./view.rowDetail')
-renderKobomatrix = require('js/formbuild/renderInBackbone').renderKobomatrix
-hasRowRestriction = require('js/components/locking/lockingUtils').hasRowRestriction
-getRowLockingProfile = require('js/components/locking/lockingUtils').getRowLockingProfile
-isRowLocked = require('js/components/locking/lockingUtils').isRowLocked
-isAssetLockable = require('js/components/locking/lockingUtils').isAssetLockable
-isAssetAllLocked = require('js/components/locking/lockingUtils').isAssetAllLocked
-getQuestionFeatures = require('js/components/locking/lockingUtils').getQuestionFeatures
-getGroupFeatures = require('js/components/locking/lockingUtils').getGroupFeatures
-LOCKING_RESTRICTIONS = require('js/components/locking/lockingConstants').LOCKING_RESTRICTIONS
-LOCKING_UI_CLASSNAMES = require('js/components/locking/lockingConstants').LOCKING_UI_CLASSNAMES
+renderKobomatrix = require('#/formbuild/renderInBackbone').renderKobomatrix
+hasRowRestriction = require('#/components/locking/lockingUtils').hasRowRestriction
+getRowLockingProfile = require('#/components/locking/lockingUtils').getRowLockingProfile
+isRowLocked = require('#/components/locking/lockingUtils').isRowLocked
+isAssetLockable = require('#/components/locking/lockingUtils').isAssetLockable
+isAssetAllLocked = require('#/components/locking/lockingUtils').isAssetAllLocked
+getQuestionFeatures = require('#/components/locking/lockingUtils').getQuestionFeatures
+getGroupFeatures = require('#/components/locking/lockingUtils').getGroupFeatures
+LockingRestrictionName = require('#/components/locking/lockingConstants').LockingRestrictionName
+LOCKING_UI_CLASSNAMES = require('#/components/locking/lockingConstants').LOCKING_UI_CLASSNAMES
 $icons = require('./view.icons')
 econsentSignature = require('../../js/components/formBuilder/econsentSignature')
 # TODO: port this and others from alertify.dialog to new modal system
 # https://github.com/kobotoolbox/kpi/issues/3977
-multiConfirm = require('js/alertify').multiConfirm
+multiConfirm = require('#/alertify').multiConfirm
 alertify = require('alertifyjs')
-constants = require('js/constants')
-notify = require('js/utils').notify
-arrayMiddleOut = require('js/ocutils').processArrayMiddleOut
+constants = require('#/constants')
+notify = require('#/utils').notify
+arrayMiddleOut = require('#/oc/utils').processArrayMiddleOut
 
 module.exports = do ->
   class BaseRowView extends Backbone.View
@@ -76,6 +76,13 @@ module.exports = do ->
 
     getRawType: ->
       return @model.get('type').get('typeId')
+
+    # All row types are supported by UI by default. If some type has `supportedByUI` override in `model.configs.coffee`
+    # we respect that.
+    isSupportedByUI: ->
+      if @model.get('type').get('rowType')?.supportedByUI is false
+        return false
+      return true
 
     ###
     # This needs to be safeguarded so much, as there is possibility row doesn't
@@ -315,6 +322,11 @@ module.exports = do ->
       return @
 
     _renderRow: ->
+      # For unsupported types we display alternative empty template
+      if not @isSupportedByUI()
+        @$el.html($viewTemplates.$$render('row.unsupportedRowView', @surveyView))
+        return @
+
       @$el.html $viewTemplates.$$render('row.xlfRowView', @surveyView)
 
       @$card = @$el.find('> .card').eq(0)
@@ -322,6 +334,14 @@ module.exports = do ->
       @$label = @$header.find('.js-card-label').eq(0)
       @$hint = @$header.find('.js-card-hint').eq(0)
       @$name = @$header.find('.card__header-name').eq(0)
+
+      if !!@model.get('file')
+        fileDetail = @model.get('file')
+        @$el.find('.card__text').append("""<p class="card__attr--file"></p>""")
+        $filePrev = @$el.find('.card__attr--file')
+        updateViewBubble = () -> $filePrev.text("🗃️ " + fileDetail.get('value'))
+        fileDetail.on('change:value', updateViewBubble)
+        updateViewBubble()
 
       context = {warnings: []}
 
@@ -349,7 +369,7 @@ module.exports = do ->
           @is_expanded = true
           isSortableDisabled = (
             @isLockable() and
-            @hasRestriction(LOCKING_RESTRICTIONS.choice_order_edit.name)
+            @hasRestriction(LockingRestrictionName.choice_order_edit)
           )
           @listView = new $viewChoices.ListView(model: cl, rowView: @).render(isSortableDisabled)
 
@@ -389,17 +409,15 @@ module.exports = do ->
     _cleanupExpandedRender: ->
       @$('.card__settings').detach()
 
-    clone: (event) =>
+    clone: (event) ->
       parent = @model._parent
-      model = @model
-      if @model.get('type').get('typeId') in ['select_one', 'select_multiple']
-        model = @model.clone()
-      else if @model.get('type').get('typeId') in ['rank', 'score']
-        model = @model.clone()
+      # When we clone a row we can't simply add another row like it, we need to also use inner clone function that will
+      # ensure all related parts are cloned too (e.g. list of choices) and the unique ids are re-generated.
+      clonedModel = @model.clone()
 
-      @model.getSurvey().insert_row.call parent._parent, model, parent.models.indexOf(@model) + 1
+      @model.getSurvey().insert_row.call(parent._parent, clonedModel, parent.models.indexOf(@model) + 1)
 
-    addItemToLibrary: (evt) =>
+    addItemToLibrary: (evt) ->
       evt.stopPropagation()
       @ngScope?.addItemToLibrary @model, @model.getSurvey()._initialParams
       # @ngScope?.add_row_to_question_library @model, @model.getSurvey()._initialParams
@@ -424,7 +442,7 @@ module.exports = do ->
 
       return
 
-    deleteGroup: (evt) =>
+    deleteGroup: (evt) ->
       evt.preventDefault()
       skipConfirm = $(evt.currentTarget).hasClass('js-force-delete-group')
       if !skipConfirm
@@ -455,28 +473,28 @@ module.exports = do ->
             label: t('Ungroup questions'),
             icon: 'k-icon k-icon-group-split'
             color: 'blue',
-            isDisabled: @isLockable() and @hasRestriction(LOCKING_RESTRICTIONS.group_split.name)
+            isDisabled: @isLockable() and @hasRestriction(LockingRestrictionName.group_split)
             callback: @_deleteGroup.bind(@),
           },
           {
             label: t('Delete everything'),
             icon: 'k-icon k-icon-trash',
             color: 'red',
-            isDisabled: @isLockable() and @hasRestriction(LOCKING_RESTRICTIONS.group_delete.name)
+            isDisabled: @isLockable() and @hasRestriction(LockingRestrictionName.group_delete)
             callback: @_deleteGroupWithContent.bind(@),
           },
         ]
       )
       return
 
-    _deleteGroup: () =>
+    _deleteGroup: () ->
       @model.splitApart()
       @model._parent._parent.trigger('remove', @model)
       @surveyView.survey.trigger('change')
       @$el.detach()
       return
 
-    _deleteGroupWithContent: () =>
+    _deleteGroupWithContent: () ->
       # delete all group rows
       @model.rows.reset()
       # and the group itself
@@ -525,6 +543,10 @@ module.exports = do ->
       if rowName is null
         return
 
+      # no locking for unsupported types
+      if @isSupportedByUI() is false
+        return
+
       @$settings = @$card.find('> .card__settings').eq(0)
       isLockable = @isLockable()
 
@@ -560,36 +582,36 @@ module.exports = do ->
       # hide group delete button only if both splitting and deleteing is locked
       if (
         isLockable and
-        @hasRestriction(LOCKING_RESTRICTIONS.group_split.name) and
-        @hasRestriction(LOCKING_RESTRICTIONS.group_delete.name)
+        @hasRestriction(LockingRestrictionName.group_split) and
+        @hasRestriction(LockingRestrictionName.group_delete)
       )
         @$header.find('.js-delete-group').addClass(LOCKING_UI_CLASSNAMES.HIDDEN)
 
       # disable group name label
-      if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.group_label_edit.name))
+      if (isLockable and @hasRestriction(LockingRestrictionName.group_label_edit))
         @$label.addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
       # hide all add and clone buttons for questions inside the group
-      if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.group_question_add.name))
+      if (isLockable and @hasRestriction(LockingRestrictionName.group_question_add))
         @$el.find('.js-add-row-button').addClass(LOCKING_UI_CLASSNAMES.HIDDEN)
         @$el.find('.js-clone-question').addClass(LOCKING_UI_CLASSNAMES.HIDDEN)
 
       # hide all child and sub-child question's delete button
-      if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.group_question_delete.name))
+      if (isLockable and @hasRestriction(LockingRestrictionName.group_question_delete))
         @$el.find('.js-delete-row').addClass(LOCKING_UI_CLASSNAMES.HIDDEN)
 
       # disable reordering all children in the group: questions and groups and
       # their children, don't apply to question options though
-      if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.group_question_order_edit.name))
+      if (isLockable and @hasRestriction(LockingRestrictionName.group_question_order_edit))
         @$card.find('.group__rows.ui-sortable').sortable('disable')
         @$card.find('.group__rows.ui-sortable').removeClass('js-sortable-enabled')
 
       # disable all UI from "Settings" tab of group settings
-      if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.group_settings_edit.name))
+      if (isLockable and @hasRestriction(LockingRestrictionName.group_settings_edit))
         @$settings.find('.js-card-settings-row-options').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
       # disable all UI from "Skip Logic" tab of group settings
-      if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.group_skip_logic_edit.name))
+      if (isLockable and @hasRestriction(LockingRestrictionName.group_skip_logic_edit))
         @$settings.find('.js-card-settings-skip-logic').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
       return
@@ -623,7 +645,7 @@ module.exports = do ->
 
       return @
 
-    add_group_to_library: (evt) =>
+    add_group_to_library: (evt) ->
       evt.stopPropagation()
       @ngScope?.addItemToLibrary(
         @model,
@@ -924,6 +946,10 @@ module.exports = do ->
       if rowName is null
         return
 
+      # no locking for unsupported types
+      if @isSupportedByUI() is false
+        return
+
       @$settings = @$card.find('> .card__settings')
       isLockable = @isLockable()
 
@@ -972,43 +998,43 @@ module.exports = do ->
             $indicatorIcon.append(iconTooltip)
 
         # disable adding new question options
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.choice_add.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.choice_add))
           @$el.find('.js-card-add-options').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
         # disable removing question options
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.choice_delete.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.choice_delete))
           @$el.find('.js-remove-option').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
         # disable changing question options labels
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.choice_label_edit.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.choice_label_edit))
           @$el.find('.js-option-label-input').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
         # disable changing question options names
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.choice_value_edit.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.choice_value_edit))
           @$el.find('.js-option-name-input').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
         # hide delete question button
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.question_delete.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.question_delete))
           @$header.find('.js-delete-row').addClass(LOCKING_UI_CLASSNAMES.HIDDEN)
 
         # disable editing question label and hint
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.question_label_edit.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.question_label_edit))
           if @$label
             @$label.addClass(LOCKING_UI_CLASSNAMES.DISABLED)
           if @$hint
             @$hint.addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
         # disable all UI from "Settings" tab of question settings and Params View (if applicable)
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.question_settings_edit.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.question_settings_edit))
           @$settings.find('.js-card-settings-row-options').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
           @$settings.find('.js-params-view').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
         # disable all UI from "Skip Logic" tab of question settings
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.question_skip_logic_edit.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.question_skip_logic_edit))
           @$settings.find('.js-card-settings-skip-logic').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
         # disable all UI from "Validation Criteria" tab of question settings
-        if (isLockable and @hasRestriction(LOCKING_RESTRICTIONS.question_validation_edit.name))
+        if (isLockable and @hasRestriction(LockingRestrictionName.question_validation_edit))
           @$settings.find('.js-card-settings-validation-criteria').addClass(LOCKING_UI_CLASSNAMES.DISABLED)
 
       return
