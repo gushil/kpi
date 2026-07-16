@@ -1133,6 +1133,9 @@ module.exports = do ->
           isSelected = card.value is cardValue
           $card = $('<div></div>')
           $card.addClass('integer-appearance-card')
+          $card.attr('role', 'button')
+          $card.attr('tabindex', '0')
+          $card.attr('aria-pressed', if isSelected then 'true' else 'false')
           if isSelected
             $card.addClass('integer-appearance-card--selected')
           $iconDiv = $('<div class="integer-appearance-card__icon"></div>')
@@ -1142,9 +1145,9 @@ module.exports = do ->
           $card.append($iconDiv).append($labelDiv)
           $grid.append($card)
 
-          $card.on 'click', =>
-            $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected')
-            $card.addClass('integer-appearance-card--selected')
+          selectCard = =>
+            $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected').attr('aria-pressed', 'false')
+            $card.addClass('integer-appearance-card--selected').attr('aria-pressed', 'true')
             @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[card.value] or CARD_LABELS[''])
             if card.value is 'other'
               $customInput.show()
@@ -1161,6 +1164,10 @@ module.exports = do ->
                   break
               newVal = if card.value and widthPart then "#{card.value} #{widthPart}" else card.value or widthPart or ''
               appearanceModel.set('value', newVal)
+
+          $card.on 'click', selectCard
+          $card.on 'keydown', (evt) =>
+            selectCard() if evt.key in ['Enter', ' ']
 
       $content.append($grid).append($customInput)
 
@@ -1202,6 +1209,9 @@ module.exports = do ->
           isSelected = card.value is cardValue
           $card = $('<div></div>')
           $card.addClass('integer-appearance-card')
+          $card.attr('role', 'button')
+          $card.attr('tabindex', '0')
+          $card.attr('aria-pressed', if isSelected then 'true' else 'false')
           if isSelected
             $card.addClass('integer-appearance-card--selected')
           $iconDiv = $('<div class="integer-appearance-card__icon"></div>')
@@ -1211,9 +1221,9 @@ module.exports = do ->
           $card.append($iconDiv).append($labelDiv)
           $grid.append($card)
 
-          $card.on 'click', =>
-            $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected')
-            $card.addClass('integer-appearance-card--selected')
+          selectCard = =>
+            $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected').attr('aria-pressed', 'false')
+            $card.addClass('integer-appearance-card--selected').attr('aria-pressed', 'true')
             @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[card.value])
             if card.value is 'other'
               $customInput.show()
@@ -1230,6 +1240,10 @@ module.exports = do ->
                   break
               newVal = if card.value and widthPart then "#{card.value} #{widthPart}" else card.value or widthPart or ''
               appearanceModel.set('value', newVal)
+
+          $card.on 'click', selectCard
+          $card.on 'keydown', (evt) =>
+            selectCard() if evt.key in ['Enter', ' ']
 
       $content.append($grid).append($customInput)
 
