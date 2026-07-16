@@ -1174,7 +1174,7 @@ module.exports = do ->
     _decimalCardValueFromModel: (modelValue) ->
       return 'default' if not modelValue
       stripped = modelValue.replace(/\bw\d+\b/g, '').trim()
-      return 'default' if stripped is 'default'
+      return 'default' if stripped is 'default' or stripped is ''
       'other'
 
     _buildDecimalAppearanceSection: (appearanceModel) ->

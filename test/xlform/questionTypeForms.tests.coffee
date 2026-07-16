@@ -165,11 +165,10 @@ do ->
       # calculate has no appearance options; html() returns falsy or no <select>
       expect(!result || result.indexOf('<select') == -1).toBe(true)
 
-    it 'decimal html() renders a textbox input (no predefined options)', ->
+    it 'decimal html() returns null (card grid rendered by view.row.coffee)', ->
       ctx = buildAppearanceMixinCtx('decimal')
       result = ctx.html()
-      # Falls through to the textbox branch
-      expect(result.indexOf('input')).not.toBe(-1)
+      expect(!result || result.indexOf('<select') is -1).toBe(true)
 
   ###############################################################
   # Per-type: select_one_from_file_ has extra "filename" field
