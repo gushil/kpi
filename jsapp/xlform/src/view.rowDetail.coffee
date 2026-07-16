@@ -1124,7 +1124,7 @@ module.exports = do ->
       if @model_is_group(@model)
         return viewRowDetail.Templates.textbox @cid, @model.key, t("Appearance"), 'text'
       else
-        if @model_type() is 'integer'
+        if @model_type() is 'integer' or @model_type() is 'decimal'
           return null
         if @model_type() isnt 'calculate'
           appearances = @getTypes()
@@ -1383,6 +1383,8 @@ module.exports = do ->
         @$select_width.on 'change', () =>
           if @model_type() is 'integer'
             @_integer_width_change_handler()
+          else if @model_type() is 'decimal'
+            @_decimal_width_change_handler()
           else
             @group_inputs_change_handler()
 
@@ -1757,6 +1759,22 @@ module.exports = do ->
       else
         @model.set 'value', ''
 
+    _decimal_width_change_handler: () ->
+      currentModelValue = (@model.get('value') or '').trim()
+      width_options = ('w' + i for i in [1..10])
+      appearancePart = currentModelValue
+      for w in width_options
+        appearancePart = appearancePart.replace(new RegExp('\\s*\\b' + w + '\\b\\s*', 'g'), '').trim()
+      widthVal = @$select_width.val()
+      widthVal = '' if widthVal is 'select'
+      if appearancePart and widthVal
+        @model.set 'value', "#{appearancePart} #{widthVal}"
+      else if appearancePart
+        @model.set 'value', appearancePart
+      else if widthVal
+        @model.set 'value', widthVal
+      else
+        @model.set 'value', ''
     not_group_inputs_change_handler: ->
       model_set_value = ''
 
