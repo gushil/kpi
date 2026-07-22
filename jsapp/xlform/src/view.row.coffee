@@ -12,6 +12,7 @@ $viewMandatorySetting = require('./view.mandatorySetting')
 $acceptedFilesView = require('./view.acceptedFiles')
 $viewRowDetail = require('./view.rowDetail')
 renderKobomatrix = require('#/formbuild/renderInBackbone').renderKobomatrix
+generateButtonBridge = require('#/openclinica/generateButtonBridge')
 hasRowRestriction = require('#/components/locking/lockingUtils').hasRowRestriction
 getRowLockingProfile = require('#/components/locking/lockingUtils').getRowLockingProfile
 isRowLocked = require('#/components/locking/lockingUtils').isRowLocked
@@ -426,6 +427,14 @@ module.exports = do ->
       ``
 
     _cleanupExpandedRender: ->
+      # OC fork (P1.3): unmount any Logic Builder "Generate" React roots mounted
+      # into this drawer before detaching it, so React roots don't leak.
+      generateButtonBridge.unmountAll(@$('.card__settings').get(0))
+      # OC fork (P1.3): tear down the model listeners registered via @listenTo
+      # in _expandedRender (e.g. the calculation/default/repeat_count panel
+      # live-refresh bindings) so re-opening the drawer doesn't accumulate
+      # duplicate handlers bound to stale, detached inputs.
+      @stopListening()
       @$('.card__settings').detach()
 
     clone: (event) ->
@@ -803,6 +812,11 @@ module.exports = do ->
         @cardSettingsWrap.find('.js-default-value-tab').removeClass('default-value-tab--hidden')
         $defaultPanel = $($viewTemplates.$$render('row.defaultValuePanel'))
         $defaultPanel.appendTo(@cardSettingsWrap.find('.js-card-settings-default-value'))
+        # OC fork (P1.3): AI Generate button in the Default Value panel header.
+        generateButtonBridge.mountGenerateButton(
+          $defaultPanel.find('.default-value-panel__header').get(0)
+          { row: @model, attribute: 'default' }
+        )
         $defaultTextarea = $defaultPanel.find('.js-default-value-input')
         currentVal = defaultModel.get('value') or ''
         $defaultTextarea.val(currentVal)
@@ -822,6 +836,24 @@ module.exports = do ->
             evt.preventDefault()
             $defaultTextarea.blur()
 
+        # OC fork (P1.3): keep the visible field in sync when the AI dialog's
+        # Apply writes directly to the model — otherwise the textarea still
+        # shows whatever it had at drawer-open time until the drawer is
+        # closed/reopened. Guarded by a value comparison so the user's own
+        # typing (which already wrote this exact value via updateDefaultModel
+        # above) never re-triggers a redundant DOM write. Bound via listenTo
+        # so _cleanupExpandedRender's @stopListening() removes it on close,
+        # instead of accumulating a new handler on every drawer open.
+        refreshDefaultInput = ->
+          modelVal = defaultModel.get('value') or ''
+          if $defaultTextarea.val() isnt modelVal
+            $defaultTextarea.val(modelVal)
+            if modelVal
+              scrollHeight = $defaultTextarea.prop('scrollHeight')
+              $defaultTextarea.css('height', '')
+              $defaultTextarea.css('height', scrollHeight)
+        @listenTo(defaultModel, 'change:value', refreshDefaultInput)
+
       # Calculation panel setup
       typesWithoutCalculation = ['note', 'image', 'audio', 'video', 'file']
       calculationModel = @model.get('calculation')
@@ -830,6 +862,11 @@ module.exports = do ->
         @cardSettingsWrap.find('.js-calculation-tab').removeClass('calculation-tab--hidden')
         $calcPanel = $($viewTemplates.$$render('row.calculationPanel'))
         $calcPanel.appendTo(@cardSettingsWrap.find('.js-card-settings-calculation'))
+        # OC fork (P1.3): AI Generate button in the Calculation panel header.
+        generateButtonBridge.mountGenerateButton(
+          $calcPanel.find('.calculation-panel__header').get(0)
+          { row: @model, attribute: 'calculation' }
+        )
 
         $calcTextarea = $calcPanel.find('.js-calculation-input')
         currentCalcVal = calculationModel.get('value') or ''
@@ -851,6 +888,20 @@ module.exports = do ->
           if evt.key is 'Enter' or evt.keyCode is 13
             evt.preventDefault()
             $calcTextarea.blur()
+
+        # OC fork (P1.3): keep the visible field in sync when the AI dialog's
+        # Apply writes directly to the model — see matching comment above
+        # refreshDefaultInput for the full rationale (guarded write, listenTo
+        # + @stopListening() teardown in _cleanupExpandedRender).
+        refreshCalculationInput = ->
+          modelVal = calculationModel.get('value') or ''
+          if $calcTextarea.val() isnt modelVal
+            $calcTextarea.val(modelVal)
+            if modelVal
+              scrollHeight = $calcTextarea.prop('scrollHeight')
+              $calcTextarea.css('height', '')
+              $calcTextarea.css('height', scrollHeight)
+        @listenTo(calculationModel, 'change:value', refreshCalculationInput)
 
         $calcTabError = @cardSettingsWrap.find('.js-calculation-tab-error')
         updateCalcTabError = ->

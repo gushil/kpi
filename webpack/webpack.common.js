@@ -97,6 +97,11 @@ const commonOptions = {
       '#': path.join(__dirname, '..', 'jsapp', 'js'), // TODO: someday rename "js" to "src".
       js: path.join(__dirname, '..', 'jsapp', 'js'), // within scss files only, sass-loader doesn't handle # char.
       scss: path.join(__dirname, '..', 'jsapp', 'scss'), // within scss files only.
+      // OC fork: dedupe React so the symlinked `@openclinica/logic-builder`
+      // (which externalizes react/react-dom) binds to kpi's single React 18
+      // copy instead of its own dev-dependency React.
+      react: path.join(__dirname, '../node_modules/react'),
+      'react-dom': path.join(__dirname, '../node_modules/react-dom'),
     },
     // HACKFIX: needed because of https://github.com/react-dnd/react-dnd/issues/3423
     fallback: {

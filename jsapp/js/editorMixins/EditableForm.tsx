@@ -70,6 +70,10 @@ import SurveyScope from '../models/surveyScope'
 import { type SurveyStateStoreData, stores } from '../stores'
 import { escapeHtml, recordKeys } from '../utils'
 import AssetNavigator from './AssetNavigator'
+// OC fork (P1.3): AI Generator dialog + Logic Builder wiring.
+import { AiGeneratorDialog, type FormFieldContext } from '@openclinica/logic-builder'
+import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
+import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 
 const ErrorMessage = makeBem(null, 'error-message')
 const ErrorMessage__strong = makeBem(null, 'error-message__header', 'strong')
@@ -168,6 +172,52 @@ interface EditableFormState extends SurveyStateStoreData {
   surveyAppRendered: boolean
   surveyLoadError: string | undefined
   surveySaveFail: boolean
+}
+
+/**
+ * OC fork (P1.3): best-effort read of the survey's fields to give the AI
+ * Generator dialog some context. The STUB client ignores it, so any failure
+ * here is non-fatal — we fall back to an empty field list.
+ */
+function buildFieldContext(row: any): FormFieldContext {
+  try {
+    const survey = row?.getSurvey?.()
+    if (!survey?.forEachRow) {
+      return { fields: [] }
+    }
+    const fields: FormFieldContext['fields'] = []
+    survey.forEachRow(
+      (r: any) => {
+        let name = ''
+        try {
+          name = r.getValue('name') || ''
+        } catch {
+          name = ''
+        }
+        if (!name) {
+          return
+        }
+        let type = ''
+        try {
+          type = String(r.getValue('type') || '')
+        } catch {
+          type = ''
+        }
+        let label = ''
+        try {
+          const rawLabel = r.getValue('label')
+          label = Array.isArray(rawLabel) ? String(rawLabel[0] ?? '') : String(rawLabel ?? '')
+        } catch {
+          label = ''
+        }
+        fields.push({ name, type, label })
+      },
+      { includeGroups: false },
+    )
+    return { fields }
+  } catch {
+    return { fields: [] }
+  }
 }
 
 /**
@@ -313,6 +363,71 @@ export default function EditableForm(props: EditableFormProps) {
       ...currentState,
       ...storeState,
     }))
+  }
+
+  // OC fork (P1.3): AI Generator dialog open/close/apply, driven by the
+  // `generateRequest` pushed onto `stores.surveyState` by the Backbone-side
+  // Generate buttons (see openclinica/generateButtonBridge.tsx).
+  function closeGenerateDialog() {
+    stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
+  }
+
+  function applyGeneratedExpression(expression: string) {
+    const request = state[GENERATE_REQUEST_KEY]
+    if (request?.row && request?.attribute) {
+      try {
+        // Match the panel inputs, which strip newlines (calculation/default do
+        // `replace(/\n/g, '')` and block Enter). XLSForm expressions are
+        // single-line, so keep the model consistent with what the UI allows.
+        const normalized = expression.replace(/\r?\n/g, '')
+        // CRITICAL: write via the RowDetail wrapper, never row.set('<col>', ...).
+        request.row.get(request.attribute)?.set?.('value', normalized)
+        // `relevant`/`constraint` are not in the auto-`change` whitelist, so
+        // trigger it explicitly (idempotent for every attribute) to enable Save.
+        request.row.getSurvey?.()?.trigger?.('change')
+      } catch (e) {
+        console.error('Logic Builder: failed to apply generated expression', e)
+      }
+    }
+    closeGenerateDialog()
+  }
+
+  function renderAiGeneratorDialog() {
+    const request = state[GENERATE_REQUEST_KEY]
+    if (!request?.row || !request?.attribute) {
+      return null
+    }
+    const tab = columnToTab(request.attribute)
+    if (!tab) {
+      return null
+    }
+    let currentExpression = ''
+    try {
+      currentExpression = request.row.get(request.attribute)?.get?.('value') || ''
+    } catch {
+      currentExpression = ''
+    }
+    let itemName = ''
+    try {
+      itemName = request.row.getValue?.('name') || request.row.get?.('name')?.get?.('value') || ''
+    } catch {
+      itemName = ''
+    }
+    return (
+      <AiGeneratorDialog
+        open
+        scope={{
+          itemName,
+          attribute: tab,
+          fields: buildFieldContext(request.row),
+          currentExpression,
+        }}
+        client={logicBuilderStubClient}
+        inertRoot={formWrapRef.current}
+        onApply={applyGeneratedExpression}
+        onClose={closeGenerateDialog}
+      />
+    )
   }
 
   function onStyleChange(newStyle: null | FormStyleDefinition) {
@@ -1531,6 +1646,9 @@ export default function EditableForm(props: EditableFormProps) {
               <Modal.Body>{renderCascadePopup()}</Modal.Body>
             </Modal>
           )}
+
+          {/* OC fork (P1.3): AI Generator dialog (portals to document.body itself). */}
+          {renderAiGeneratorDialog()}
         </div>
       </>
     </DocumentTitle>
