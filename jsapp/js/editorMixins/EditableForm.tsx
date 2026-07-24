@@ -84,7 +84,8 @@ const CHOICE_LIST_SUPPORT_URL = 'cascading_select.html'
 
 // OC fork: OpenClinica Form Designer help docs and a sessionStorage cache for the
 // selected form style.
-const FORM_DESIGNER_SUPPORT_URL = 'https://docs.openclinica.com/oc4/help-index/form-designer/'
+const FORM_DESIGNER_SUPPORT_URL =
+  'https://openclinicaservicedesk.freshdesk.com/support/solutions/articles/158000436442-using-form-designer'
 const FORM_STYLE_CACHE_NAME = 'kpi.editable-form.form-style'
 
 const UNSAVED_CHANGES_WARNING = t('You have unsaved changes. Leave form without saving?')
