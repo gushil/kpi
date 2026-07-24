@@ -29,6 +29,11 @@ interface TrackedRoot {
 
 // Module-level registry of every React root we create, so we can unmount them
 // on drawer cleanup (the settings drawer has no unmount hook of its own).
+//
+// NOTE (PR#273 #8): jsapp/js/formbuild/renderInBackbone.js also mounts React
+// into Backbone views (renderKobomatrix), but it does not track or unmount its
+// roots (see its own open TODO). This bridge intentionally adds that lifecycle
+// management; folding the two into one shared helper is worthwhile follow-up.
 const trackedRoots: TrackedRoot[] = []
 
 interface MountOptions {
@@ -110,8 +115,10 @@ export function unmountAll(scope?: unknown): void {
     }
     try {
       tracked.root.unmount()
-    } catch {
-      // ignore — already unmounted / detached
+    } catch (e) {
+      // Most likely already unmounted / detached — but don't assume that; a
+      // real unmount failure should leave a trace rather than vanish (PR#273 #7).
+      console.error('Logic Builder: failed to unmount a Generate-button root', e)
     }
     tracked.mountEl.remove()
     trackedRoots.splice(i, 1)

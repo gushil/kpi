@@ -633,6 +633,20 @@ module.exports = do ->
         { row: @model._parent, attribute: 'relevant' }
       )
 
+      # OC fork (PR#273 #2): the skip-logic facade is seeded from the model value
+      # once and cached, so an external write (e.g. applying an AI-generated
+      # expression) leaves the panel showing the old value and can silently
+      # overwrite the applied one. Rebuild the facade from the current value and
+      # re-render whenever value changes underneath us. change:value fires only
+      # on such external writes here (typing updates facade state + a survey
+      # 'change', not model.set('value')), so this never fights the user's own
+      # edits. Bound on the long-lived rowView so _cleanupExpandedRender's
+      # stopListening tears it down (no duplicate handlers across drawer opens).
+      @rowView.listenTo(@model, 'change:value', =>
+        @model.postInitialize()
+        @model.facade.render(@target_element)
+      )
+
     insertInDOM: (rowView) ->
       @_insertInDOM rowView.cardSettingsWrap.find('.js-card-settings-relevant-logic').eq(0)
 
@@ -661,6 +675,14 @@ module.exports = do ->
       generateButtonBridge.mountGenerateButton(
         @$('.skiplogic__extras').get(0)
         { row: @model._parent, attribute: 'constraint' }
+      )
+
+      # OC fork (PR#273 #2): see the identical note on the relevant panel above.
+      # The validation-criteria facade is likewise seeded once and cached, so
+      # rebuild + re-render it when the value changes underneath us.
+      @rowView.listenTo(@model, 'change:value', =>
+        @model.postInitialize()
+        @model.facade.render(@target_element)
       )
 
     insertInDOM: (rowView) ->

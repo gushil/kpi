@@ -75,6 +75,10 @@ import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openc
 import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 
+// OC fork (P1.3): only Calculation and Default block newlines on manual entry,
+// so an applied AI result is normalized only for those two (PR#273 #3).
+const NEWLINE_STRIPPING_ATTRIBUTES = new Set(['calculation', 'default'])
+
 const ErrorMessage = makeBem(null, 'error-message')
 const ErrorMessage__strong = makeBem(null, 'error-message__header', 'strong')
 bem.CascadePopup = makeBem(null, 'cascade-popup')
@@ -192,7 +196,8 @@ function buildFieldContext(row: any): FormFieldContext {
         let name = ''
         try {
           name = r.getValue('name') || ''
-        } catch {
+        } catch (e) {
+          console.warn('Logic Builder: failed to read a field name for AI context', e)
           name = ''
         }
         if (!name) {
@@ -201,14 +206,16 @@ function buildFieldContext(row: any): FormFieldContext {
         let type = ''
         try {
           type = String(r.getValue('type') || '')
-        } catch {
+        } catch (e) {
+          console.warn('Logic Builder: failed to read a field type for AI context', e)
           type = ''
         }
         let label = ''
         try {
           const rawLabel = r.getValue('label')
           label = Array.isArray(rawLabel) ? String(rawLabel[0] ?? '') : String(rawLabel ?? '')
-        } catch {
+        } catch (e) {
+          console.warn('Logic Builder: failed to read a field label for AI context', e)
           label = ''
         }
         fields.push({ name, type, label })
@@ -216,7 +223,8 @@ function buildFieldContext(row: any): FormFieldContext {
       { includeGroups: false },
     )
     return { fields }
-  } catch {
+  } catch (e) {
+    console.warn('Logic Builder: failed to build field context; using empty list', e)
     return { fields: [] }
   }
 }
@@ -251,6 +259,11 @@ export default function EditableForm(props: EditableFormProps) {
   })
 
   const formWrapRef = useRef<HTMLDivElement>(null)
+  // OC fork (P1.3): ref on the whole builder so the AI dialog can make it inert
+  // (aside + header + form content), keeping Save / Preview / Manage Languages
+  // unclickable while it is open (PR#273 #10). The dialog portals to <body>, so
+  // it itself stays interactive.
+  const formBuilderWrapRef = useRef<HTMLDivElement>(null)
   const cascadeRef = useRef<HTMLTextAreaElement>(null)
 
   const onSurveyChangeDebounced = debounce(onSurveyChange, 200)
@@ -375,20 +388,34 @@ export default function EditableForm(props: EditableFormProps) {
 
   function applyGeneratedExpression(expression: string) {
     const request = state[GENERATE_REQUEST_KEY]
-    if (request?.row && request?.attribute) {
-      try {
-        // Match the panel inputs, which strip newlines (calculation/default do
-        // `replace(/\n/g, '')` and block Enter). XLSForm expressions are
-        // single-line, so keep the model consistent with what the UI allows.
-        const normalized = expression.replace(/\r?\n/g, '')
-        // CRITICAL: write via the RowDetail wrapper, never row.set('<col>', ...).
-        request.row.get(request.attribute)?.set?.('value', normalized)
-        // `relevant`/`constraint` are not in the auto-`change` whitelist, so
-        // trigger it explicitly (idempotent for every attribute) to enable Save.
-        request.row.getSurvey?.()?.trigger?.('change')
-      } catch (e) {
-        console.error('Logic Builder: failed to apply generated expression', e)
-      }
+    const detail =
+      request?.row && request?.attribute ? request.row.get(request.attribute) : null
+    if (!request?.attribute || !detail?.set) {
+      // The RowDetail we meant to write is gone (row removed, stale reference,
+      // or a mapping miss). The dialog closes on Apply regardless, so surface an
+      // error instead of letting a silent no-op look like a saved value (PR#273 #1).
+      console.error(
+        'Logic Builder: could not apply generated expression — no RowDetail for',
+        request?.attribute,
+      )
+      alertify.error(t('Could not apply the generated expression. Please try again.'))
+      closeGenerateDialog()
+      return
+    }
+    try {
+      // Only Calculation/Default block newlines on manual entry; Constraint and
+      // Relevant keep them, so normalize only where manual input already does.
+      const value = NEWLINE_STRIPPING_ATTRIBUTES.has(request.attribute)
+        ? expression.replace(/\r?\n/g, '')
+        : expression
+      // CRITICAL: write via the RowDetail wrapper, never row.set('<col>', ...).
+      detail.set('value', value)
+      // `relevant`/`constraint` are not in the auto-`change` whitelist, so
+      // trigger it explicitly (idempotent for every attribute) to enable Save.
+      request.row.getSurvey?.()?.trigger?.('change')
+    } catch (e) {
+      console.error('Logic Builder: failed to apply generated expression', e)
+      alertify.error(t('Could not apply the generated expression. Please try again.'))
     }
     closeGenerateDialog()
   }
@@ -405,13 +432,15 @@ export default function EditableForm(props: EditableFormProps) {
     let currentExpression = ''
     try {
       currentExpression = request.row.get(request.attribute)?.get?.('value') || ''
-    } catch {
+    } catch (e) {
+      console.warn('Logic Builder: failed to read current expression for the dialog', e)
       currentExpression = ''
     }
     let itemName = ''
     try {
       itemName = request.row.getValue?.('name') || request.row.get?.('name')?.get?.('value') || ''
-    } catch {
+    } catch (e) {
+      console.warn('Logic Builder: failed to read item name for the dialog', e)
       itemName = ''
     }
     return (
@@ -424,7 +453,7 @@ export default function EditableForm(props: EditableFormProps) {
           currentExpression,
         }}
         client={logicBuilderStubClient}
-        inertRoot={formWrapRef.current}
+        inertRoot={formBuilderWrapRef.current}
         onApply={applyGeneratedExpression}
         onClose={closeGenerateDialog}
       />
@@ -1607,7 +1636,7 @@ export default function EditableForm(props: EditableFormProps) {
           */
           state.preventNavigatingOut && <Prompt />
         }
-        <div className='form-builder-wrapper'>
+        <div className='form-builder-wrapper' ref={formBuilderWrapRef}>
           {renderAside()}
 
           <bem.FormBuilder>
