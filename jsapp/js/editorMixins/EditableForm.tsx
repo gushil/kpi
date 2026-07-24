@@ -71,7 +71,7 @@ import { type SurveyStateStoreData, stores } from '../stores'
 import { escapeHtml, recordKeys } from '../utils'
 import AssetNavigator from './AssetNavigator'
 // OC fork (P1.3): AI Generator dialog + Logic Builder wiring.
-import { AiGeneratorDialog, type FormFieldContext } from '@openclinica/logic-builder'
+import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openclinica/logic-builder'
 import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 
@@ -185,7 +185,8 @@ function buildFieldContext(row: any): FormFieldContext {
     if (!survey?.forEachRow) {
       return { fields: [] }
     }
-    const fields: FormFieldContext['fields'] = []
+    // Mutable local we build up, then hand off as the readonly context field.
+    const fields: FormField[] = []
     survey.forEachRow(
       (r: any) => {
         let name = ''
