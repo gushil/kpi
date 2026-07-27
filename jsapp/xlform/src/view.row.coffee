@@ -1147,6 +1147,14 @@ module.exports = do ->
       else if modelValue isnt 'other' and modelValue isnt ''
         $customInput.val(modelValue)
 
+      updatePillText = (value) =>
+        text = if value is 'other'
+          customVal = $customInput.val().trim()
+          if customVal then "#{t('Custom')}: #{customVal}" else t('Custom')
+        else
+          CARD_LABELS[value] or CARD_LABELS['']
+        @appearanceSection.find('.js-appearance-pill').text(text)
+
       for card in INTEGER_APPEARANCE_CARDS
         do (card) =>
           isSelected = card.value is cardValue
@@ -1167,7 +1175,6 @@ module.exports = do ->
           selectCard = =>
             $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected').attr('aria-pressed', 'false')
             $card.addClass('integer-appearance-card--selected').attr('aria-pressed', 'true')
-            @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[card.value] or CARD_LABELS[''])
             if card.value is 'other'
               $customInput.show()
               customVal = $customInput.val().trim()
@@ -1176,13 +1183,11 @@ module.exports = do ->
               $customInput.val('')
               $customInput.hide()
               currentFull = (appearanceModel.get('value') or '').trim()
-              widthPart = ''
-              for wOpt in ['w10','w9','w8','w7','w6','w5','w4','w3','w2','w1']
-                if currentFull.indexOf(wOpt) > -1
-                  widthPart = wOpt
-                  break
+              widthMatch = currentFull.match(/\bw\d+\b/)
+              widthPart = if widthMatch then widthMatch[0] else ''
               newVal = if card.value and widthPart then "#{card.value} #{widthPart}" else card.value or widthPart or ''
               appearanceModel.set('value', newVal)
+            updatePillText(card.value)
 
           $card.on 'click', selectCard
           $card.on 'keydown', (evt) =>
@@ -1192,12 +1197,13 @@ module.exports = do ->
 
       $content.append($grid).append($customInput)
 
-      @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[cardValue] or CARD_LABELS[''])
+      updatePillText(cardValue)
 
       $customInput.on 'input blur change', =>
         if $customInput.is(':visible')
           customVal = $customInput.val().trim()
           appearanceModel.set('value', if customVal then customVal else 'other')
+          updatePillText('other')
 
     _decimalCardValueFromModel: (modelValue) ->
       return '' if not modelValue or modelValue is 'default'
@@ -1225,6 +1231,14 @@ module.exports = do ->
       else if modelValue isnt 'other' and modelValue isnt ''
         $customInput.val(modelValue)
 
+      updatePillText = (value) =>
+        text = if value is 'other'
+          customVal = $customInput.val().trim()
+          if customVal then "#{t('Custom')}: #{customVal}" else t('Custom')
+        else
+          CARD_LABELS[value]
+        @appearanceSection.find('.js-appearance-pill').text(text)
+
       for card in DECIMAL_APPEARANCE_CARDS
         do (card) =>
           isSelected = card.value is cardValue
@@ -1245,7 +1259,6 @@ module.exports = do ->
           selectCard = =>
             $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected').attr('aria-pressed', 'false')
             $card.addClass('integer-appearance-card--selected').attr('aria-pressed', 'true')
-            @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[card.value])
             if card.value is 'other'
               $customInput.show()
               customVal = $customInput.val().trim()
@@ -1254,13 +1267,11 @@ module.exports = do ->
               $customInput.val('')
               $customInput.hide()
               currentFull = (appearanceModel.get('value') or '').trim()
-              widthPart = ''
-              for wOpt in ['w10','w9','w8','w7','w6','w5','w4','w3','w2','w1']
-                if currentFull.indexOf(wOpt) > -1
-                  widthPart = wOpt
-                  break
+              widthMatch = currentFull.match(/\bw\d+\b/)
+              widthPart = if widthMatch then widthMatch[0] else ''
               newVal = if card.value and widthPart then "#{card.value} #{widthPart}" else card.value or widthPart or ''
               appearanceModel.set('value', newVal)
+            updatePillText(card.value)
 
           $card.on 'click', selectCard
           $card.on 'keydown', (evt) =>
@@ -1270,12 +1281,13 @@ module.exports = do ->
 
       $content.append($grid).append($customInput)
 
-      @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[cardValue])
+      updatePillText(cardValue)
 
       $customInput.on 'input blur change', =>
         if $customInput.is(':visible')
           customVal = $customInput.val().trim()
           appearanceModel.set('value', if customVal then customVal else 'other')
+          updatePillText('other')
 
     _imageCardValueFromModel: (modelValue) ->
       return 'default' if not modelValue
@@ -1307,6 +1319,14 @@ module.exports = do ->
       else if modelValue isnt 'other' and modelValue isnt ''
         $customInput.val(modelValue)
 
+      updatePillText = (value) =>
+        text = if value is 'other'
+          customVal = $customInput.val().trim()
+          if customVal then "#{t('Custom')}: #{customVal}" else t('Custom')
+        else
+          CARD_LABELS[value] or CARD_LABELS['default']
+        @appearanceSection.find('.js-appearance-pill').text(text)
+
       for card in IMAGE_APPEARANCE_CARDS
         do (card) =>
           isSelected = card.value is cardValue
@@ -1327,7 +1347,6 @@ module.exports = do ->
           selectCard = =>
             $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected').attr('aria-pressed', 'false')
             $card.addClass('integer-appearance-card--selected').attr('aria-pressed', 'true')
-            @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[card.value] or CARD_LABELS['default'])
             if card.value is 'other'
               $customInput.show()
               customVal = $customInput.val().trim()
@@ -1336,29 +1355,30 @@ module.exports = do ->
               $customInput.val('')
               $customInput.hide()
               currentFull = (appearanceModel.get('value') or '').trim()
-              widthPart = ''
-              for wOpt in ['w10','w9','w8','w7','w6','w5','w4','w3','w2','w1']
-                if currentFull.indexOf(wOpt) > -1
-                  widthPart = wOpt
-                  break
+              widthMatch = currentFull.match(/\bw\d+\b/)
+              widthPart = if widthMatch then widthMatch[0] else ''
               newVal = if card.value and widthPart then "#{card.value} #{widthPart}" else card.value or widthPart or ''
               appearanceModel.set('value', newVal)
+            updatePillText(card.value)
 
           $card.on 'click', selectCard
           $card.on 'keydown', (evt) =>
-            selectCard() if evt.key in ['Enter', ' ']
+            if evt.key in ['Enter', ' ']
+              evt.preventDefault()
+              selectCard()
 
       $signatureNote = $('<div class="image-appearance-signature-note"></div>')
       $signatureNote.text('⚠ ' + t('Signature capture is not 21 CFR Part 11-compliant. Use only where electronic signature compliance is not required.'))
 
       $content.append($grid).append($customInput).append($signatureNote)
 
-      @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[cardValue] or CARD_LABELS['default'])
+      updatePillText(cardValue)
 
       $customInput.on 'input blur change', =>
         if $customInput.is(':visible')
           customVal = $customInput.val().trim()
           appearanceModel.set('value', if customVal then customVal else 'other')
+          updatePillText('other')
 
     hideMultioptions: ->
       @$card.removeClass('card--expandedchoices')
