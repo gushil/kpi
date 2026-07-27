@@ -8,6 +8,9 @@ from kpi.constants import PERM_VIEW_ASSET
 from kpi.fields import RelativePrefixHyperlinkedRelatedField, WritableJSONField
 from kpi.models import Asset, AssetSnapshot
 from kpi.utils.object_permission import get_database_user
+from kpi.utils.study_designer_preview import (
+    decorate_snapshot_with_study_designer_preview,
+)
 from kobo.apps.oc_tenant_auth.utils import is_owner_in_subdomain
 
 
@@ -38,6 +41,9 @@ class AssetSnapshotSerializer(serializers.HyperlinkedModelSerializer):
     asset_version_id = serializers.ReadOnlyField()
     date_created = serializers.DateTimeField(read_only=True)
     source = WritableJSONField(required=False)
+    use_study_designer_preview = serializers.BooleanField(
+        write_only=True, required=False, default=False
+    )
 
     class Meta:
         model = AssetSnapshot
@@ -52,6 +58,7 @@ class AssetSnapshotSerializer(serializers.HyperlinkedModelSerializer):
                   'asset_version_id',
                   'details',
                   'source',
+                  'use_study_designer_preview',
                   )
 
     def check_subdomain_permission(self, asset):
@@ -82,6 +89,9 @@ class AssetSnapshotSerializer(serializers.HyperlinkedModelSerializer):
         """
         asset = validated_data.get('asset', None)
         source = validated_data.get('source', None)
+        use_study_designer_preview = validated_data.pop(
+            'use_study_designer_preview', False
+        )
 
         # Force owner to be the requesting user
         # NB: validated_data is not used when linking to an existing asset
@@ -98,6 +108,12 @@ class AssetSnapshotSerializer(serializers.HyperlinkedModelSerializer):
 
         if not snapshot.xml:
             raise serializers.ValidationError(snapshot.details)
+
+        if source and use_study_designer_preview:
+            decorate_snapshot_with_study_designer_preview(
+                snapshot, self.context['request']
+            )
+
         return snapshot
 
     def get_enketopreviewlink(self, obj):

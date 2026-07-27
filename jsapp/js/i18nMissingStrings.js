@@ -10,7 +10,7 @@ test = t('Add another condition')
 
 test = t('All of these conditions must be met')
 test = t('At least one of these conditions must be met')
-test = t('Click to add another response...')
+test = t('Add response')
 test = t('AUTOMATIC')
 test = t('Skip Logic')
 test = t('Question Options')

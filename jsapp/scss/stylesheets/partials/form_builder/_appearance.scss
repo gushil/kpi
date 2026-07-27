@@ -224,10 +224,23 @@
   margin-right: 60px;
 }
 
-// Group panel: appearance is a sibling of the tab panels, not nested inside row-options,
-// so hide it when row-options is inactive.
-.js-card-settings-row-options:not(.card__settings__fields--active) ~ .js-card-settings-appearance {
+// Group panel: appearance and columns-in-grid are siblings of the tab panels,
+// so hide them when row-options is inactive.
+.js-card-settings-row-options:not(.card__settings__fields--active) ~ .js-card-settings-appearance,
+.js-card-settings-row-options:not(.card__settings__fields--active) ~ .js-group-cols-wrap {
   display: none;
+}
+
+// When Columns in Grid follows a collapsed Appearance section, suppress the redundant
+// top border (the Appearance header already has border-bottom acting as the divider).
+// When Appearance is expanded its body is visible, so restore the border to separate them.
+.card__settings__appearance-section + .card__settings__appearance-section {
+  border-top: none;
+  margin-top: 0;
+}
+
+.card__settings__appearance-section:not(.is-collapsed) + .card__settings__appearance-section {
+  border-top: 1px solid #CBD5E1;
 }
 
 // Group type: always 3 columns (single row)

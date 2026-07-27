@@ -55,8 +55,8 @@ DECIMAL_APPEARANCE_SVGS =
   'custom': '<svg width="72" height="44" viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="9" width="56" height="10" rx="2" stroke="#888" stroke-width="1.1" stroke-dasharray="3 2"/><rect x="8" y="25" width="56" height="10" rx="2" stroke="#888" stroke-width="1.1" stroke-dasharray="3 2"/><text x="36" y="16" font-size="6" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">appearance=</text><text x="36" y="31" font-size="5.5" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">w3 my-class</text></svg>'
 
 DECIMAL_APPEARANCE_CARDS = [
-  { value: 'default', svgKey: 'decimal-input' }
-  { value: 'other',   svgKey: 'custom' }
+  { value: '',      svgKey: 'decimal-input' }
+  { value: 'other', svgKey: 'custom' }
 ]
 
 IMAGE_APPEARANCE_SVGS =
@@ -1186,7 +1186,9 @@ module.exports = do ->
 
           $card.on 'click', selectCard
           $card.on 'keydown', (evt) =>
-            selectCard() if evt.key in ['Enter', ' ']
+            if evt.key in ['Enter', ' ']
+              evt.preventDefault()
+              selectCard()
 
       $content.append($grid).append($customInput)
 
@@ -1198,9 +1200,9 @@ module.exports = do ->
           appearanceModel.set('value', if customVal then customVal else 'other')
 
     _decimalCardValueFromModel: (modelValue) ->
-      return 'default' if not modelValue
+      return '' if not modelValue or modelValue is 'default'
       stripped = modelValue.replace(/\bw\d+\b/g, '').trim()
-      return 'default' if stripped is 'default' or stripped is ''
+      return '' if stripped is 'default' or stripped is ''
       'other'
 
     _buildDecimalAppearanceSection: (appearanceModel) ->
@@ -1208,7 +1210,7 @@ module.exports = do ->
       cardValue = @_decimalCardValueFromModel(modelValue)
 
       CARD_LABELS =
-        'default': t('Decimal input')
+        '': t('Decimal input')
         'other': t('Custom')
 
       @appearanceSection.removeClass('appearance-section--hidden')
@@ -1262,7 +1264,9 @@ module.exports = do ->
 
           $card.on 'click', selectCard
           $card.on 'keydown', (evt) =>
-            selectCard() if evt.key in ['Enter', ' ']
+            if evt.key in ['Enter', ' ']
+              evt.preventDefault()
+              selectCard()
 
       $content.append($grid).append($customInput)
 

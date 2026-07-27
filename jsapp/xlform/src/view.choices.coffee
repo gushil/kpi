@@ -21,6 +21,11 @@ module.exports = do ->
       if cardText.find('.card__buttons__multioptions.js-expand-multioptions').length is 0
         cardText.prepend $.parseHTML($viewTemplates.row.expandChoiceList())
       @$el.html (@ul = $("<ul>", class: @ulClasses))
+      $header = $('<div class="multioptions__header">')
+      $header.append($('<span class="multioptions__header__col multioptions__header__col--label">').text(t('Label')))
+      $header.append($('<span class="multioptions__header__col multioptions__header__col--value">').text(t('Value')))
+      $header.append($('<span class="multioptions__header__col multioptions__header__col--image">').text(t('Image')))
+      @$el.prepend($header)
       if @row.get("type").get("rowType").specifyChoice
         for option, i in @model.options.models
           new OptionView(model: option, cl: @model).render().$el.appendTo @ul
@@ -37,8 +42,9 @@ module.exports = do ->
       if not isSortableDisabled
         @ul.sortable({
             axis: "y"
-            cursor: "move"
+            cursor: "grabbing"
             distance: 5
+            handle: ".js-drag-handle"
             items: "> li"
             placeholder: "option-placeholder"
             opacity: 0.9
@@ -59,7 +65,7 @@ module.exports = do ->
         i = @model.options.length
         @addEmptyOption("Option #{i+1}")
         @model.getSurvey()?.trigger('change')
-        @$el.children().eq(0).children().eq(i).find('input.option-view-input').select()
+        @ul.children().eq(i).find('input.option-view-input').select()
         setTimeout =>
           @ul.find('li').last().find('.editable-wrapper').trigger('click')
         , 1
@@ -117,12 +123,13 @@ module.exports = do ->
       Backbone.on('consentRowChoiceValueError', @onConsentRowChoiceValueError, @)
       Backbone.on('consentRowChoiceValueNotError', @onConsentRowChoiceValueNotError, @)
     render: ->
+      @h = $("<span class=\"multioptions__drag-handle js-drag-handle\">")
       @t = $("<i class=\"k-icon k-icon-trash js-remove-option\">")
       @pw = $("<div class=\"editable-wrapper js-option-label-input js-cancel-select-row\">")
       @p = $("<input placeholder=\"#{t("No value")}\" class=\"js-cancel-select-row option-view-input\" dir=\"auto\">")
       @c = $("<code><input type=\"text\" class=\"js-option-name-input js-cancel-select-row\"></input></code>")
       @i = $("<code><input type=\"text\" class=\"js-option-image-input js-cancel-select-row\"></input></code>")
-      @d = $('<div>')
+      @d = $('<div class="multioptions__option__row">')
       @optionImageField = 'image'
       if @model
         @p.val @model.get("label") || 'Empty'
@@ -223,10 +230,11 @@ module.exports = do ->
         return
       ).bind @
 
+      @d.append(@h)
       @d.append(@pw)
-      @d.append(@t)
       @d.append(@c)
       @d.append(@i)
+      @d.append(@t)
       @$el.html(@d)
       return @
     keyupinput: (evt)->

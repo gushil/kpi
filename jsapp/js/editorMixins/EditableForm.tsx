@@ -23,10 +23,11 @@ import TextBox from '#/components/common/textBox'
 import { isEConsentSignatureRow } from '#/components/formBuilder/econsentSignature'
 import {
   type KoboMatrixParserParams,
+  applyFreshPrimaryLanguage,
   getFormBuilderAssetType,
   koboMatrixParser,
+  mergeFreshTranslations,
   surveyToValidJson,
-  unnullifyTranslations,
 } from '#/components/formBuilder/formBuilderUtils'
 import FormLockedMessage from '#/components/locking/formLockedMessage'
 import { LOCKING_UI_CLASSNAMES, LockingRestrictionName } from '#/components/locking/lockingConstants'
@@ -43,6 +44,7 @@ import {
   AssetTypeName,
   type FormStyleDefinition,
   type FormStyleName,
+  MODAL_TYPES,
   NAME_MAX_LENGTH,
   OC_USER_TYPES,
   QuestionTypeName,
@@ -50,6 +52,7 @@ import {
   update_states,
 } from '#/constants'
 import envStore from '#/envStore'
+import pageState from '#/pageState.store'
 import type { RouterProp } from '#/router/legacy'
 import { ROUTES } from '#/router/routerConstants'
 import sessionStore from '#/stores/session'
@@ -81,7 +84,8 @@ const CHOICE_LIST_SUPPORT_URL = 'cascading_select.html'
 
 // OC fork: OpenClinica Form Designer help docs and a sessionStorage cache for the
 // selected form style.
-const FORM_DESIGNER_SUPPORT_URL = 'https://docs.openclinica.com/oc4/help-index/form-designer/'
+const FORM_DESIGNER_SUPPORT_URL =
+  'https://openclinicaservicedesk.freshdesk.com/support/solutions/articles/158000436442-using-form-designer'
 const FORM_STYLE_CACHE_NAME = 'kpi.editable-form.form-style'
 
 const UNSAVED_CHANGES_WARNING = t('You have unsaved changes. Leave form without saving?')
@@ -452,7 +456,27 @@ export default function EditableForm(props: EditableFormProps) {
     return state.asset_updated === update_states.UNSAVED_CHANGES
   }
 
-  function previewForm(evt: React.TouchEvent<HTMLButtonElement>) {
+  /**
+   * Fetches the asset's current saved state, used by previewForm()/saveForm()
+   * to resolve the form's actual current primary language and translations
+   * instead of the live model's frozen mount-time snapshot (see the comment
+   * on `applyFreshPrimaryLanguage` usage in both functions for why).
+   */
+  async function fetchFreshAsset(
+    uid: string,
+  ): Promise<{ freshAsset: AssetResponse | undefined; fetchFailed: boolean }> {
+    if (uid === '') {
+      return { freshAsset: undefined, fetchFailed: false }
+    }
+    try {
+      const freshAsset = await dataInterface.getAsset({ id: uid })
+      return { freshAsset, fetchFailed: false }
+    } catch {
+      return { freshAsset: undefined, fetchFailed: true }
+    }
+  }
+
+  async function previewForm(evt: React.TouchEvent<HTMLButtonElement>) {
     // At this point app should really be defined, and if not, there is no point in doing anything
     if (!app) {
       console.error('app is not defined!')
@@ -472,16 +496,43 @@ export default function EditableForm(props: EditableFormProps) {
     }
 
     let surveyJSON = surveyToValidJson(app?.survey)
-    if (app?.survey._initialParams?.translations_0) {
-      surveyJSON = unnullifyTranslations(surveyJSON, app.survey._initialParams)
-    }
-    let params: KoboMatrixParserParams & { asset?: string } = { source: surveyJSON }
 
-    params = koboMatrixParser(params)
+    // Fetch the current saved asset up front, rather than gating unnullify/
+    // merge on the live model's frozen mount-time primary-language snapshot
+    // (`app.survey._initialParams`, set once in the Survey constructor and
+    // never updated — see model.survey.coffee). A primary language set for
+    // the first time in this session would otherwise never be picked up,
+    // since `_initialParams.translations_0` stays permanently unset for any
+    // form that had no primary language when Form Designer first loaded.
+    // A failed fetch just falls back to the live model's own (possibly stale
+    // or language-blind) translations rather than blocking preview.
+    const { freshAsset } = await fetchFreshAsset(assetUid)
+    const primaryLangResult = applyFreshPrimaryLanguage(surveyJSON, freshAsset?.content, app?.survey._initialParams)
+    surveyJSON = primaryLangResult.surveyDataJSON
+    const primaryLangName = primaryLangResult.primaryLangName
+
+    let params: KoboMatrixParserParams & {
+      asset?: string
+      use_study_designer_preview?: boolean
+    } = { source: surveyJSON, use_study_designer_preview: true }
 
     if (state.asset && state.asset.url) {
       params.asset = state.asset.url
     }
+
+    if (freshAsset?.content && primaryLangName) {
+      // Only protect the primary language from the merge when there's an
+      // actual unsaved local edit pending in this session (`needsSave()`).
+      // Without that, the common case — translate the primary language via
+      // Translations Table, then Preview without having touched anything
+      // inline — would keep showing the stale primary-language text for no
+      // reason, since there's nothing local left to protect.
+      const protectedLangName = needsSave() ? primaryLangName : null
+      surveyJSON = mergeFreshTranslations(surveyJSON, freshAsset.content, protectedLangName)
+      params.source = surveyJSON
+    }
+
+    params = koboMatrixParser(params)
 
     dataInterface
       .createAssetSnapshot(params)
@@ -505,7 +556,7 @@ export default function EditableForm(props: EditableFormProps) {
       })
   }
 
-  function saveForm(evt: React.TouchEvent<HTMLButtonElement>) {
+  async function saveForm(evt: React.TouchEvent<HTMLButtonElement>) {
     if (evt && evt.preventDefault) {
       evt.preventDefault()
     }
@@ -565,9 +616,37 @@ export default function EditableForm(props: EditableFormProps) {
     if (surveyJSONWithMatrix) {
       surveyJSON = surveyJSONWithMatrix
     }
-    if (app.survey._initialParams?.translations_0) {
-      surveyJSON = unnullifyTranslations(surveyJSON, app.survey._initialParams)
+
+    // Fetch the current saved asset up front, rather than gating unnullify/
+    // merge on the live model's frozen mount-time primary-language snapshot
+    // (`app.survey._initialParams`, set once in the Survey constructor and
+    // never updated — see model.survey.coffee, and the same comment in
+    // previewForm()). Only relevant once the asset actually exists server-side.
+    const { freshAsset, fetchFailed: freshFetchFailed } = await fetchFreshAsset(assetUid)
+
+    // If the live model has never known about a primary language this
+    // session (i.e. one was set for the first time via Manage Languages,
+    // after this page loaded) AND we couldn't confirm the asset's actual
+    // current language state from the server, saving now would silently
+    // overwrite (delete) any language(s) added this session — abort rather
+    // than risk it.
+    if (assetUid !== '' && !app.survey._initialParams?.translations_0 && freshFetchFailed) {
+      alertify.defaults.theme.ok = 'ajs-cancel'
+      const dialog = alertify.dialog('alert')
+      dialog
+        .set({
+          title: t('Error saving form'),
+          message: t("Could not verify the form's current languages before saving. Please try again."),
+          label: t('Dismiss'),
+        })
+        .show()
+      return
     }
+
+    const primaryLangResult = applyFreshPrimaryLanguage(surveyJSON, freshAsset?.content, app.survey._initialParams)
+    surveyJSON = primaryLangResult.surveyDataJSON
+    const primaryLangName = primaryLangResult.primaryLangName
+
     // We normally have `content` as an actual object, not a stringified representation, but since
     // `actions.resources.updateAsset` already works with JSON string, let's extend the types
     const params: Partial<AssetRequestObject> & { content: string } = { content: surveyJSON }
@@ -577,6 +656,10 @@ export default function EditableForm(props: EditableFormProps) {
     }
 
     if (state.isNewAsset) {
+      setState((currentState) => ({
+        ...currentState,
+        asset_updated: update_states.PENDING_UPDATE,
+      }))
       // we're intentionally leaving after creating new asset,
       // so there is nothing unsaved here
       unpreventClosingTab()
@@ -596,6 +679,22 @@ export default function EditableForm(props: EditableFormProps) {
         props.router.navigate(ROUTES.LIBRARY)
       })
     } else if (assetUid !== '') {
+      setState((currentState) => ({
+        ...currentState,
+        asset_updated: update_states.PENDING_UPDATE,
+      }))
+
+      if (freshAsset?.content && primaryLangName) {
+        // Only protect the primary language when there was an actual unsaved
+        // local edit pending before this save started (`needsSave()`, read
+        // here before it flips to PENDING_UPDATE above — the `state` this
+        // closure captured at render time doesn't change until next
+        // render, so this still reads the pre-save value). See the same
+        // comment in previewForm() for why this matters.
+        const protectedLangName = needsSave() ? primaryLangName : null
+        params.content = mergeFreshTranslations(params.content, freshAsset.content, protectedLangName)
+      }
+
       // TODO: change this into react-query mutation
       actions.resources.updateAsset
         .triggerAsync(assetUid, params)
@@ -634,10 +733,6 @@ export default function EditableForm(props: EditableFormProps) {
           }))
         })
     }
-    setState((currentState) => ({
-      ...currentState,
-      asset_updated: update_states.PENDING_UPDATE,
-    }))
   }
 
   function buttonStates() {
@@ -710,6 +805,15 @@ export default function EditableForm(props: EditableFormProps) {
       ...asideSettings,
     }))
     saveAsideSettings(asideSettings)
+  }
+
+  function manageLanguages() {
+    if (state.asset) {
+      pageState.showModal({
+        type: MODAL_TYPES.FORM_LANGUAGES,
+        asset: state.asset,
+      })
+    }
   }
 
   function toggleAsideLayoutSettings(evt: React.TouchEvent<HTMLButtonElement>) {
@@ -1118,6 +1222,22 @@ export default function EditableForm(props: EditableFormProps) {
           </bem.FormBuilderHeader__cell>
 
           <bem.FormBuilderHeader__cell m='verticalRule' />
+
+          {state.asset?.asset_type === ASSET_TYPES.survey.id && (
+            <bem.FormBuilderHeader__cell>
+              <Button
+                type='text'
+                size='m'
+                onClick={manageLanguages}
+                tooltip={t('Manage languages for this form')}
+                tooltipPosition='left'
+                startIcon='language'
+                label={t('Manage Languages')}
+              />
+            </bem.FormBuilderHeader__cell>
+          )}
+
+          {state.asset?.asset_type === ASSET_TYPES.survey.id && <bem.FormBuilderHeader__cell m={'verticalRule'} />}
 
           <bem.FormBuilderHeader__cell>
             <Button

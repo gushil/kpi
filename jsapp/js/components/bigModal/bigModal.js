@@ -114,11 +114,11 @@ class BigModal extends React.Component {
         break
 
       case MODAL_TYPES.LIBRARY_COLLECTION_CREATE:
-        this.setState({ title: t('Create Collection'), modalClass: 'modal--top-aligned' })
+        this.setState({ title: t('Create Collection'), modalClass: 'modal--top-aligned modal--oc' })
         break
 
       case MODAL_TYPES.LIBRARY_COLLECTION_EDIT:
-        this.setState({ title: t('Edit Collection'), modalClass: 'modal--top-aligned' })
+        this.setState({ title: t('Edit Collection'), modalClass: 'modal--top-aligned modal--oc' })
         break
 
       case MODAL_TYPES.ASSET_TAGS:
@@ -169,13 +169,13 @@ class BigModal extends React.Component {
         break
 
       case MODAL_TYPES.FORM_LANGUAGES:
-        this.setModalTitle(t('Manage Languages'))
+        this.setState({ modalClass: 'modal--oc' })
         break
 
       case MODAL_TYPES.FORM_TRANSLATIONS_TABLE:
         this.setState({
-          title: t('Translations Table'),
-          modalClass: 'modal--large',
+          title: `${t('Translations table')} — ${this.props.params.langString}`,
+          modalClass: 'modal--form-translations-table modal--oc',
         })
         break
 
@@ -257,6 +257,12 @@ class BigModal extends React.Component {
         var filename = props.params.filename || ''
         newState.title = t('Uploading XLS file')
         newState.message = t('Uploading: ') + filename
+      }
+
+      if (props.params.type === MODAL_TYPES.FORM_LANGUAGES) {
+        const translations = props.params.asset?.content?.translations
+        const isSettingPrimaryLanguage = translations?.length === 1 && translations[0] === null
+        newState.title = isSettingPrimaryLanguage ? t('Select a primary language') : t('Manage Languages')
       }
 
       // store for later

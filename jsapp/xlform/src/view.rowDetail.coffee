@@ -1195,6 +1195,10 @@ module.exports = do ->
       @_columnCount = columnCount
       @_customText = customText
 
+      # Sync @$select_width with any saved column count so card clicks preserve it
+      currentWidth = @get_width_from_model_value()
+      @$select_width.val(currentWidth) if currentWidth?
+
       $section = @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0)
       $pill    = $section.find('.js-appearance-pill').eq(0)
       $toggle  = $section.find('.js-appearance-toggle').eq(0)
@@ -1231,10 +1235,15 @@ module.exports = do ->
       @$el.off('click.oc-appearance').on 'click.oc-appearance', '.appearance-card', (evt) =>
         selectCard(evt.currentTarget)
       @$el.off('keydown.oc-appearance').on 'keydown.oc-appearance', '.appearance-card', (evt) =>
-        selectCard(evt.currentTarget) if evt.key in ['Enter', ' ']
+        if evt.key in ['Enter', ' ']
+          evt.preventDefault()
+          selectCard(evt.currentTarget)
 
-      # Item width section
-      @_afterRenderWidth()
+      # For groups: Columns in Grid as own section after Appearance; for non-groups: item width picker
+      if questionType is 'group'
+        @_afterRenderGroupCols(@get_width_from_model_value())
+      else
+        @_afterRenderWidth()
 
       # Initial pill (section starts collapsed)
       @_refreshPill($pill)
@@ -1605,7 +1614,7 @@ module.exports = do ->
 
     _afterRenderGroupCols: (storedVal) ->
       return unless @is_form_style_theme_grid()
-      @$el.find('.js-group-cols-wrap').remove()
+      @rowView.cardSettingsWrap.find('.js-group-cols-wrap').remove()
 
       DEFAULT_COLS = 4
       currentSelCols = null
@@ -1614,22 +1623,21 @@ module.exports = do ->
         currentSelCols = parsed unless isNaN(parsed) or parsed < 1 or parsed > 10
       outOfRange = storedVal? and storedVal isnt '' and currentSelCols is null
 
-      $wrap = $('<div/>', { class: 'js-group-cols-wrap card__settings__fields__field group-cols-section' })
-      $wrap.append($('<label/>').text(t('Columns in Grid') + ':'))
+      $wrap = $('<div/>', { class: 'js-group-cols-wrap card__settings__appearance-section is-collapsed' })
 
-      $settingsInput = $('<span/>', { class: 'settings__input' })
-
-      $header = $('<button/>', {
-        class: 'group-cols__header'
-        type: 'button'
+      $header = $('<div/>', {
+        class: 'card__settings__appearance-header js-group-cols-toggle'
+        role: 'button'
+        tabindex: '0'
         'aria-expanded': 'false'
       })
-      $pill = $('<span/>', { class: 'js-group-cols-pill group-cols__pill' })
+      $header.append($('<span/>', { class: 'card__settings__appearance-title' }).text(t('Columns in Grid')))
+      $pill = $('<span/>', { class: 'js-group-cols-pill card__settings__appearance-pill' })
       $header.append($pill)
-      $header.append($('<i/>', { class: 'k-icon k-icon-angle-down group-cols__chev', 'aria-hidden': 'true' }))
-      $settingsInput.append($header)
+      $header.append($('<i/>', { class: 'k-icon k-icon-angle-down card__settings__appearance-toggle__icon', 'aria-hidden': 'true' }))
+      $wrap.append($header)
 
-      $body = $('<div/>', { class: 'js-group-cols-body group-cols__body' })
+      $body = $('<div/>', { class: 'js-group-cols-body card__settings__appearance-body' })
       $body.append(
         $('<p/>', { class: 'group-cols__instruction' }).text(
           t('Sets how many columns items in this group are arranged into.')
@@ -1661,10 +1669,8 @@ module.exports = do ->
           )
         )
 
-      $body.hide()
-      $settingsInput.append($body)
-      $wrap.append($settingsInput)
-      @$el.append($wrap)
+      $wrap.append($body)
+      @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0).after($wrap)
 
       refreshPill = =>
         numCols = currentSelCols ? DEFAULT_COLS
@@ -1672,12 +1678,16 @@ module.exports = do ->
         $pill.text(if currentSelCols? then "#{numCols} #{colWord} · w#{numCols}" else "#{numCols} #{colWord}")
 
       refreshPill()
+      $pill.show()
 
       selectCols = (el) =>
         numCols = parseInt($(el).data('cols'), 10)
         currentSelCols = numCols
         @$select_width.val("w#{numCols}")
-        @group_inputs_change_handler()
+        if @_card?
+          @_writeModelValue()
+        else
+          @group_inputs_change_handler()
         $grid.find('.group-cols-card').each ->
           $c = $(@)
           cn = parseInt($c.data('cols'), 10)
@@ -1694,18 +1704,23 @@ module.exports = do ->
           evt.stopPropagation()
           selectCols(evt.currentTarget)
 
-      $header.off('click.groupColsToggle').on 'click.groupColsToggle', (evt) =>
-        evt.stopPropagation()
-        isCollapsed = $body.is(':hidden')
-        if isCollapsed
-          $body.show()
-          $header.attr('aria-expanded', 'true')
-          $pill.hide()
-        else
-          $body.hide()
-          $header.attr('aria-expanded', 'false')
-          refreshPill()
-          $pill.show()
+      $header.off('click.groupColsToggle keydown.groupColsToggle')
+        .on 'click.groupColsToggle', (evt) =>
+          evt.stopPropagation()
+          isCollapsed = $wrap.hasClass('is-collapsed')
+          if isCollapsed
+            $wrap.removeClass('is-collapsed')
+            $header.attr('aria-expanded', 'true')
+            $pill.hide()
+          else
+            $wrap.addClass('is-collapsed')
+            $header.attr('aria-expanded', 'false')
+            refreshPill()
+            $pill.show()
+        .on 'keydown.groupColsToggle', (evt) =>
+          if evt.key in ['Enter', ' ']
+            evt.preventDefault()
+            $header.trigger('click')
 
     _writeWidthValue: (widthSlug) ->
       currentVal = @model.get('value') or ''

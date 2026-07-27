@@ -1,6 +1,9 @@
 import {
+  applyFreshPrimaryLanguage,
+  mergeFreshTranslations,
   nullifyTranslations,
   readParameters,
+  resolveCurrentPrimaryLanguage,
   unnullifyTranslations,
   writeParameters,
 } from '#/components/formBuilder/formBuilderUtils'
@@ -407,5 +410,191 @@ describe('writeParameters', () => {
     it(`should return ${pair.note}`, () => {
       chai.expect(writeParameters(pair.obj)).to.equal(pair.str)
     })
+  })
+})
+
+describe('mergeFreshTranslations', () => {
+  // Returns the parsed survey after merging.
+  const merge = (surveyData, freshContent, protectedLangName) =>
+    JSON.parse(mergeFreshTranslations(JSON.stringify(surveyData), freshContent, protectedLangName))
+
+  it("1. updates a $kuid-matched row's non-protected-language translation from fresh content", () => {
+    const result = merge(
+      {
+        survey: [
+          { $kuid: 'q1', name: 'q1', type: 'text', 'label::English (en)': 'Hello', 'label::Polski (pl)': 'STALE' },
+        ],
+      },
+      {
+        translated: ['label'],
+        translations: ['English (en)', 'Polski (pl)'],
+        survey: [{ $kuid: 'q1', name: 'q1', label: ['Hello', 'Cześć'] }],
+      },
+      'English (en)',
+    )
+    expect(result.survey[0]['label::English (en)']).to.equal('Hello') // protected, untouched
+    expect(result.survey[0]['label::Polski (pl)']).to.equal('Cześć') // updated
+  })
+
+  it('2. falls back to name matching when the row has no $kuid', () => {
+    const result = merge(
+      { survey: [{ name: 'q1', type: 'text', 'label::English (en)': 'Hello', 'label::Polski (pl)': 'STALE' }] },
+      {
+        translated: ['label'],
+        translations: ['English (en)', 'Polski (pl)'],
+        survey: [{ $kuid: 'q1', name: 'q1', label: ['Hello', 'Cześć'] }],
+      },
+      'English (en)',
+    )
+    expect(result.survey[0]['label::Polski (pl)']).to.equal('Cześć')
+  })
+
+  it('3. never touches the protected language key even when fresh content differs there', () => {
+    const result = merge(
+      { survey: [{ name: 'q1', 'label::English (en)': 'IN PROGRESS EDIT', 'label::Polski (pl)': 'old' }] },
+      {
+        translated: ['label'],
+        translations: ['English (en)', 'Polski (pl)'],
+        survey: [{ name: 'q1', label: ['Different English', 'Nowy'] }],
+      },
+      'English (en)',
+    )
+    expect(result.survey[0]['label::English (en)']).to.equal('IN PROGRESS EDIT') // protected suffixed key preserved
+    expect(result.survey[0]['label::Polski (pl)']).to.equal('Nowy')
+  })
+
+  it('4. leaves no phantom key for a language removed from fresh translations', () => {
+    const result = merge(
+      {
+        survey: [
+          { name: 'q1', 'label::English (en)': 'Hello', 'label::Polski (pl)': 'Cześć', 'label::Deutsch (de)': 'Hallo' },
+        ],
+      },
+      {
+        translated: ['label'],
+        translations: ['English (en)', 'Polski (pl)'], // Deutsch removed
+        survey: [{ name: 'q1', label: ['Hello', 'Cześć'] }],
+      },
+      'English (en)',
+    )
+    expect(result.survey[0]).to.not.have.property('label::Deutsch (de)')
+    expect(result.survey[0]['label::Polski (pl)']).to.equal('Cześć')
+  })
+
+  it('5. creates a new key for a language added to fresh translations', () => {
+    const result = merge(
+      { survey: [{ name: 'q1', 'label::English (en)': 'Hello', 'label::Polski (pl)': 'Cześć' }] },
+      {
+        translated: ['label'],
+        translations: ['English (en)', 'Polski (pl)', 'Deutsch (de)'], // Deutsch added
+        survey: [{ name: 'q1', label: ['Hello', 'Cześć', 'Hallo'] }],
+      },
+      'English (en)',
+    )
+    expect(result.survey[0]['label::Deutsch (de)']).to.equal('Hallo')
+  })
+
+  it('6. leaves a row present in surveyData but absent from fresh content completely untouched', () => {
+    const result = merge(
+      {
+        survey: [
+          { name: 'q1', 'label::English (en)': 'Hello', 'label::Polski (pl)': 'Cześć' },
+          { name: 'q2', 'label::English (en)': 'New Q', 'label::Polski (pl)': 'unsaved' }, // newly added, unsaved
+        ],
+      },
+      {
+        translated: ['label'],
+        translations: ['English (en)', 'Polski (pl)'],
+        survey: [{ name: 'q1', label: ['Hello', 'Zmienione'] }],
+      },
+      'English (en)',
+    )
+    expect(result.survey[1]['label::English (en)']).to.equal('New Q')
+    expect(result.survey[1]['label::Polski (pl)']).to.equal('unsaved') // untouched
+  })
+
+  it('7. updates a choice matched by name + list_name (no $kuid)', () => {
+    const result = merge(
+      { choices: [{ name: 'yes', list_name: 'yn', 'label::English (en)': 'Yes', 'label::Polski (pl)': 'STALE' }] },
+      {
+        translated: ['label'],
+        translations: ['English (en)', 'Polski (pl)'],
+        choices: [{ name: 'yes', list_name: 'yn', label: ['Yes', 'Tak'] }],
+      },
+      'English (en)',
+    )
+    expect(result.choices[0]['label::Polski (pl)']).to.equal('Tak')
+    expect(result.choices[0]['label::English (en)']).to.equal('Yes')
+  })
+
+  it('8. resolves langNames[0] from translations_0 when translations[0] is null', () => {
+    // protectedLangName is null here so the index-0 write is observable: if the
+    // translations_0 fallback works, the value lands under `label::English (en)`
+    // (suffixed); if it failed, it would land under the bare `label` key.
+    const result = merge(
+      { survey: [{ name: 'q1' }] },
+      {
+        translated: ['label'],
+        translations: [null, 'Polski (pl)'],
+        translations_0: 'English (en)',
+        survey: [{ name: 'q1', label: ['Hello', 'Cześć'] }],
+      },
+      null,
+    )
+    expect(result.survey[0]['label::English (en)']).to.equal('Hello')
+    expect(result.survey[0]['label::Polski (pl)']).to.equal('Cześć')
+    expect(result.survey[0]).to.not.have.property('label')
+  })
+})
+
+describe('resolveCurrentPrimaryLanguage', () => {
+  it('1. prefers the fresh asset primary language over the frozen mount snapshot', () => {
+    const result = resolveCurrentPrimaryLanguage(
+      { translations: ['French (fr)', 'English (en)'], translated: ['label'] },
+      { translations_0: 'English (en)', translated: ['label', 'hint'] },
+    )
+    expect(result.primaryLangName).to.equal('French (fr)')
+    expect(result.translatedProps).to.deep.equal(['label'])
+  })
+
+  it('2. falls back to translations_0 when fresh translations[0] is null', () => {
+    const result = resolveCurrentPrimaryLanguage(
+      { translations: [null, 'Polski (pl)'], translations_0: 'English (en)', translated: ['label'] },
+      undefined,
+    )
+    expect(result.primaryLangName).to.equal('English (en)')
+  })
+
+  it('3. falls back to the frozen mount snapshot when there is no fresh content', () => {
+    const result = resolveCurrentPrimaryLanguage(undefined, { translations_0: 'English (en)', translated: ['label'] })
+    expect(result.primaryLangName).to.equal('English (en)')
+    expect(result.translatedProps).to.deep.equal(['label'])
+  })
+
+  it('4. returns null and an empty list when neither source has a primary language', () => {
+    const result = resolveCurrentPrimaryLanguage(undefined, undefined)
+    expect(result.primaryLangName).to.equal(null)
+    expect(result.translatedProps).to.deep.equal([])
+  })
+})
+
+describe('applyFreshPrimaryLanguage', () => {
+  it('1. unnullifies the survey JSON when a primary language is found', () => {
+    const surveyDataJSON = JSON.stringify({ settings: [{}], survey: [{ name: 'q1', label: 'Hello' }] })
+    const result = applyFreshPrimaryLanguage(
+      surveyDataJSON,
+      { translations: ['English (en)'], translated: ['label'] },
+      undefined,
+    )
+    expect(result.primaryLangName).to.equal('English (en)')
+    const survey = JSON.parse(result.surveyDataJSON)
+    expect(survey.survey[0]['label::English (en)']).to.equal('Hello')
+  })
+
+  it('2. leaves the survey JSON untouched when no primary language is found', () => {
+    const surveyDataJSON = JSON.stringify({ settings: [{}], survey: [{ name: 'q1', label: 'Hello' }] })
+    const result = applyFreshPrimaryLanguage(surveyDataJSON, undefined, undefined)
+    expect(result.primaryLangName).to.equal(null)
+    expect(result.surveyDataJSON).to.equal(surveyDataJSON)
   })
 })

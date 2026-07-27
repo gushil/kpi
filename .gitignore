@@ -31,6 +31,8 @@ public
 storybook-static
 emails
 .claude/
+/.worktrees/
+/docs/superpowers/
 
 # We post changelog in github releases, but generate it here. Let's not accidentally commit it.
 CHANGELOG.md

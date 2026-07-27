@@ -299,6 +299,89 @@ $modal-custom-header-height: 60px;
   }
 }
 
+// Shared "OpenClinica" chrome: rounded corners + a bit more breathing room
+// around the title/close-icon/body than the base modal. Plain white header
+// (inherits the base `.modal__header` styling) — no color override. Apply
+// this alongside any modal-specific class (sizing, positioning, etc.).
+.modal.modal--oc {
+  border-radius: 12px;
+  overflow: hidden;
+
+  .modal__title {
+    font-size: 18px;
+    padding: 15px;
+  }
+
+  .modal__x {
+    margin: 10px;
+  }
+
+  .modal__body {
+    padding-top: 20px;
+  }
+
+  // Bumps the Create/Edit Collection field label ("Please enter the name of
+  // your new Collection...") up from the shared TextBox component's default
+  // 12px, and gives it more breathing room above the input box (default is
+  // just 3px). Scoped to `.modal--oc` so it doesn't affect TextBox usage
+  // elsewhere in the app; structural (not a CSS-module class) since
+  // textBox.module.scss's hashed class names aren't stable to select from
+  // outside the component.
+  .library-asset-form label > div:first-child {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+}
+
+.modal.modal--form-translations-table {
+  // Wide enough to keep the 3-column table readable, but not full-viewport
+  // like `.modal--large` (which this modal intentionally doesn't use).
+  // `max-height` (not `height`) lets the modal shrink to fit a form with only
+  // a few translatable strings, while still capping growth and scrolling
+  // internally for forms with many.
+  width: 100%;
+  max-width: 900px;
+  max-height: 85vh;
+
+  .modal__content {
+    max-height: 85vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal__body {
+    flex: 1 1 auto;
+    // Without this, a flex child won't shrink below its content's natural
+    // size, so the body would just push the modal taller instead of
+    // scrolling internally once `max-height` is reached.
+    min-height: 0;
+    overflow: auto;
+  }
+}
+
+.modal__footer--translation-table {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+
+  // The base `.modal__footer` clearfix (`::before`/`::after { content: '' }`,
+  // for its old float-based button layout) becomes an invisible first/last
+  // flex item once this footer is `display: flex`, offsetting the Save
+  // button from the table's left edge by one `gap` unit. Flex containers
+  // don't need a float clearfix, so drop the generated content entirely.
+  &::before,
+  &::after {
+    content: none;
+  }
+
+  .translation-table-footer__help {
+    font-size: 12px;
+    color: colors.$kobo-gray-600;
+  }
+}
+
 .enketo-holder {
   // resets modal window paddings
   margin: 0 -20px;
@@ -478,7 +561,7 @@ $modal-custom-header-height: 60px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid colors.$kobo-gray-300;
+    border-bottom: 1px solid colors.$kobo-gray-300;
     padding: 6px 0;
 
     .form-view__cell--translation-name {
@@ -496,15 +579,19 @@ $modal-custom-header-height: 60px;
   }
 
   .form-view__label--default-language {
-    display: inline;
+    display: inline-block;
+    background-color: colors.$kobo-bg-blue;
+    color: colors.$kobo-dark-blue;
+    font-size: 11px;
     font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 8px;
     margin-left: 6px;
   }
 
   .form-view__cell--add-language {
     padding-top: 20px;
-    text-align: right;
-    border-top: 1px solid colors.$kobo-gray-300;
+    text-align: left;
   }
 
   .form-view__cell--add-language-form {
@@ -524,6 +611,11 @@ $modal-custom-header-height: 60px;
   .translation-table-container {
     flex: 1;
     overflow-y: auto;
+    // Columns use explicit fixed widths (see translationTable.js) sized to
+    // fit without horizontal scroll; this is a safety net so a stray few px
+    // of overflow never produces a second, horizontal scrollbar alongside
+    // the vertical one above.
+    overflow-x: hidden;
     border: 1px solid colors.$kobo-gray-300;
   }
 
@@ -564,15 +656,10 @@ $modal-custom-header-height: 60px;
         }
       }
 
-      > .rt-th:first-child,
-      > .rt-td:first-child {
-        min-width: 30%;
+      // "Original string" (2nd column: Element, Original string, Translation)
+      > .rt-th:nth-child(2),
+      > .rt-td:nth-child(2) {
         color: colors.$kobo-gray-700;
-      }
-
-      > .rt-th:last-child,
-      > .rt-td:last-child {
-        min-width: 70%;
       }
 
       .translation {

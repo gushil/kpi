@@ -1,5 +1,6 @@
 # coding: utf-8
 import re
+from unittest.mock import patch
 
 from django.urls import reverse
 from rest_framework import status
@@ -271,6 +272,61 @@ class TestAssetSnapshotList(AssetSnapshotBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
 
+    def test_use_study_designer_preview_calls_decoration(self):
+        self.client.login(username='someuser', password='someuser')
+        url = reverse(self._get_endpoint('assetsnapshot-list'))
+        data = {'source': self.form_source, 'use_study_designer_preview': True}
+
+        with patch(
+            'kpi.serializers.v2.asset_snapshot'
+            '.decorate_snapshot_with_study_designer_preview'
+        ) as mock_decorate:
+            response = self.client.post(url, data, format='json')
+
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, msg=response.data
+        )
+        mock_decorate.assert_called_once()
+        called_snapshot = mock_decorate.call_args[0][0]
+        self.assertEqual(called_snapshot.uid, response.data['uid'])
+        called_request = mock_decorate.call_args[0][1]
+        self.assertTrue(hasattr(called_request, 'user'))
+        self.assertEqual(called_request.user.username, 'someuser')
+
+    def test_use_study_designer_preview_false_by_default(self):
+        self.client.login(username='someuser', password='someuser')
+        url = reverse(self._get_endpoint('assetsnapshot-list'))
+        data = {'source': self.form_source}
+
+        with patch(
+            'kpi.serializers.v2.asset_snapshot'
+            '.decorate_snapshot_with_study_designer_preview'
+        ) as mock_decorate:
+            response = self.client.post(url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_decorate.assert_not_called()
+
+    def test_use_study_designer_preview_ignored_for_asset_snapshot_branch(self):
+        self.client.login(username='someuser', password='someuser')
+        asset = self.create_asset(
+            'Take my snapshot!', self.form_source, format='json'
+        )
+        asset_url = reverse(self._get_endpoint('asset-detail'), args=(asset.uid,))
+        url = reverse(self._get_endpoint('assetsnapshot-list'))
+        data = {'asset': asset_url, 'use_study_designer_preview': True}
+
+        with patch(
+            'kpi.serializers.v2.asset_snapshot'
+            '.decorate_snapshot_with_study_designer_preview'
+        ) as mock_decorate:
+            response = self.client.post(url, data, format='json')
+
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, msg=response.data
+        )
+        mock_decorate.assert_not_called()
+
 
 class TestAssetSnapshotDetail(AssetSnapshotBase):
 
@@ -326,6 +382,23 @@ class TestAssetSnapshotDetail(AssetSnapshotBase):
         )
         xml_response = self.client.get(snapshot_url)
         self.assertContains(xml_response, 'Global message in English')
+
+    def test_preview_forces_english_language(self):
+        self.client.login(username='someuser', password='someuser')
+        url = reverse(self._get_endpoint('assetsnapshot-list'))
+        data = {'source': self.form_source}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, msg=response.data
+        )
+
+        preview_url = reverse(
+            self._get_endpoint('assetsnapshot-preview'),
+            kwargs={'uid_asset_snapshot': response.data['uid']},
+        )
+        preview_response = self.client.get(preview_url)
+        self.assertEqual(preview_response.status_code, status.HTTP_302_FOUND)
+        self.assertIn('lang=en', preview_response.url)
 
     def test_preview_with_overridden_form_disclaimer(self):
         self.client.login(username='someuser', password='someuser')

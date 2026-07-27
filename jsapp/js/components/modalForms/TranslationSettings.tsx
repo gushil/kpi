@@ -3,6 +3,8 @@ import React from 'react'
 import alertify from 'alertifyjs'
 import cloneDeep from 'lodash.clonedeep'
 import { actions } from '#/actions'
+import { invalidateItem } from '#/api/mutation-defaults/common'
+import { getAssetsRetrieveQueryKey } from '#/api/react-query/manage-projects-and-library-content'
 import assetStore, { type AssetStoreData } from '#/assetStore'
 import bem from '#/bem'
 import Button from '#/components/common/button'
@@ -13,11 +15,8 @@ import { hasAssetRestriction } from '#/components/locking/lockingUtils'
 import LanguageForm from '#/components/modalForms/languageForm'
 import { MODAL_TYPES } from '#/constants'
 import type { AssetContent, AssetResponse, SureveyRowOrChoiceTranslatableProp, SurveyRow } from '#/dataInterface'
-import envStore from '#/envStore'
 import pageState from '#/pageState.store'
 import { type LangObject, escapeHtml, getLangString, notify } from '#/utils'
-
-const LANGUAGE_SUPPORT_URL = 'language_dashboard.html'
 
 interface TranslationSettingsProps {
   asset: AssetResponse
@@ -245,8 +244,8 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
 
     const dialog = alertify.dialog('confirm')
     const opts = {
-      title: t('Change default language?'),
-      message: t('Are you sure you would like to set ##lang## as the default language for this form?').replace(
+      title: t('Change primary language?'),
+      message: t('Are you sure you would like to set ##lang## as the primary language for this form?').replace(
         '##lang##',
         escapeHtml(String(langString)),
       ),
@@ -272,6 +271,11 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
       { content: JSON.stringify(content) },
       // reload asset on failure
       {
+        onComplete: () => {
+          // Keep the React Query asset cache in sync so Form Designer's live
+          // preview/save reads the freshly-saved translations.
+          invalidateItem(getAssetsRetrieveQueryKey(this.state.asset.uid))
+        },
         onFailed: () => {
           actions.resources.loadAsset({ id: this.state.asset.uid }, true)
           notify.error('failed to update translations')
@@ -301,27 +305,10 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
       <bem.FormModal m='translation-settings'>
         <bem.FormModal__item>
           <bem.FormView__cell m='translation-note'>
-            <p>{t('Here you can add more languages to your project, and translate the strings in each of them.')}</p>
             <p>
-              {t('For the language code field, we suggest using the')}
-              <a
-                target='_blank'
-                href='https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry'
-              >
-                {' ' + t('official language code') + ' '}
-              </a>
-              {t('(e.g. "English (en)" or "Rohingya (rhg)").')}
-
-              {envStore.isReady && envStore.data.support_url && (
-                <a target='_blank' href={envStore.data.support_url + LANGUAGE_SUPPORT_URL}>
-                  {' ' + t('Read more.')}
-                </a>
+              {t(
+                'Setting a primary language is required. This is the language you have entered in the main Form Designer interface. Provide the official language code. For example, if this form is primarily authored in English, enter "English" and "en". It does not necessarily determine which language the form will use during data collection.',
               )}
-            </p>
-          </bem.FormView__cell>
-          <bem.FormView__cell m='translation'>
-            <p>
-              <strong>{t('Please name your default language before adding languages and translations.')}</strong>
             </p>
           </bem.FormView__cell>
           <bem.FormView__cell m='update-language-form'>
@@ -329,6 +316,7 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
               isPending={this.state.isUpdatingAsset}
               onLanguageChange={this.onLanguageChange.bind(this)}
               existingLanguages={this.getAllLanguages()}
+              langString='English (en)'
               isDefault
             />
           </bem.FormView__cell>
@@ -347,7 +335,7 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
               type='warning'
               icon='alert'
               message={t(
-                'You have named translations in your form but the default translation is unnamed. Please specifiy a default translation or make an existing one default.',
+                'You have named translations in your form but the primary translation is unnamed. Please specify a primary translation or make an existing one primary.',
               )}
             />
           )}
@@ -357,7 +345,7 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
                 <bem.FormView__cell m='translation-name'>
                   {l}
 
-                  {i === 0 && <bem.FormView__label m='default-language'>{t('default')}</bem.FormView__label>}
+                  {i === 0 && <bem.FormView__label m='default-language'>{t('primary')}</bem.FormView__label>}
 
                   {i !== 0 && (
                     <Button
@@ -367,7 +355,7 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
                         this.changeDefaultLanguage(i)
                       }}
                       isDisabled={this.state.isUpdatingAsset || !this.canEditLanguages()}
-                      tooltip={t('Make default')}
+                      tooltip={t('Make primary')}
                       startIcon='language-default'
                     />
                   )}
@@ -449,6 +437,14 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
               />
 
               <bem.FormView__cell m='label'>{t('Add a new language')}</bem.FormView__cell>
+
+              <bem.FormView__cell m='translation-note'>
+                <p>
+                  {t(
+                    'Enter the name of the language and the official IANA language code. (E.g. if your new language is French, enter "French" and "fr").',
+                  )}
+                </p>
+              </bem.FormView__cell>
 
               <LanguageForm
                 isPending={this.state.isUpdatingAsset}

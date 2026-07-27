@@ -166,7 +166,7 @@ do ->
     it 'decimal html() returns null (card grid rendered by view.row.coffee)', ->
       ctx = buildAppearanceMixinCtx('decimal')
       result = ctx.html()
-      expect(!result || result.indexOf('<select') is -1).toBe(true)
+      expect(result).toBe(null)
 
   ###############################################################
   # Per-type: select_one_from_file_ has extra "filename" field
