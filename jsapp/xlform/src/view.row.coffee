@@ -59,6 +59,21 @@ DECIMAL_APPEARANCE_CARDS = [
   { value: 'other', svgKey: 'custom' }
 ]
 
+IMAGE_APPEARANCE_SVGS =
+  'upload-and-preview': '<svg width="72" height="44" viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="40" height="36" rx="3" stroke="#888" stroke-width="1.3"/><circle cx="14" cy="14" r="4" fill="#888" fill-opacity="0.2"/><path d="M4 30 L16 20 L26 28 L32 22 L44 30" stroke="#888" stroke-width="1.2" stroke-opacity="0.35"/><rect x="50" y="12" width="16" height="14" rx="2" stroke="#888" stroke-width="1.2"/><path d="M54 19 L58 15 L62 19" stroke="#888" stroke-width="1.1" stroke-opacity="0.6"/><line x1="58" y1="22" x2="58" y2="28" stroke="#888" stroke-width="1.4" stroke-linecap="round"/><line x1="55" y1="25" x2="61" y2="25" stroke="#888" stroke-width="1.4" stroke-linecap="round"/></svg>'
+  'draw': '<svg width="72" height="44" viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="4" width="60" height="36" rx="3" stroke="#888" stroke-width="1.3"/><path d="M14 34 Q22 18 30 26 Q38 12 48 28 Q54 20 60 24" stroke="#888" stroke-width="1.8" stroke-linecap="round"/><circle cx="14" cy="34" r="2" fill="#888" fill-opacity="0.5"/></svg>'
+  'annotate': '<svg width="72" height="44" viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="44" height="36" rx="3" stroke="#888" stroke-width="1.3"/><circle cx="14" cy="14" r="4" fill="#888" fill-opacity="0.15"/><path d="M4 30 L16 22 L26 28 L36 18 L48 28" stroke="#888" stroke-width="1.1" stroke-opacity="0.25"/><rect x="38" y="6" width="30" height="24" rx="2" stroke="#378ADD" stroke-width="1.5"/><path d="M42 22 Q50 14 64 18" stroke="#378ADD" stroke-width="1.5" stroke-linecap="round"/><circle cx="46" cy="12" r="2" fill="#378ADD" fill-opacity="0.6"/></svg>'
+  'signature': '<svg width="72" height="44" viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="6" width="60" height="28" rx="3" stroke="#888" stroke-width="1.3"/><path d="M12 28 Q22 12 34 20 Q46 28 58 16" stroke="#888" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="32" x2="64" y2="32" stroke="#888" stroke-width="0.8" stroke-opacity="0.4"/></svg>'
+  'custom': '<svg width="72" height="44" viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="9" width="56" height="10" rx="2" stroke="#888" stroke-width="1.1" stroke-dasharray="3 2"/><rect x="8" y="25" width="56" height="10" rx="2" stroke="#888" stroke-width="1.1" stroke-dasharray="3 2"/><text x="36" y="16" font-size="6" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">appearance=</text><text x="36" y="31" font-size="5.5" fill="#888" text-anchor="middle" dominant-baseline="middle" font-family="monospace">w3 my-class</text></svg>'
+
+IMAGE_APPEARANCE_CARDS = [
+  { value: 'default',   svgKey: 'upload-and-preview' }
+  { value: 'draw',      svgKey: 'draw' }
+  { value: 'annotate',  svgKey: 'annotate' }
+  { value: 'signature', svgKey: 'signature' }
+  { value: 'other',     svgKey: 'custom' }
+]
+
 module.exports = do ->
   class BaseRowView extends Backbone.View
     tagName: 'li'
@@ -806,6 +821,10 @@ module.exports = do ->
                 new $viewRowDetail.DetailView(model: val, rowView: @).render().insertInDOM(@)
                 @_buildDecimalAppearanceSection(val)
                 continue
+              else if key is 'appearance' and questionType is 'image'
+                new $viewRowDetail.DetailView(model: val, rowView: @).render().insertInDOM(@)
+                @_buildImageAppearanceSection(val)
+                continue
               # Note: For PII items, bind::oc:briefdescription and bind::oc:description
               # DetailViews are still rendered so their afterRender can hide+clear values
               new $viewRowDetail.DetailView(model: val, rowView: @).render().insertInDOM(@)
@@ -1128,6 +1147,14 @@ module.exports = do ->
       else if modelValue isnt 'other' and modelValue isnt ''
         $customInput.val(modelValue)
 
+      updatePillText = (value) =>
+        text = if value is 'other'
+          customVal = $customInput.val().trim()
+          if customVal then "#{t('Custom')}: #{customVal}" else t('Custom')
+        else
+          CARD_LABELS[value] or CARD_LABELS['']
+        @appearanceSection.find('.js-appearance-pill').text(text)
+
       for card in INTEGER_APPEARANCE_CARDS
         do (card) =>
           isSelected = card.value is cardValue
@@ -1148,7 +1175,6 @@ module.exports = do ->
           selectCard = =>
             $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected').attr('aria-pressed', 'false')
             $card.addClass('integer-appearance-card--selected').attr('aria-pressed', 'true')
-            @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[card.value] or CARD_LABELS[''])
             if card.value is 'other'
               $customInput.show()
               customVal = $customInput.val().trim()
@@ -1157,13 +1183,11 @@ module.exports = do ->
               $customInput.val('')
               $customInput.hide()
               currentFull = (appearanceModel.get('value') or '').trim()
-              widthPart = ''
-              for wOpt in ['w10','w9','w8','w7','w6','w5','w4','w3','w2','w1']
-                if currentFull.indexOf(wOpt) > -1
-                  widthPart = wOpt
-                  break
+              widthMatch = currentFull.match(/\bw\d+\b/)
+              widthPart = if widthMatch then widthMatch[0] else ''
               newVal = if card.value and widthPart then "#{card.value} #{widthPart}" else card.value or widthPart or ''
               appearanceModel.set('value', newVal)
+            updatePillText(card.value)
 
           $card.on 'click', selectCard
           $card.on 'keydown', (evt) =>
@@ -1173,12 +1197,13 @@ module.exports = do ->
 
       $content.append($grid).append($customInput)
 
-      @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[cardValue] or CARD_LABELS[''])
+      updatePillText(cardValue)
 
       $customInput.on 'input blur change', =>
         if $customInput.is(':visible')
           customVal = $customInput.val().trim()
           appearanceModel.set('value', if customVal then customVal else 'other')
+          updatePillText('other')
 
     _decimalCardValueFromModel: (modelValue) ->
       return '' if not modelValue or modelValue is 'default'
@@ -1206,6 +1231,14 @@ module.exports = do ->
       else if modelValue isnt 'other' and modelValue isnt ''
         $customInput.val(modelValue)
 
+      updatePillText = (value) =>
+        text = if value is 'other'
+          customVal = $customInput.val().trim()
+          if customVal then "#{t('Custom')}: #{customVal}" else t('Custom')
+        else
+          CARD_LABELS[value]
+        @appearanceSection.find('.js-appearance-pill').text(text)
+
       for card in DECIMAL_APPEARANCE_CARDS
         do (card) =>
           isSelected = card.value is cardValue
@@ -1226,7 +1259,6 @@ module.exports = do ->
           selectCard = =>
             $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected').attr('aria-pressed', 'false')
             $card.addClass('integer-appearance-card--selected').attr('aria-pressed', 'true')
-            @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[card.value])
             if card.value is 'other'
               $customInput.show()
               customVal = $customInput.val().trim()
@@ -1235,13 +1267,11 @@ module.exports = do ->
               $customInput.val('')
               $customInput.hide()
               currentFull = (appearanceModel.get('value') or '').trim()
-              widthPart = ''
-              for wOpt in ['w10','w9','w8','w7','w6','w5','w4','w3','w2','w1']
-                if currentFull.indexOf(wOpt) > -1
-                  widthPart = wOpt
-                  break
+              widthMatch = currentFull.match(/\bw\d+\b/)
+              widthPart = if widthMatch then widthMatch[0] else ''
               newVal = if card.value and widthPart then "#{card.value} #{widthPart}" else card.value or widthPart or ''
               appearanceModel.set('value', newVal)
+            updatePillText(card.value)
 
           $card.on 'click', selectCard
           $card.on 'keydown', (evt) =>
@@ -1251,12 +1281,104 @@ module.exports = do ->
 
       $content.append($grid).append($customInput)
 
-      @appearanceSection.find('.js-appearance-pill').text(CARD_LABELS[cardValue])
+      updatePillText(cardValue)
 
       $customInput.on 'input blur change', =>
         if $customInput.is(':visible')
           customVal = $customInput.val().trim()
           appearanceModel.set('value', if customVal then customVal else 'other')
+          updatePillText('other')
+
+    _imageCardValueFromModel: (modelValue) ->
+      return 'default' if not modelValue
+      stripped = modelValue.replace(/\bw\d+\b/g, '').trim()
+      return 'default' if not stripped or stripped is 'default'
+      return stripped if stripped in ['draw', 'annotate', 'signature']
+      'other'
+
+    _buildImageAppearanceSection: (appearanceModel) ->
+      modelValue = (appearanceModel?.get('value') or '').trim()
+      cardValue = @_imageCardValueFromModel(modelValue)
+
+      CARD_LABELS =
+        'default':   t('Upload & preview')
+        'draw':      t('Draw')
+        'annotate':  t('Annotate')
+        'signature': t('Signature')
+        'other':     t('Custom')
+
+      @appearanceSection.removeClass('appearance-section--hidden')
+
+      $content = @appearanceSection.find('.js-appearance-card-content')
+      $grid = $('<div class="integer-appearance-card-grid"></div>')
+
+      $customInput = $('<input type="text" class="integer-appearance-custom-input" />')
+      $customInput.attr('placeholder', t('Enter appearance value'))
+      if cardValue isnt 'other'
+        $customInput.hide()
+      else if modelValue isnt 'other' and modelValue isnt ''
+        $customInput.val(modelValue)
+
+      updatePillText = (value) =>
+        text = if value is 'other'
+          customVal = $customInput.val().trim()
+          if customVal then "#{t('Custom')}: #{customVal}" else t('Custom')
+        else
+          CARD_LABELS[value] or CARD_LABELS['default']
+        @appearanceSection.find('.js-appearance-pill').text(text)
+
+      for card in IMAGE_APPEARANCE_CARDS
+        do (card) =>
+          isSelected = card.value is cardValue
+          $card = $('<div></div>')
+          $card.addClass('integer-appearance-card')
+          $card.attr('role', 'button')
+          $card.attr('tabindex', '0')
+          $card.attr('aria-pressed', if isSelected then 'true' else 'false')
+          if isSelected
+            $card.addClass('integer-appearance-card--selected')
+          $iconDiv = $('<div class="integer-appearance-card__icon"></div>')
+          $iconDiv.html(IMAGE_APPEARANCE_SVGS[card.svgKey])
+          $labelDiv = $('<div class="integer-appearance-card__label"></div>')
+          $labelDiv.text(CARD_LABELS[card.value])
+          $card.append($iconDiv).append($labelDiv)
+          $grid.append($card)
+
+          selectCard = =>
+            $grid.find('.integer-appearance-card').removeClass('integer-appearance-card--selected').attr('aria-pressed', 'false')
+            $card.addClass('integer-appearance-card--selected').attr('aria-pressed', 'true')
+            if card.value is 'other'
+              $customInput.show()
+              customVal = $customInput.val().trim()
+              appearanceModel.set('value', if customVal then customVal else 'other')
+            else
+              $customInput.val('')
+              $customInput.hide()
+              currentFull = (appearanceModel.get('value') or '').trim()
+              widthMatch = currentFull.match(/\bw\d+\b/)
+              widthPart = if widthMatch then widthMatch[0] else ''
+              newVal = if card.value and widthPart then "#{card.value} #{widthPart}" else card.value or widthPart or ''
+              appearanceModel.set('value', newVal)
+            updatePillText(card.value)
+
+          $card.on 'click', selectCard
+          $card.on 'keydown', (evt) =>
+            if evt.key in ['Enter', ' ']
+              evt.preventDefault()
+              selectCard()
+
+      $signatureNote = $('<div class="image-appearance-signature-note"></div>')
+      $signatureNote.text('⚠ ' + t('Signature capture is not 21 CFR Part 11-compliant. Use only where electronic signature compliance is not required.'))
+
+      $content.append($grid).append($customInput).append($signatureNote)
+
+      updatePillText(cardValue)
+
+      $customInput.on 'input blur change', =>
+        if $customInput.is(':visible')
+          customVal = $customInput.val().trim()
+          appearanceModel.set('value', if customVal then customVal else 'other')
+          updatePillText('other')
 
     hideMultioptions: ->
       @$card.removeClass('card--expandedchoices')
