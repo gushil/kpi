@@ -343,7 +343,7 @@
   row-gap: 12px;
   align-items: start;
 
-  .item-width-subsection { grid-column: 1 / -1; }
+  .item-width-section { grid-column: 1 / -1; }
   .xlf-dv-default       { grid-column: 1; }
   .xlf-dv-readonly      { grid-column: 1; }
   .xlf-dv-oc_item_group { grid-column: 2; }

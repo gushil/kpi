@@ -1514,7 +1514,7 @@ module.exports = do ->
       selectedW  = if outOfRange then null else if currentW? then currentW else defaultW
 
       # --- Build DOM ---
-      $wrap = $('<div/>', { class: 'js-item-width-wrap item-width-subsection', style: 'grid-column: 1 / -1' })
+      $wrap = $('<div/>', { class: 'js-item-width-wrap item-width-section', style: 'grid-column: 1 / -1' })
 
       # Header row (collapse toggle)
       $header = $('<button/>', {
