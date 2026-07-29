@@ -1478,11 +1478,10 @@ module.exports = do ->
 
     _afterRenderWidth: ->
       return unless @is_form_style_theme_grid()
-      $advBody = @rowView.cardSettingsWrap.find('#js-card-settings-row-options-advanced').eq(0)
-      return unless $advBody.length
+      return unless @rowView.cardSettingsWrap.find('.js-card-settings-advanced-toggle').length
 
-      # Idempotent: remove stale sub-section from a prior render
-      $advBody.find('.js-item-width-wrap').remove()
+      # Idempotent: remove stale section from a prior render
+      @rowView.cardSettingsWrap.find('.js-item-width-wrap').remove()
 
       groupCols = getParentGroupCols(@)
       groupName = getParentGroupName(@)
@@ -1523,7 +1522,7 @@ module.exports = do ->
         type: 'button'
         'aria-expanded': 'false'
       })
-      $header.append($('<span/>', { class: 'item-width__title' }).text(t('Item width in group grid')))
+      $header.append($('<span/>', { class: 'item-width__title' }).text(t('Item width')))
       $pill = $('<span/>', { class: 'js-item-width-pill item-width__pill', style: 'display:none' })
       $header.append($pill)
       $chev = $('<i/>', { class: 'k-icon k-icon-angle-down item-width__chev', 'aria-hidden': 'true' })
@@ -1571,7 +1570,8 @@ module.exports = do ->
 
       $body.hide()
       $wrap.append($body)
-      $advBody.prepend($wrap)
+      $advancedToggle = @rowView.cardSettingsWrap.find('.js-card-settings-advanced-toggle').eq(0)
+      $wrap.insertBefore($advancedToggle)
 
       @_refreshWidthPill($pill)
       $pill.show()
