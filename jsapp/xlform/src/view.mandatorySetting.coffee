@@ -49,7 +49,7 @@ module.exports = do ->
       @$el.appendTo(rowView.defaultRowDetailParent)
       @$panelEl = $($viewTemplates.$$render('row.requiredLogicPanel'))
       @$panelEl.appendTo(rowView.cardSettingsWrap.find('.js-card-settings-required-logic'))
-      # OC fork (P1.3): AI Generate button in the Required Logic panel header.
+      # OC fork (P1.1): AI Generate button in the Required Logic panel header.
       generateButtonBridge.mountGenerateButton(
         @$panelEl.find('.required-logic-panel__header').get(0)
         { row: @model._parent, attribute: 'required' }

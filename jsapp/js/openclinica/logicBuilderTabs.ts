@@ -1,5 +1,5 @@
 /**
- * OC fork — P1.3 Logic Builder mapping helpers.
+ * OC fork — P1.1 Logic Builder mapping helpers.
  *
  * Bridges the xlform world (Backbone RowDetail column names) and the
  * `@openclinica/logic-builder` package's `ExpressionTab` union. Every column
@@ -21,24 +21,9 @@ const COLUMN_TO_TAB: Partial<Record<string, ExpressionTab>> = {
   repeat_count: 'repeatCount',
 }
 
-/** package ExpressionTab -> xlform RowDetail column name. */
-const TAB_TO_COLUMN: Record<ExpressionTab, string> = {
-  calculation: 'calculation',
-  default: 'default',
-  constraint: 'constraint',
-  required: 'required',
-  relevant: 'relevant',
-  repeatCount: 'repeat_count',
-}
-
 /** Map an xlform column name to a package tab. Returns `undefined` if unknown. */
 export function columnToTab(column: string): ExpressionTab | undefined {
   return COLUMN_TO_TAB[column]
-}
-
-/** Map a package tab back to its xlform column name. */
-export function tabToColumn(tab: ExpressionTab): string {
-  return TAB_TO_COLUMN[tab]
 }
 
 /** Shape stored on `stores.surveyState[GENERATE_REQUEST_KEY]` while the dialog is open. */

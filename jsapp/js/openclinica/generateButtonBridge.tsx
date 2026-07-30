@@ -1,5 +1,5 @@
 /**
- * OC fork — P1.3 Logic Builder "Generate" button bridge (Backbone <-> React).
+ * OC fork — P1.1 Logic Builder "Generate" button bridge (Backbone <-> React).
  *
  * The xlform Form Designer settings drawer is hand-built jQuery/CoffeeScript.
  * This module lets that CoffeeScript imperatively mount the package's
@@ -68,11 +68,15 @@ function resolveEl(anchor: unknown): HTMLElement | null {
 export function mountGenerateButton(anchor: unknown, options: MountOptions): HTMLElement | null {
   const anchorEl = resolveEl(anchor)
   if (!anchorEl) {
+    // A silent no-op here means a Generate button quietly stops appearing if a
+    // panel-header template class is ever renamed — leave a trace (PR#273).
+    console.warn('Logic Builder: Generate button anchor not found; not mounting', options.attribute)
     return null
   }
 
   const tab = columnToTab(options.attribute)
   if (!tab) {
+    console.warn('Logic Builder: no logic tab maps to attribute; not mounting Generate button', options.attribute)
     return null
   }
 
@@ -106,7 +110,17 @@ export function mountGenerateButton(anchor: unknown, options: MountOptions): HTM
  * roots don't leak when the drawer is torn down.
  */
 export function unmountAll(scope?: unknown): void {
-  const scopeEl = resolveEl(scope)
+  // Distinguish "no scope requested -> unmount everything" from "a scope was
+  // passed but couldn't be resolved". The only caller (_cleanupExpandedRender)
+  // always passes a scope, so a failed lookup (e.g. cleanup running after
+  // `.card__settings` was detached) must NOT silently escalate to unmounting
+  // every Generate-button root on the page — log it and skip this cleanup
+  // (PR#273 #4).
+  const scopeEl = scope === undefined ? undefined : resolveEl(scope)
+  if (scope !== undefined && !scopeEl) {
+    console.error('Logic Builder: unmountAll scope element could not be resolved; skipping cleanup', scope)
+    return
+  }
   for (let i = trackedRoots.length - 1; i >= 0; i -= 1) {
     const tracked = trackedRoots[i]
     const inScope = !scopeEl || scopeEl === tracked.mountEl || scopeEl.contains(tracked.mountEl)

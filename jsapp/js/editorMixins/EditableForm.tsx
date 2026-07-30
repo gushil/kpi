@@ -70,12 +70,12 @@ import SurveyScope from '../models/surveyScope'
 import { type SurveyStateStoreData, stores } from '../stores'
 import { escapeHtml, recordKeys } from '../utils'
 import AssetNavigator from './AssetNavigator'
-// OC fork (P1.3): AI Generator dialog + Logic Builder wiring.
+// OC fork (P1.1): AI Generator dialog + Logic Builder wiring.
 import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openclinica/logic-builder'
 import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 
-// OC fork (P1.3): only Calculation and Default block newlines on manual entry,
+// OC fork (P1.1): only Calculation and Default block newlines on manual entry,
 // so an applied AI result is normalized only for those two (PR#273 #3).
 const NEWLINE_STRIPPING_ATTRIBUTES = new Set(['calculation', 'default'])
 
@@ -179,7 +179,7 @@ interface EditableFormState extends SurveyStateStoreData {
 }
 
 /**
- * OC fork (P1.3): best-effort read of the survey's fields to give the AI
+ * OC fork (P1.1): best-effort read of the survey's fields to give the AI
  * Generator dialog some context. The STUB client ignores it, so any failure
  * here is non-fatal — we fall back to an empty field list.
  */
@@ -259,7 +259,7 @@ export default function EditableForm(props: EditableFormProps) {
   })
 
   const formWrapRef = useRef<HTMLDivElement>(null)
-  // OC fork (P1.3): ref on the whole builder so the AI dialog can make it inert
+  // OC fork (P1.1): ref on the whole builder so the AI dialog can make it inert
   // (aside + header + form content), keeping Save / Preview / Manage Languages
   // unclickable while it is open (PR#273 #10). The dialog portals to <body>, so
   // it itself stays interactive.
@@ -379,7 +379,7 @@ export default function EditableForm(props: EditableFormProps) {
     }))
   }
 
-  // OC fork (P1.3): AI Generator dialog open/close/apply, driven by the
+  // OC fork (P1.1): AI Generator dialog open/close/apply, driven by the
   // `generateRequest` pushed onto `stores.surveyState` by the Backbone-side
   // Generate buttons (see openclinica/generateButtonBridge.tsx).
   function closeGenerateDialog() {
@@ -420,6 +420,23 @@ export default function EditableForm(props: EditableFormProps) {
     closeGenerateDialog()
   }
 
+  // Defensive (PR#273 #2): if a generate request ever carries an attribute that
+  // maps to no logic tab, the dialog can't render for it — clear the dangling
+  // request (so a clicked Generate doesn't silently do nothing) and leave a
+  // trace. Done in an effect, not during render, to avoid setState-in-render.
+  // In practice unreachable: the Generate button is only mounted for mappable
+  // columns (generateButtonBridge.mountGenerateButton).
+  const generateRequest = state[GENERATE_REQUEST_KEY]
+  useEffect(() => {
+    if (generateRequest?.attribute && !columnToTab(generateRequest.attribute)) {
+      console.warn(
+        'Logic Builder: no logic tab maps to the generate-request attribute; clearing it',
+        generateRequest.attribute,
+      )
+      stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
+    }
+  }, [generateRequest])
+
   function renderAiGeneratorDialog() {
     const request = state[GENERATE_REQUEST_KEY]
     if (!request?.row || !request?.attribute) {
@@ -427,6 +444,8 @@ export default function EditableForm(props: EditableFormProps) {
     }
     const tab = columnToTab(request.attribute)
     if (!tab) {
+      // No dialog for an unmappable attribute; the effect above clears the
+      // dangling request + logs (PR#273 #2). Can't reset state during render.
       return null
     }
     let currentExpression = ''
@@ -1677,7 +1696,7 @@ export default function EditableForm(props: EditableFormProps) {
             </Modal>
           )}
 
-          {/* OC fork (P1.3): AI Generator dialog (portals to document.body itself). */}
+          {/* OC fork (P1.1): AI Generator dialog (portals to document.body itself). */}
           {renderAiGeneratorDialog()}
         </div>
       </>

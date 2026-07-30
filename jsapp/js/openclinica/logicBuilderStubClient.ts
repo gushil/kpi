@@ -1,5 +1,5 @@
 /**
- * OC fork — P1.3 AI Generator (Logic Builder) STUB client.
+ * OC fork — P1.1 AI Generator (Logic Builder) STUB client.
  *
  * A stand-in for the eventual real AI generation backend. It returns a canned,
  * attribute-appropriate XPath-ish expression after a short delay so the
@@ -11,9 +11,9 @@
  *    is actually cancelled (its pending timer is cleared) rather than only
  *    having its result ignored by the dialog; and
  *  - it reports an intentional failure as a labeled `GenerationFailure`
- *    (`{ error }`) — reachable by putting the word "fail" in the prompt —
- *    instead of an unlabeled promise rejection, so the caller can tell a
- *    failure apart from an empty-but-successful expression.
+ *    (`{ kind: 'failure', error }`) — reachable by putting the word "fail" in
+ *    the prompt — instead of an unlabeled promise rejection, so the caller can
+ *    tell a failure apart from an empty-but-successful expression.
  *
  * NOTE: the `${...}` sequences below are LITERAL expression placeholders, not
  * JS template interpolation — hence single-quoted strings throughout.
@@ -38,7 +38,7 @@ export const logicBuilderStubClient: GenerateClient = {
 
         if (prompt.includes('fail')) {
           // Labeled failure shape — distinguishable from an empty success.
-          resolve({ error: 'Stub generation failed on purpose (prompt contained "fail").' })
+          resolve({ kind: 'failure', error: 'Stub generation failed on purpose (prompt contained "fail").' })
           return
         }
 
@@ -56,7 +56,7 @@ export const logicBuilderStubClient: GenerateClient = {
           expression = '${WEIGHT} div pow(${HEIGHT} div 100, 2)'
         }
 
-        resolve({ expression })
+        resolve({ kind: 'success', expression })
       }, STUB_DELAY_MS)
 
       // Cancel the pending "request" when the dialog supersedes it (a newer

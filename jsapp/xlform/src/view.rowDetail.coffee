@@ -614,7 +614,7 @@ module.exports = do ->
       """
 
     afterRender: ->
-      # OC fork (P1.3): .skiplogic__extras (holding the AI Generate button) is
+      # OC fork (P1.1): .skiplogic__extras (holding the AI Generate button) is
       # rendered ABOVE .skiplogic__main so the button sits at the top of the
       # panel, matching the other logic panels. It must NEVER be inside
       # .skiplogic__main — the facade calls .empty() on that node every mode switch.
@@ -642,9 +642,16 @@ module.exports = do ->
       # 'change', not model.set('value')), so this never fights the user's own
       # edits. Bound on the long-lived rowView so _cleanupExpandedRender's
       # stopListening tears it down (no duplicate handlers across drawer opens).
+      # change:value can also fire from undo/redo, paste, or a bulk import — not
+      # just the AI dialog's Apply — and Backbone dispatches it synchronously
+      # from .set(), so an uncaught throw here would propagate out of that
+      # unrelated operation. Contain it (PR#273 #3).
       @rowView.listenTo(@model, 'change:value', =>
-        @model.postInitialize()
-        @model.facade.render(@target_element)
+        try
+          @model.postInitialize()
+          @model.facade.render(@target_element)
+        catch e
+          console.error('Logic Builder: failed to refresh the relevant panel after a value change', e)
       )
 
     insertInDOM: (rowView) ->
@@ -658,7 +665,7 @@ module.exports = do ->
       </div>
       """
     afterRender: ->
-      # OC fork (P1.3): .skiplogic__extras (holding the AI Generate button) is
+      # OC fork (P1.1): .skiplogic__extras (holding the AI Generate button) is
       # rendered ABOVE .skiplogic__main so the button sits at the top of the
       # panel, matching the other logic panels. It must NEVER be inside
       # .skiplogic__main — the facade calls .empty() on that node every mode switch.
@@ -679,10 +686,15 @@ module.exports = do ->
 
       # OC fork (PR#273 #2): see the identical note on the relevant panel above.
       # The validation-criteria facade is likewise seeded once and cached, so
-      # rebuild + re-render it when the value changes underneath us.
+      # rebuild + re-render it when the value changes underneath us. Same
+      # non-Apply triggers and synchronous dispatch as the relevant panel, so
+      # contain any throw (PR#273 #3).
       @rowView.listenTo(@model, 'change:value', =>
-        @model.postInitialize()
-        @model.facade.render(@target_element)
+        try
+          @model.postInitialize()
+          @model.facade.render(@target_element)
+        catch e
+          console.error('Logic Builder: failed to refresh the constraint panel after a value change', e)
       )
 
     insertInDOM: (rowView) ->
@@ -935,12 +947,12 @@ module.exports = do ->
       modelValue = @model.getValue()
       if modelValue?
         @$input.val(modelValue)
-      # OC fork (P1.3): AI Generate button in the Repeat Count panel header.
+      # OC fork (P1.1): AI Generate button in the Repeat Count panel header.
       generateButtonBridge.mountGenerateButton(
         @$el.find('.repeat-count-panel__header').get(0)
         { row: @model._parent, attribute: 'repeat_count' }
       )
-      # OC fork (P1.3): keep the visible field in sync when the AI dialog's
+      # OC fork (P1.1): keep the visible field in sync when the AI dialog's
       # Apply writes directly to the model — otherwise the input still shows
       # whatever it had at drawer-open time until the drawer is
       # closed/reopened. Guarded by a value comparison so the user's own
