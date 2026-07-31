@@ -1,5 +1,5 @@
 import chai from 'chai'
-import { applyExpressionToRow, focusPanelInput } from './applyExpression'
+import { applyExpressionToRow, focusPanelInput, focusGenerateButton } from './applyExpression'
 
 // Minimal Backbone-ish fakes: a row hands out a RowDetail via get(attribute)
 // and its survey via getSurvey(); the detail exposes set()/getValue().
@@ -131,6 +131,46 @@ describe('focusPanelInput (P1.3 AC4)', () => {
 
   it('returns false and warns when the input is not in the DOM', () => {
     chai.expect(focusPanelInput('calculation')).to.equal(false)
+    chai.expect(warnSpy.mock.calls.length).to.equal(1)
+  })
+})
+
+describe('focusGenerateButton (P1.1 AC6, dismiss)', () => {
+  let warnSpy: jest.SpyInstance
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    document.body.innerHTML = ''
+  })
+  afterEach(() => {
+    warnSpy.mockRestore()
+    document.body.innerHTML = ''
+  })
+
+  it("focuses the panel's Generate button by its accessible name", () => {
+    // The GenerateButton renders aria-label `Generate <Label> with AI`.
+    document.body.innerHTML =
+      '<button aria-label="Generate Relevant Logic with AI">Generate</button>'
+    const focused = focusGenerateButton('relevant')
+    chai.expect(focused).to.equal(true)
+    chai.expect((document.activeElement as HTMLElement)?.getAttribute('aria-label')).to.equal(
+      'Generate Relevant Logic with AI',
+    )
+  })
+
+  it('scopes to the requested attribute when several Generate buttons are present', () => {
+    document.body.innerHTML =
+      '<button aria-label="Generate Calculation with AI">g1</button>' +
+      '<button aria-label="Generate Constraint Logic with AI" id="target">g2</button>'
+    focusGenerateButton('constraint')
+    chai.expect((document.activeElement as HTMLElement)?.id).to.equal('target')
+  })
+
+  it('returns false for an unmapped attribute', () => {
+    chai.expect(focusGenerateButton('bogus')).to.equal(false)
+  })
+
+  it('returns false and warns when no matching Generate button exists', () => {
+    chai.expect(focusGenerateButton('relevant')).to.equal(false)
     chai.expect(warnSpy.mock.calls.length).to.equal(1)
   })
 })

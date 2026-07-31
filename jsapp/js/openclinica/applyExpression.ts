@@ -6,6 +6,8 @@
  * outcome onto user-facing feedback (alertify) and dialog state; everything
  * that touches the Backbone row lives here.
  */
+import { ATTRIBUTE_LABELS } from '@openclinica/logic-builder'
+import { columnToTab } from './logicBuilderTabs'
 
 // Only Calculation and Default block newlines on manual entry, so an applied
 // AI result is normalized only for those two (PR#273 round-1 #3).
@@ -107,5 +109,29 @@ export function focusPanelInput(attribute: string, root: ParentNode = document):
     return false
   }
   el.focus()
+  return true
+}
+
+/**
+ * Move focus to the panel's Generate button after a *dismiss* close (Cancel /
+ * × / Escape) — P1.1 AC6, the counterpart to focusPanelInput for Apply.
+ *
+ * The dialog is embedded and the builder is made inert while it is open, so the
+ * package's own captured-opener restore does not reliably land back on the
+ * Generate button in this host (verified live). We own it here with a fresh
+ * lookup — scoped to the attribute via the button's accessible name (set by the
+ * package's GenerateButton) — after the dialog unmounts and inert clears.
+ */
+export function focusGenerateButton(attribute: string, root: ParentNode = document): boolean {
+  const tab = columnToTab(attribute)
+  if (!tab) {
+    return false
+  }
+  const btn = root.querySelector<HTMLElement>(`button[aria-label="Generate ${ATTRIBUTE_LABELS[tab]} with AI"]`)
+  if (!btn) {
+    console.warn('Logic Builder: could not find the Generate button to focus after dismiss', attribute)
+    return false
+  }
+  btn.focus()
   return true
 }

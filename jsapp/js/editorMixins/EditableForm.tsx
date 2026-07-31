@@ -74,7 +74,7 @@ import AssetNavigator from './AssetNavigator'
 import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openclinica/logic-builder'
 import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
-import { applyExpressionToRow, focusPanelInput } from '#/openclinica/applyExpression'
+import { applyExpressionToRow, focusPanelInput, focusGenerateButton } from '#/openclinica/applyExpression'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
 
 const ErrorMessage = makeBem(null, 'error-message')
@@ -385,8 +385,26 @@ export default function EditableForm(props: EditableFormProps) {
   // OC fork (P1.1): AI Generator dialog open/close/apply, driven by the
   // `generateRequest` pushed onto `stores.surveyState` by the Backbone-side
   // Generate buttons (see openclinica/generateButtonBridge.tsx).
+  //
+  // Focus-on-close is owned here, not by the package: the dialog is embedded
+  // and the builder is inert while it's open, so the package's captured-opener
+  // restore doesn't reliably land in this host (verified live). Apply focuses
+  // the panel's expression field (below); a *dismiss* (Cancel / × / Escape)
+  // returns focus to the panel's Generate button. This ref tells the two apart
+  // — the package calls onApply then onClose, so an Apply sets it before the
+  // close fires.
+  const closingViaApplyRef = useRef(false)
   function closeGenerateDialog() {
+    const wasApply = closingViaApplyRef.current
+    closingViaApplyRef.current = false
+    const attribute = state[GENERATE_REQUEST_KEY]?.attribute
     stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
+    if (!wasApply && attribute) {
+      // Dismiss (P1.1 AC6): return focus to the Generate button after the
+      // dialog unmounts and the builder's inert clears (same deferral the
+      // Apply-focus path uses).
+      window.setTimeout(() => focusGenerateButton(attribute), 0)
+    }
   }
 
   function applyGeneratedExpression(expression: string) {
@@ -426,6 +444,9 @@ export default function EditableForm(props: EditableFormProps) {
       )
     }
     const attribute = request.attribute
+    // Mark this close as an Apply so closeGenerateDialog focuses the expression
+    // field (below), not the Generate button.
+    closingViaApplyRef.current = true
     closeGenerateDialog()
     // P1.3 AC4: Apply moves focus to the panel's expression field. Wait for
     // React to commit the dialog unmount first — the builder stays inert until
