@@ -605,6 +605,22 @@ module.exports = do ->
     html: -> false
     insertInDOM: (rowView)-> return
 
+  # OC fork (P1.1, PR#273 round-3): before rebuilding a skip-logic/validation
+  # facade (postInitialize), release the survey listeners its current state and
+  # criterion presenters registered — otherwise every rebuild leaks listeners
+  # bound to the replaced facade. Mirrors the existing cleanup idiom in
+  # mv.skipLogicHelpers: `use_mode_selector_helper`'s
+  # `survey.off null, null, @state` and criterion remove()'s
+  # `survey.off null, null, presenter`.
+  releaseFacadeSurveyListeners = (model) ->
+    survey = model?.getSurvey?()
+    state = model?.facade?.context?.state
+    return unless survey and state
+    survey.off(null, null, state)
+    if state.presenters
+      survey.off(null, null, presenter) for presenter in state.presenters
+    return
+
   viewRowDetail.DetailViewMixins.relevant =
     html: ->
       @$el.addClass("card__settings__fields--active")
@@ -648,6 +664,7 @@ module.exports = do ->
       # unrelated operation. Contain it (PR#273 #3).
       @rowView.listenTo(@model, 'change:value', =>
         try
+          releaseFacadeSurveyListeners(@model)
           @model.postInitialize()
           @model.facade.render(@target_element)
         catch e
@@ -691,6 +708,7 @@ module.exports = do ->
       # contain any throw (PR#273 #3).
       @rowView.listenTo(@model, 'change:value', =>
         try
+          releaseFacadeSurveyListeners(@model)
           @model.postInitialize()
           @model.facade.render(@target_element)
         catch e

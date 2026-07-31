@@ -74,10 +74,8 @@ import AssetNavigator from './AssetNavigator'
 import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openclinica/logic-builder'
 import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
-
-// OC fork (P1.1): only Calculation and Default block newlines on manual entry,
-// so an applied AI result is normalized only for those two (PR#273 #3).
-const NEWLINE_STRIPPING_ATTRIBUTES = new Set(['calculation', 'default'])
+import { applyExpressionToRow, focusPanelInput } from '#/openclinica/applyExpression'
+import { unmountAll } from '#/openclinica/generateButtonBridge'
 
 const ErrorMessage = makeBem(null, 'error-message')
 const ErrorMessage__strong = makeBem(null, 'error-message__header', 'strong')
@@ -336,6 +334,11 @@ export default function EditableForm(props: EditableFormProps) {
       sessionStorage.removeItem(FORM_STYLE_CACHE_NAME)
       unpreventClosingTab()
       cleanupAppForSurveyContent()
+      // OC fork (P1.1, PR#273 round-3): leaving the Form Designer bypasses the
+      // settings-drawer close path, so release every Generate-button React
+      // root and drop any dialog request still pointing at the old form.
+      unmountAll()
+      stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
     }
   }, [])
 
@@ -388,36 +391,48 @@ export default function EditableForm(props: EditableFormProps) {
 
   function applyGeneratedExpression(expression: string) {
     const request = state[GENERATE_REQUEST_KEY]
-    const detail =
-      request?.row && request?.attribute ? request.row.get(request.attribute) : null
-    if (!request?.attribute || !detail?.set) {
-      // The RowDetail we meant to write is gone (row removed, stale reference,
-      // or a mapping miss). The dialog closes on Apply regardless, so surface an
-      // error instead of letting a silent no-op look like a saved value (PR#273 #1).
+    if (!request?.row || !request?.attribute) {
+      closeGenerateDialog()
+      return
+    }
+    // The write path lives in openclinica/applyExpression.ts (unit-tested);
+    // this handler only maps the outcome onto user feedback + dialog state.
+    const outcome = applyExpressionToRow(request.row, request.attribute, expression)
+    if (outcome.status === 'error') {
+      // Missing RowDetail, detached row, or a throw mid-write: the dialog
+      // closes on Apply regardless, so surface an error instead of letting a
+      // silent no-op look like a saved value (PR#273 rounds 2–3).
       console.error(
-        'Logic Builder: could not apply generated expression — no RowDetail for',
-        request?.attribute,
+        'Logic Builder: could not apply generated expression —',
+        outcome.reason,
+        request.attribute,
       )
       alertify.error(t('Could not apply the generated expression. Please try again.'))
       closeGenerateDialog()
       return
     }
-    try {
-      // Only Calculation/Default block newlines on manual entry; Constraint and
-      // Relevant keep them, so normalize only where manual input already does.
-      const value = NEWLINE_STRIPPING_ATTRIBUTES.has(request.attribute)
-        ? expression.replace(/\r?\n/g, '')
-        : expression
-      // CRITICAL: write via the RowDetail wrapper, never row.set('<col>', ...).
-      detail.set('value', value)
-      // `relevant`/`constraint` are not in the auto-`change` whitelist, so
-      // trigger it explicitly (idempotent for every attribute) to enable Save.
-      request.row.getSurvey?.()?.trigger?.('change')
-    } catch (e) {
-      console.error('Logic Builder: failed to apply generated expression', e)
-      alertify.error(t('Could not apply the generated expression. Please try again.'))
+    if (outcome.storedMismatch) {
+      // The skip-logic facade re-serialized the expression and dropped what it
+      // couldn't resolve (PR#273 round-3): make the loss visible before it
+      // leaves Draft rather than silently saving a reduced expression.
+      console.warn(
+        'Logic Builder: this panel could not represent the applied expression as written',
+        outcome.storedMismatch,
+      )
+      alertify.error(
+        t(
+          'Part of the applied expression could not be represented in this panel (it may reference a question that does not exist on this form) and will not be saved as written. Review the panel before saving.',
+        ),
+      )
     }
+    const attribute = request.attribute
     closeGenerateDialog()
+    // P1.3 AC4: Apply moves focus to the panel's expression field. Wait for
+    // React to commit the dialog unmount first — the builder stays inert until
+    // then, and focusing an inert element is a silent no-op.
+    window.setTimeout(() => {
+      focusPanelInput(attribute)
+    }, 0)
   }
 
   // Defensive (PR#273 #2): if a generate request ever carries an attribute that
