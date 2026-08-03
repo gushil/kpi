@@ -75,6 +75,12 @@ class DecorateSnapshotWithStudyDesignerPreviewTest(TestCase):
         self.assertNotIn(b'media_base_url', sent_request.body)
         self.assertEqual(sent_request.headers['Authorization'], 'Bearer test-token')
 
+    @override_settings(
+        ENKETO_FORM_OC_INSTANCE_URL=(
+            'https://build.test/form-service/api/storage/artifacts/'
+            'clinicaldata.xml'
+        )
+    )
     @patch('kpi.utils.study_designer_preview.KeycloakOpenID')
     @patch('kpi.utils.study_designer_preview._cached_client_secret')
     @patch('kpi.utils.study_designer_preview._cached_realm_name')
@@ -97,11 +103,15 @@ class DecorateSnapshotWithStudyDesignerPreviewTest(TestCase):
 
         decorate_snapshot_with_study_designer_preview(self.snapshot, self.request)
 
-        expected_users_url = settings.ENKETO_FORM_OC_INSTANCE_URL.replace(
-            'clinicaldata.xml', 'users.xml'
+        self.assertIn(
+            'https://build.test/form-service/api/storage/artifacts/users.xml',
+            self.snapshot.xml,
         )
-        self.assertIn(expected_users_url, self.snapshot.xml)
-        self.assertIn(settings.ENKETO_FORM_OC_INSTANCE_URL, self.snapshot.xml)
+        self.assertIn(
+            'https://build.test/form-service/api/storage/artifacts/'
+            'clinicaldata.xml',
+            self.snapshot.xml,
+        )
         self.assertNotIn('jr://file-csv/users.xml', self.snapshot.xml)
         self.assertNotIn('jr://file/clinicaldata.xml', self.snapshot.xml)
 

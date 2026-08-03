@@ -118,7 +118,7 @@ def _fetch_decorated_xml(snapshot, request):
     # its URL from the existing per-environment setting instead of adding
     # a new one.
     clinicaldata_url = settings.ENKETO_FORM_OC_INSTANCE_URL
-    users_url = clinicaldata_url.replace('clinicaldata.xml', 'users.xml')
+    users_url = clinicaldata_url.rsplit('/', 1)[0] + '/users.xml'
     return xml.replace('jr://file-csv/users.xml', users_url).replace(
         'jr://file/clinicaldata.xml', clinicaldata_url
     )
