@@ -4,21 +4,53 @@ import alertify from 'alertifyjs'
 import ReactTable from 'react-table'
 import TextareaAutosize from 'react-textarea-autosize'
 import { actions } from '#/actions'
+import { invalidateItem } from '#/api/mutation-defaults/common'
+import { getAssetsRetrieveQueryKey } from '#/api/react-query/manage-projects-and-library-content'
 import bem from '#/bem'
 import Button from '#/components/common/button'
 import LoadingSpinner from '#/components/common/loadingSpinner'
 import { LockingRestrictionName } from '#/components/locking/lockingConstants'
-import { hasAssetRestriction, hasRowRestriction } from '#/components/locking/lockingUtils'
-import LanguageForm from '#/components/modalForms/languageForm'
+import { hasRowRestriction } from '#/components/locking/lockingUtils'
 import { GROUP_TYPES_BEGIN, MODAL_TYPES, QUESTION_TYPES } from '#/constants'
 import pageState from '#/pageState.store'
 import { stores } from '#/stores'
-import { getLangString, notify, recordKeys } from '#/utils'
+import { recordKeys } from '#/utils'
 
 const SAVE_BUTTON_TEXT = {
-  DEFAULT: t('Save Changes'),
-  UNSAVED: t('* Save Changes'),
+  DEFAULT: t('Save translations'),
+  UNSAVED: t('* Save translations'),
   PENDING: t('Saving…'),
+}
+
+const ELEMENT_TYPE_LABELS = {
+  hint: t('Hint'),
+  constraint_message: t('Constraint message'),
+  required_message: t('Required message'),
+  guidance_hint: t('Guidance hint'),
+  'media::image': t('Image'),
+  'media::audio': t('Audio'),
+  'media::video': t('Video'),
+}
+
+// Derives a human-readable "Element" column label (e.g. "Group label",
+// "Question label", "Choice label", "Hint") from the translatable property
+// name and, for survey rows, the row's type. Falls back to a humanized
+// version of the property name for any translatable column pyxform may
+// produce that isn't explicitly mapped above.
+function getElementTypeLabel(contentProp, itemProp, rowType) {
+  if (contentProp === 'choices') {
+    return t('Choice label')
+  }
+  if (itemProp === 'label') {
+    return rowType && GROUP_TYPES_BEGIN[rowType] ? t('Group label') : t('Question label')
+  }
+  if (ELEMENT_TYPE_LABELS[itemProp]) {
+    return ELEMENT_TYPE_LABELS[itemProp]
+  }
+  return itemProp
+    .replace(/^media::/, '')
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase())
 }
 
 export class TranslationTable extends React.Component {
@@ -28,13 +60,10 @@ export class TranslationTable extends React.Component {
       saveChangesButtonText: SAVE_BUTTON_TEXT.DEFAULT,
       isSaveChangesButtonPending: false,
       tableData: [],
-      showLanguageForm: false,
-      langString: props.langString,
     }
     stores.translations.setTranslationTableUnsaved(false)
     const { translated, survey, choices, translations } = props.asset.content
     const langIndex = props.langIndex
-    const editableColTitle = langIndex == 0 ? t('updated text') : t('translation')
     const lockedChoiceLists = []
 
     // add each translatable property for survey items to translation table
@@ -59,6 +88,7 @@ export class TranslationTable extends React.Component {
             name: row.name || row.$autoname,
             itemProp: property,
             contentProp: 'survey',
+            elementType: getElementTypeLabel('survey', property, row.type),
             isLabelLocked: isLabelLocked,
           })
         }
@@ -77,6 +107,7 @@ export class TranslationTable extends React.Component {
             listName: choice.list_name,
             itemProp: 'label',
             contentProp: 'choices',
+            elementType: getElementTypeLabel('choices', 'label'),
             isLabelLocked: isLabelLocked,
           })
         }
@@ -85,9 +116,14 @@ export class TranslationTable extends React.Component {
 
     this.columns = [
       {
+        Header: t('Element'),
+        accessor: 'elementType',
+        width: 150,
+      },
+      {
         Header: t('Original string'),
         accessor: 'original',
-        minWidth: 130,
+        width: 353,
         Cell: (cellInfo) => (
           // Disabling has no effect on this cell, but we do it to gray out the
           // text to indicate that the label is locked
@@ -99,18 +135,7 @@ export class TranslationTable extends React.Component {
         ),
       },
       {
-        Header: () => (
-          <React.Fragment>
-            <Button
-              type='text'
-              size='m'
-              onClick={this.toggleRenameLanguageForm.bind(this)}
-              isDisabled={!this.canEditLanguages()}
-              startIcon={this.state.showLanguageForm ? 'close' : 'edit'}
-            />
-            {`${translations[langIndex]} ${editableColTitle}`}
-          </React.Fragment>
-        ),
+        Header: translations[langIndex],
         accessor: 'translation',
         className: 'translation',
         Cell: (cellInfo) => (
@@ -154,11 +179,6 @@ export class TranslationTable extends React.Component {
     stores.translations.setTranslationTableUnsaved(false)
   }
 
-  toggleRenameLanguageForm(evt) {
-    evt.stopPropagation()
-    this.setState({ showLanguageForm: !this.state.showLanguageForm })
-  }
-
   saveChanges() {
     const content = this.props.asset.content,
       rows = this.state.tableData,
@@ -183,7 +203,12 @@ export class TranslationTable extends React.Component {
         content: JSON.stringify(content),
       },
       {
-        onComplete: this.markFormIdle.bind(this),
+        onComplete: () => {
+          this.markFormIdle()
+          // Keep the React Query asset cache in sync so Form Designer's live
+          // preview/save reads the freshly-saved translations.
+          invalidateItem(getAssetsRetrieveQueryKey(this.props.asset.uid))
+        },
         onFailed: this.markFormUnsaved.bind(this),
       },
     )
@@ -212,38 +237,6 @@ export class TranslationTable extends React.Component {
     })
   }
 
-  onLanguageChange(lang, index) {
-    const content = this.props.asset.content,
-      langString = getLangString(lang)
-
-    content.translations[index] = langString
-    this.setState({ langString: langString })
-
-    if (index === 0) {
-      content.settings.default_language = langString
-    }
-
-    this.updateHeader(content)
-  }
-
-  updateHeader(content) {
-    actions.resources.updateAsset(
-      this.props.asset.uid,
-      { content: JSON.stringify(content) },
-      // reload asset on failure
-      {
-        onFailed: () => {
-          actions.resources.loadAsset({ id: this.props.asset.uid }, true)
-          notify.error('failed to update translations')
-        },
-      },
-    )
-  }
-
-  getAllLanguages() {
-    return this.props.asset.content.translations
-  }
-
   // Compare current row type agaisnt those with lockable labels and return if
   // the relevant label restriction applies
   isRowLabelLocked(rowType, rowName) {
@@ -260,30 +253,9 @@ export class TranslationTable extends React.Component {
     return hasRowRestriction(this.props.asset.content, rowName, LockingRestrictionName.choice_label_edit)
   }
 
-  canEditLanguages() {
-    return (
-      this.props.asset?.content && !hasAssetRestriction(this.props.asset.content, LockingRestrictionName.language_edit)
-    )
-  }
-
   render() {
     return (
       <bem.FormModal m='translation-table'>
-        {this.state.showLanguageForm && (
-          <bem.FormModal>
-            <bem.FormModal__item>
-              <bem.FormView__cell m='update-language-form'>
-                <LanguageForm
-                  langString={this.state.langString}
-                  langIndex={this.props.langIndex}
-                  onLanguageChange={this.onLanguageChange.bind(this)}
-                  existingLanguages={this.getAllLanguages()}
-                  isDefault={this.props.langIndex === 0}
-                />
-              </bem.FormView__cell>
-            </bem.FormModal__item>
-          </bem.FormModal>
-        )}
         <div className='translation-table-container'>
           <ReactTable
             data={this.state.tableData}
@@ -301,9 +273,7 @@ export class TranslationTable extends React.Component {
           />
         </div>
 
-        <bem.Modal__footer>
-          <Button type='secondary' size='l' onClick={this.onBack.bind(this)} label={t('Back')} />
-
+        <bem.Modal__footer m='translation-table'>
           <Button
             type='primary'
             size='l'
@@ -311,6 +281,12 @@ export class TranslationTable extends React.Component {
             isDisabled={this.state.isSaveChangesButtonPending}
             label={this.state.saveChangesButtonText}
           />
+
+          <Button type='secondary' size='l' onClick={this.onBack.bind(this)} label={t('Cancel')} />
+
+          <span className='translation-table-footer__help'>
+            {t('Saving adds the translations to the form definition.')}
+          </span>
         </bem.Modal__footer>
       </bem.FormModal>
     )

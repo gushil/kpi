@@ -1216,7 +1216,7 @@ module.exports = do ->
       if @model_is_group(@model)
         return viewRowDetail.Templates.textbox @cid, @model.key, t("Appearance"), 'text'
       else
-        if @model_type() is 'integer'
+        if @model_type() is 'integer' or @model_type() is 'decimal' or @model_type() is 'image'
           return null
         if @model_type() isnt 'calculate'
           appearances = @getTypes()
@@ -1287,6 +1287,10 @@ module.exports = do ->
       @_columnCount = columnCount
       @_customText = customText
 
+      # Sync @$select_width with any saved column count so card clicks preserve it
+      currentWidth = @get_width_from_model_value()
+      @$select_width.val(currentWidth) if currentWidth?
+
       $section = @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0)
       $pill    = $section.find('.js-appearance-pill').eq(0)
       $toggle  = $section.find('.js-appearance-toggle').eq(0)
@@ -1323,10 +1327,15 @@ module.exports = do ->
       @$el.off('click.oc-appearance').on 'click.oc-appearance', '.appearance-card', (evt) =>
         selectCard(evt.currentTarget)
       @$el.off('keydown.oc-appearance').on 'keydown.oc-appearance', '.appearance-card', (evt) =>
-        selectCard(evt.currentTarget) if evt.key in ['Enter', ' ']
+        if evt.key in ['Enter', ' ']
+          evt.preventDefault()
+          selectCard(evt.currentTarget)
 
-      # Item width section
-      @_afterRenderWidth()
+      # For groups: Columns in Grid as own section after Appearance; for non-groups: item width picker
+      if questionType is 'group'
+        @_afterRenderGroupCols(@get_width_from_model_value())
+      else
+        @_afterRenderWidth()
 
       # Initial pill (section starts collapsed)
       @_refreshPill($pill)
@@ -1475,6 +1484,10 @@ module.exports = do ->
         @$select_width.on 'change', () =>
           if @model_type() is 'integer'
             @_integer_width_change_handler()
+          else if @model_type() is 'decimal'
+            @_decimal_width_change_handler()
+          else if @model_type() is 'image'
+            @_image_width_change_handler()
           else
             @group_inputs_change_handler()
 
@@ -1557,11 +1570,10 @@ module.exports = do ->
 
     _afterRenderWidth: ->
       return unless @is_form_style_theme_grid()
-      $advBody = @rowView.cardSettingsWrap.find('#js-card-settings-row-options-advanced').eq(0)
-      return unless $advBody.length
+      return unless @rowView.cardSettingsWrap.find('.js-card-settings-advanced-toggle').length
 
-      # Idempotent: remove stale sub-section from a prior render
-      $advBody.find('.js-item-width-wrap').remove()
+      # Idempotent: remove stale section from a prior render
+      @rowView.cardSettingsWrap.find('.js-item-width-wrap').remove()
 
       groupCols = getParentGroupCols(@)
       groupName = getParentGroupName(@)
@@ -1594,7 +1606,7 @@ module.exports = do ->
       selectedW  = if outOfRange then null else if currentW? then currentW else defaultW
 
       # --- Build DOM ---
-      $wrap = $('<div/>', { class: 'js-item-width-wrap item-width-subsection', style: 'grid-column: 1 / -1' })
+      $wrap = $('<div/>', { class: 'js-item-width-wrap item-width-section', style: 'grid-column: 1 / -1' })
 
       # Header row (collapse toggle)
       $header = $('<button/>', {
@@ -1602,7 +1614,7 @@ module.exports = do ->
         type: 'button'
         'aria-expanded': 'false'
       })
-      $header.append($('<span/>', { class: 'item-width__title' }).text(t('Item width in group grid')))
+      $header.append($('<span/>', { class: 'item-width__title' }).text(t('Item width')))
       $pill = $('<span/>', { class: 'js-item-width-pill item-width__pill', style: 'display:none' })
       $header.append($pill)
       $chev = $('<i/>', { class: 'k-icon k-icon-angle-down item-width__chev', 'aria-hidden': 'true' })
@@ -1650,7 +1662,8 @@ module.exports = do ->
 
       $body.hide()
       $wrap.append($body)
-      $advBody.prepend($wrap)
+      $advancedToggle = @rowView.cardSettingsWrap.find('.js-card-settings-advanced-toggle').eq(0)
+      $wrap.insertBefore($advancedToggle)
 
       @_refreshWidthPill($pill)
       $pill.show()
@@ -1693,7 +1706,7 @@ module.exports = do ->
 
     _afterRenderGroupCols: (storedVal) ->
       return unless @is_form_style_theme_grid()
-      @$el.find('.js-group-cols-wrap').remove()
+      @rowView.cardSettingsWrap.find('.js-group-cols-wrap').remove()
 
       DEFAULT_COLS = 4
       currentSelCols = null
@@ -1702,22 +1715,21 @@ module.exports = do ->
         currentSelCols = parsed unless isNaN(parsed) or parsed < 1 or parsed > 10
       outOfRange = storedVal? and storedVal isnt '' and currentSelCols is null
 
-      $wrap = $('<div/>', { class: 'js-group-cols-wrap card__settings__fields__field group-cols-section' })
-      $wrap.append($('<label/>').text(t('Columns in Grid') + ':'))
+      $wrap = $('<div/>', { class: 'js-group-cols-wrap card__settings__appearance-section is-collapsed' })
 
-      $settingsInput = $('<span/>', { class: 'settings__input' })
-
-      $header = $('<button/>', {
-        class: 'group-cols__header'
-        type: 'button'
+      $header = $('<div/>', {
+        class: 'card__settings__appearance-header js-group-cols-toggle'
+        role: 'button'
+        tabindex: '0'
         'aria-expanded': 'false'
       })
-      $pill = $('<span/>', { class: 'js-group-cols-pill group-cols__pill' })
+      $header.append($('<span/>', { class: 'card__settings__appearance-title' }).text(t('Columns in Grid')))
+      $pill = $('<span/>', { class: 'js-group-cols-pill card__settings__appearance-pill' })
       $header.append($pill)
-      $header.append($('<i/>', { class: 'k-icon k-icon-angle-down group-cols__chev', 'aria-hidden': 'true' }))
-      $settingsInput.append($header)
+      $header.append($('<i/>', { class: 'k-icon k-icon-angle-down card__settings__appearance-toggle__icon', 'aria-hidden': 'true' }))
+      $wrap.append($header)
 
-      $body = $('<div/>', { class: 'js-group-cols-body group-cols__body' })
+      $body = $('<div/>', { class: 'js-group-cols-body card__settings__appearance-body' })
       $body.append(
         $('<p/>', { class: 'group-cols__instruction' }).text(
           t('Sets how many columns items in this group are arranged into.')
@@ -1749,10 +1761,8 @@ module.exports = do ->
           )
         )
 
-      $body.hide()
-      $settingsInput.append($body)
-      $wrap.append($settingsInput)
-      @$el.append($wrap)
+      $wrap.append($body)
+      @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0).after($wrap)
 
       refreshPill = =>
         numCols = currentSelCols ? DEFAULT_COLS
@@ -1760,12 +1770,16 @@ module.exports = do ->
         $pill.text(if currentSelCols? then "#{numCols} #{colWord} · w#{numCols}" else "#{numCols} #{colWord}")
 
       refreshPill()
+      $pill.show()
 
       selectCols = (el) =>
         numCols = parseInt($(el).data('cols'), 10)
         currentSelCols = numCols
         @$select_width.val("w#{numCols}")
-        @group_inputs_change_handler()
+        if @_card?
+          @_writeModelValue()
+        else
+          @group_inputs_change_handler()
         $grid.find('.group-cols-card').each ->
           $c = $(@)
           cn = parseInt($c.data('cols'), 10)
@@ -1782,18 +1796,23 @@ module.exports = do ->
           evt.stopPropagation()
           selectCols(evt.currentTarget)
 
-      $header.off('click.groupColsToggle').on 'click.groupColsToggle', (evt) =>
-        evt.stopPropagation()
-        isCollapsed = $body.is(':hidden')
-        if isCollapsed
-          $body.show()
-          $header.attr('aria-expanded', 'true')
-          $pill.hide()
-        else
-          $body.hide()
-          $header.attr('aria-expanded', 'false')
-          refreshPill()
-          $pill.show()
+      $header.off('click.groupColsToggle keydown.groupColsToggle')
+        .on 'click.groupColsToggle', (evt) =>
+          evt.stopPropagation()
+          isCollapsed = $wrap.hasClass('is-collapsed')
+          if isCollapsed
+            $wrap.removeClass('is-collapsed')
+            $header.attr('aria-expanded', 'true')
+            $pill.hide()
+          else
+            $wrap.addClass('is-collapsed')
+            $header.attr('aria-expanded', 'false')
+            refreshPill()
+            $pill.show()
+        .on 'keydown.groupColsToggle', (evt) =>
+          if evt.key in ['Enter', ' ']
+            evt.preventDefault()
+            $header.trigger('click')
 
     _writeWidthValue: (widthSlug) ->
       currentVal = @model.get('value') or ''
@@ -1838,6 +1857,40 @@ module.exports = do ->
           stripped = stripped.replace(new RegExp('\\s*\\b' + w + '\\b\\s*', 'g'), '').trim()
         appearancePart = stripped
 
+      widthVal = @$select_width.val()
+      widthVal = '' if widthVal is 'select'
+      if appearancePart and widthVal
+        @model.set 'value', "#{appearancePart} #{widthVal}"
+      else if appearancePart
+        @model.set 'value', appearancePart
+      else if widthVal
+        @model.set 'value', widthVal
+      else
+        @model.set 'value', ''
+
+    _decimal_width_change_handler: () ->
+      currentModelValue = (@model.get('value') or '').trim()
+      width_options = ('w' + i for i in [1..10])
+      appearancePart = currentModelValue
+      for w in width_options
+        appearancePart = appearancePart.replace(new RegExp('\\s*\\b' + w + '\\b\\s*', 'g'), '').trim()
+      widthVal = @$select_width.val()
+      widthVal = '' if widthVal is 'select'
+      if appearancePart and widthVal
+        @model.set 'value', "#{appearancePart} #{widthVal}"
+      else if appearancePart
+        @model.set 'value', appearancePart
+      else if widthVal
+        @model.set 'value', widthVal
+      else
+        @model.set 'value', ''
+
+    _image_width_change_handler: () ->
+      currentModelValue = (@model.get('value') or '').trim()
+      width_options = ('w' + i for i in [1..10])
+      appearancePart = currentModelValue
+      for w in width_options
+        appearancePart = appearancePart.replace(new RegExp('\\s*\\b' + w + '\\b\\s*', 'g'), '').trim()
       widthVal = @$select_width.val()
       widthVal = '' if widthVal is 'select'
       if appearancePart and widthVal

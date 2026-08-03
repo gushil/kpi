@@ -85,6 +85,115 @@ export function unnullifyTranslations(surveyDataJSON: string, surveyInitialParam
   return JSON.stringify(surveyData)
 }
 
+export function mergeFreshTranslations(
+  surveyDataJSON: string,
+  freshContent: AssetContent,
+  protectedLangName: string | null,
+): string {
+  if (!freshContent?.translations || !freshContent.translated) {
+    return surveyDataJSON
+  }
+  const surveyData: FlatSurvey = JSON.parse(surveyDataJSON)
+  const translatedProps = freshContent.translated
+
+  const langNames: Array<string | null> = freshContent.translations.map((name, i) =>
+    i === 0 ? (name ?? freshContent.translations_0 ?? null) : name,
+  )
+
+  const applyItem = (flat: Record<string, unknown>, fresh: Record<string, unknown>) => {
+    translatedProps.forEach((prop) => {
+      // Delete every existing key for this prop, EXCEPT the protected language's key.
+      Object.keys(flat).forEach((k) => {
+        if (k !== prop && !k.startsWith(`${prop}::`)) return
+        const keyLangName = k === prop ? null : k.slice(prop.length + 2)
+        if (protectedLangName !== null && keyLangName === protectedLangName) return
+        delete flat[k]
+      })
+      const freshValues = fresh[prop] as Array<string | null> | undefined
+      if (!freshValues) return
+      langNames.forEach((langName, i) => {
+        if (protectedLangName !== null && langName === protectedLangName) return
+        const key = langName == null ? prop : `${prop}::${langName}`
+        flat[key] = freshValues[i] ?? null
+      })
+    })
+  }
+
+  const rowsByKuid = new Map<string, any>()
+  const rowsByName = new Map<string, any>()
+  freshContent.survey?.forEach((r: any) => {
+    if (r.$kuid) rowsByKuid.set(r.$kuid, r)
+    const nm = r.name || r.$autoname
+    if (nm) rowsByName.set(nm, r)
+  })
+  const choicesByKuid = new Map<string, any>()
+  const choicesByNameList = new Map<string, any>()
+  freshContent.choices?.forEach((c: any) => {
+    if (c.$kuid) choicesByKuid.set(c.$kuid, c)
+    const nm = c.name || c.$autovalue
+    if (nm) choicesByNameList.set(`${nm}::${c.list_name}`, c)
+  })
+
+  surveyData.survey?.forEach((row: any) => {
+    const rowName = row.name || row.$autoname
+    const fresh = (row.$kuid && rowsByKuid.get(row.$kuid)) || (rowName && rowsByName.get(rowName))
+    if (fresh) applyItem(row, fresh)
+  })
+  surveyData.choices?.forEach((ch: any) => {
+    const chName = ch.name || ch.$autovalue
+    const fresh =
+      (ch.$kuid && choicesByKuid.get(ch.$kuid)) || (chName && choicesByNameList.get(`${chName}::${ch.list_name}`))
+    if (fresh) applyItem(ch, fresh)
+  })
+
+  return JSON.stringify(surveyData)
+}
+
+/**
+ * Resolves the form's current primary-language name and translated-property
+ * list, preferring a freshly-fetched asset's actual current state over the
+ * Form Builder survey model's frozen mount-time snapshot (`_initialParams`,
+ * captured once when the model was built and never updated afterward — see
+ * EditableForm.tsx's previewForm()/saveForm(), which both need this and
+ * previously duplicated the same fallback logic inline in two places).
+ */
+export function resolveCurrentPrimaryLanguage(
+  freshContent: AssetContent | undefined,
+  frozenInitialParams: AssetContent | undefined,
+): { primaryLangName: string | null; translatedProps: string[] } {
+  // `translations[0]` is normally the real primary-language name, but
+  // (mirroring mergeFreshTranslations() above) it can be `null` with the name
+  // stored in `translations_0` instead.
+  const primaryLangName =
+    freshContent?.translations?.[0] ?? freshContent?.translations_0 ?? frozenInitialParams?.translations_0 ?? null
+  const translatedProps = freshContent?.translated ?? frozenInitialParams?.translated ?? []
+  return { primaryLangName, translatedProps }
+}
+
+/**
+ * Resolves the current primary language (see resolveCurrentPrimaryLanguage())
+ * and, if one exists, unnullifies `surveyDataJSON` against it. Bundles the
+ * two steps together since every caller needs both and previously duplicated
+ * this same pairing inline in two places (Form Designer's previewForm() and
+ * saveForm()).
+ */
+export function applyFreshPrimaryLanguage(
+  surveyDataJSON: string,
+  freshContent: AssetContent | undefined,
+  frozenInitialParams: AssetContent | undefined,
+): { surveyDataJSON: string; primaryLangName: string | null } {
+  const { primaryLangName, translatedProps } = resolveCurrentPrimaryLanguage(freshContent, frozenInitialParams)
+  if (!primaryLangName) {
+    return { surveyDataJSON, primaryLangName }
+  }
+  const updatedSurveyDataJSON = unnullifyTranslations(surveyDataJSON, {
+    ...frozenInitialParams,
+    translations_0: primaryLangName,
+    translated: translatedProps,
+  })
+  return { surveyDataJSON: updatedSurveyDataJSON, primaryLangName }
+}
+
 /**
  * @typedef NullifiedTranslations
  * @property {object} survey - Modified survey.

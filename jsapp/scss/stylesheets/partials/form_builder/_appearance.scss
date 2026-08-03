@@ -224,10 +224,23 @@
   margin-right: 60px;
 }
 
-// Group panel: appearance is a sibling of the tab panels, not nested inside row-options,
-// so hide it when row-options is inactive.
-.js-card-settings-row-options:not(.card__settings__fields--active) ~ .js-card-settings-appearance {
+// Group panel: appearance and columns-in-grid are siblings of the tab panels,
+// so hide them when row-options is inactive.
+.js-card-settings-row-options:not(.card__settings__fields--active) ~ .js-card-settings-appearance,
+.js-card-settings-row-options:not(.card__settings__fields--active) ~ .js-group-cols-wrap {
   display: none;
+}
+
+// When Columns in Grid follows a collapsed Appearance section, suppress the redundant
+// top border (the Appearance header already has border-bottom acting as the divider).
+// When Appearance is expanded its body is visible, so restore the border to separate them.
+.card__settings__appearance-section + .card__settings__appearance-section {
+  border-top: none;
+  margin-top: 0;
+}
+
+.card__settings__appearance-section:not(.is-collapsed) + .card__settings__appearance-section {
+  border-top: 1px solid #CBD5E1;
 }
 
 // Group type: always 3 columns (single row)
@@ -249,22 +262,22 @@
 }
 
 // ==========================================================================
-// Item width sub-section (inside Advanced options)
+// Item width standalone section (between Appearance and Advanced options)
 // ==========================================================================
 
-.item-width-subsection {
+.item-width-section {
   padding: 6px 0 4px;
   border-bottom: 1px solid #CBD5E1;
-  margin-bottom: 4px;
+  margin-bottom: 12px;
 }
 
 .item-width__header {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #334155;
+  color: #020617;
   padding: 2px 0;
   cursor: pointer;
   user-select: none;
@@ -287,7 +300,7 @@
 
 .item-width__title {
   text-align: left;
-  color: #334155;
+  color: #020617;
 }
 
 .item-width__pill {

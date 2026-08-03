@@ -138,14 +138,14 @@ class LanguageForm extends React.Component {
       <bem.FormView__form m='add-language-fields'>
         <bem.FormView__cell m='lang-name'>
           <bem.FormModal__item>
-            <label>{this.props.isDefault ? t('Default language name') : t('Language name')}</label>
+            <label>{this.props.isDefault ? t('Primary language name') : t('Language name')}</label>
             <TextBox value={this.state.name} onChange={this.onNameChange.bind(this)} errors={this.state.nameError} />
           </bem.FormModal__item>
         </bem.FormView__cell>
 
         <bem.FormView__cell m='lang-code'>
           <bem.FormModal__item>
-            <label>{this.props.isDefault ? t('Default language code') : t('Language code')}</label>
+            <label>{this.props.isDefault ? t('Primary language code') : t('Language code')}</label>
             <TextBox value={this.state.code} onChange={this.onCodeChange.bind(this)} errors={this.state.codeError} />
           </bem.FormModal__item>
         </bem.FormView__cell>

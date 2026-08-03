@@ -132,12 +132,10 @@ do ->
       result = ctx.html()
       expect(result).toBe('')
 
-    it 'image html() renders a dropdown with draw, annotate, signature', ->
+    it 'image html() returns null (card grid rendered by view.row.coffee)', ->
       ctx = buildAppearanceMixinCtx('image')
       result = ctx.html()
-      expect(result.indexOf('<select')).not.toBe(-1)
-      expect(result.indexOf('draw')).not.toBe(-1)
-      expect(result.indexOf('signature')).not.toBe(-1)
+      expect(!result || result.indexOf('<select') is -1).toBe(true)
 
     it 'date html() returns empty string (card grid path, no legacy dropdown)', ->
       ctx = buildAppearanceMixinCtx('date')
@@ -165,11 +163,10 @@ do ->
       # calculate has no appearance options; html() returns falsy or no <select>
       expect(!result || result.indexOf('<select') == -1).toBe(true)
 
-    it 'decimal html() renders a textbox input (no predefined options)', ->
+    it 'decimal html() returns null (card grid rendered by view.row.coffee)', ->
       ctx = buildAppearanceMixinCtx('decimal')
       result = ctx.html()
-      # Falls through to the textbox branch
-      expect(result.indexOf('input')).not.toBe(-1)
+      expect(result).toBe(null)
 
   ###############################################################
   # Per-type: select_one_from_file_ has extra "filename" field
