@@ -110,7 +110,18 @@ def _fetch_decorated_xml(snapshot, request):
         )
         return None
 
-    return xml
+    # generateXform never rewrites these two refs (by design: no persisted
+    # data files exist for a stateless request), so point them at
+    # form-service's existing stub-file route ourselves, same as the
+    # deployed/Study Designer upload pipeline does. users.xml lives
+    # alongside clinicaldata.xml in that same artifacts folder, so derive
+    # its URL from the existing per-environment setting instead of adding
+    # a new one.
+    clinicaldata_url = settings.ENKETO_FORM_OC_INSTANCE_URL
+    users_url = clinicaldata_url.replace('clinicaldata.xml', 'users.xml')
+    return xml.replace('jr://file-csv/users.xml', users_url).replace(
+        'jr://file/clinicaldata.xml', clinicaldata_url
+    )
 
 
 def _cached_client_credentials_token(realm_name):
