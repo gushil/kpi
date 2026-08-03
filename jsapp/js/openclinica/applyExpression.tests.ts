@@ -16,13 +16,27 @@ function makeRow(options: { detail?: any; survey?: any } = {}) {
   return { row, detail, survey }
 }
 
+// A facade-backed RowDetail whose getValue() returns a scripted sequence: the
+// pre-write serialization first (captured to restore on a lossy apply), then
+// the post-write serialization the drop-detection compares against.
+function makeFacadeRow(getValues: string[]) {
+  const getValue = jest.fn()
+  for (const v of getValues) getValue.mockReturnValueOnce(v)
+  getValue.mockReturnValue(getValues[getValues.length - 1] ?? '')
+  const detail = { set: jest.fn(), getValue }
+  return makeRow({ detail })
+}
+
 describe('applyExpressionToRow (P1.3)', () => {
   let errorSpy: jest.SpyInstance
+  let warnSpy: jest.SpyInstance
   beforeEach(() => {
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
   })
   afterEach(() => {
     errorSpy.mockRestore()
+    warnSpy.mockRestore()
   })
 
   it('reports missing-detail when the row has no RowDetail for the attribute', () => {
@@ -41,48 +55,76 @@ describe('applyExpressionToRow (P1.3)', () => {
   it('strips newlines for calculation, writes via the RowDetail, and triggers a survey change', () => {
     const { row, detail, survey } = makeRow()
     const outcome = applyExpressionToRow(row, 'calculation', '${A}\n + \r\n${B}')
-    chai.expect(outcome).to.deep.equal({ status: 'applied', storedMismatch: null })
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
     chai.expect(detail.set.mock.calls).to.deep.equal([['value', '${A} + ${B}']])
     chai.expect(survey.trigger.mock.calls).to.deep.equal([['change']])
   })
 
-  it('keeps newlines for relevant (manual entry keeps them there too)', () => {
+  it('strips newlines for required too — its panel input is single-line (round-5 #7)', () => {
     const { row, detail } = makeRow()
-    detail.getValue = jest.fn(() => '${A} = 1\nand ${B} = 2')
-    applyExpressionToRow(row, 'relevant', '${A} = 1\nand ${B} = 2')
+    applyExpressionToRow(row, 'required', '${A} = 1\nand ${B} = 2')
+    chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1and ${B} = 2')
+  })
+
+  it('keeps newlines for relevant (manual entry keeps them there too)', () => {
+    // Stored form keeps both field refs → a clean apply, newlines preserved.
+    const { row, detail } = makeFacadeRow(['', '${A} = 1\nand ${B} = 2'])
+    const outcome = applyExpressionToRow(row, 'relevant', '${A} = 1\nand ${B} = 2')
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
     chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1\nand ${B} = 2')
   })
 
-  it('does not report a mismatch when the facade only reformats (whitespace / quote style)', () => {
-    const { row, detail } = makeRow()
-    detail.getValue = jest.fn(() => "${A}=1 and ${B}='x'")
-    const outcome = applyExpressionToRow(row, 'relevant', '${A} = 1 and ${B} = "x"')
-    chai.expect(outcome).to.deep.equal({ status: 'applied', storedMismatch: null })
+  it('does not flag a date() wrapper the serializer adds (round-5 #3 false positive)', () => {
+    // DateOperator wraps a bare date literal in date('…') on serialize; the
+    // field ref ${visit_date} survives, so this is a clean apply, not a drop.
+    const { row } = makeFacadeRow(['', "${visit_date} > date('2024-01-01')"])
+    const outcome = applyExpressionToRow(row, 'constraint', "${visit_date} > '2024-01-01'")
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
   })
 
-  it('reports a mismatch when the facade drops a clause it cannot resolve', () => {
-    const { row, detail } = makeRow()
-    detail.getValue = jest.fn(() => '${A} = 1')
+  it('does not flag quotes the serializer adds around an unquoted value (round-5 #3)', () => {
+    // TextOperator wraps an unquoted value in quotes; ${subject_code} survives.
+    const { row } = makeFacadeRow(['', "${subject_code} = '123'"])
+    const outcome = applyExpressionToRow(row, 'constraint', '${subject_code} = 123')
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
+  })
+
+  it('refuses and reverts a partial clause-drop, reporting the unresolved refs (round-5 #5)', () => {
+    // The facade dropped the ${NOPE} clause it could not resolve. Rather than
+    // persist a silently-reduced expression, restore the previous value and
+    // report a rejection.
+    const previous = '${A} = 1'
+    const { row, detail } = makeFacadeRow([previous, '${A} = 1'])
     const outcome = applyExpressionToRow(row, 'constraint', '${A} = 1 and ${NOPE} = 2')
     chai.expect(outcome).to.deep.equal({
-      status: 'applied',
-      storedMismatch: { intended: '${A} = 1 and ${NOPE} = 2', stored: '${A} = 1' },
+      status: 'rejected',
+      intended: '${A} = 1 and ${NOPE} = 2',
+      stored: '${A} = 1',
+      unresolved: ['${NOPE}'],
     })
+    // Wrote the attempt, then restored the previous value (revert).
+    chai.expect(detail.set.mock.calls).to.deep.equal([
+      ['value', '${A} = 1 and ${NOPE} = 2'],
+      ['value', previous],
+    ])
   })
 
-  it('reports a mismatch when the facade serializes the whole expression away', () => {
-    const { row, detail } = makeRow()
-    detail.getValue = jest.fn(() => '')
+  it('refuses and reverts a total clause-drop', () => {
+    const { row, detail } = makeFacadeRow(['', ''])
     const outcome = applyExpressionToRow(row, 'relevant', '${AGE} >= 18')
-    chai.expect(outcome.status).to.equal('applied')
-    chai.expect((outcome as any).storedMismatch).to.deep.equal({ intended: '${AGE} >= 18', stored: '' })
+    chai.expect(outcome.status).to.equal('rejected')
+    chai.expect((outcome as any).unresolved).to.deep.equal(['${AGE}'])
+    chai.expect(detail.set.mock.calls).to.deep.equal([
+      ['value', '${AGE} >= 18'],
+      ['value', ''],
+    ])
   })
 
   it('does not consult getValue for non-facade attributes', () => {
     const { row, detail } = makeRow()
     detail.getValue = jest.fn(() => 'something else entirely')
     const outcome = applyExpressionToRow(row, 'calculation', '${A} + 1')
-    chai.expect(outcome).to.deep.equal({ status: 'applied', storedMismatch: null })
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
     chai.expect(detail.getValue.mock.calls.length).to.equal(0)
   })
 
@@ -125,6 +167,29 @@ describe('focusPanelInput (P1.3 AC4)', () => {
     chai.expect(document.activeElement?.className).to.equal('target')
   })
 
+  it('falls back to a mode-selector button when the panel has no input (round-5 #4)', () => {
+    // On a fully-collapsed skip-logic panel the only focusable control in
+    // .skiplogic__main is a mode-selector <button> — focus it rather than
+    // finding nothing.
+    document.body.innerHTML =
+      '<div class="js-card-settings-relevant-logic"><div class="skiplogic__main"><button class="mode">+ Add a condition</button></div></div>'
+    const focused = focusPanelInput('relevant')
+    chai.expect(focused).to.equal(true)
+    chai.expect(document.activeElement?.className).to.equal('mode')
+  })
+
+  it('scopes to the given root so a second open drawer is not hit (round-5 #2)', () => {
+    // Two rows expanded at once render the same class; a document-wide lookup
+    // would return whichever comes first in DOM order. Passing the row's own
+    // settings root disambiguates by row.
+    document.body.innerHTML =
+      '<div id="rowA" class="card__settings"><div class="js-card-settings-relevant-logic"><div class="skiplogic__main"><input class="a"></div></div></div>' +
+      '<div id="rowB" class="card__settings"><div class="js-card-settings-relevant-logic"><div class="skiplogic__main"><input class="b"></div></div></div>'
+    const rowB = document.getElementById('rowB')!
+    focusPanelInput('relevant', rowB)
+    chai.expect(document.activeElement?.className).to.equal('b')
+  })
+
   it('returns false for an unmapped attribute', () => {
     chai.expect(focusPanelInput('bogus')).to.equal(false)
   })
@@ -147,7 +212,6 @@ describe('focusGenerateButton (P1.1 AC6, dismiss)', () => {
   })
 
   it("focuses the panel's Generate button by its accessible name", () => {
-    // The GenerateButton renders aria-label `Generate <Label> with AI`.
     document.body.innerHTML =
       '<button aria-label="Generate Relevant Logic with AI">Generate</button>'
     const focused = focusGenerateButton('relevant')
@@ -163,6 +227,16 @@ describe('focusGenerateButton (P1.1 AC6, dismiss)', () => {
       '<button aria-label="Generate Constraint Logic with AI" id="target">g2</button>'
     focusGenerateButton('constraint')
     chai.expect((document.activeElement as HTMLElement)?.id).to.equal('target')
+  })
+
+  it('scopes to the given root so the right row is focused (round-5 #2)', () => {
+    // Same attribute, two rows; the row's settings root disambiguates.
+    document.body.innerHTML =
+      '<div id="rowA" class="card__settings"><button aria-label="Generate Relevant Logic with AI" id="a">g</button></div>' +
+      '<div id="rowB" class="card__settings"><button aria-label="Generate Relevant Logic with AI" id="b">g</button></div>'
+    const rowB = document.getElementById('rowB')!
+    focusGenerateButton('relevant', rowB)
+    chai.expect((document.activeElement as HTMLElement)?.id).to.equal('b')
   })
 
   it('returns false for an unmapped attribute', () => {

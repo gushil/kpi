@@ -93,8 +93,13 @@ export function mountGenerateButton(anchor: unknown, options: MountOptions): HTM
     <GenerateButton
       attribute={tab}
       onOpen={() => {
+        // Capture this row's own settings drawer so the host can scope its
+        // post-close focus lookup to it — `.closest` stops at the nearest
+        // ancestor, i.e. THIS row's `.card__settings`, never a sibling or
+        // parent group's (round-5 #2).
+        const settingsRoot = anchorEl.closest<HTMLElement>('.card__settings')
         stores.surveyState.setState({
-          [GENERATE_REQUEST_KEY]: { row: options.row, attribute: options.attribute },
+          [GENERATE_REQUEST_KEY]: { row: options.row, attribute: options.attribute, settingsRoot },
         })
       }}
     />,

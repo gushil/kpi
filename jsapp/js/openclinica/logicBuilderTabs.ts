@@ -32,4 +32,8 @@ export interface GenerateRequest {
   row: any
   // xlform column name, e.g. 'calculation' | 'relevant' | 'repeat_count'.
   attribute: string
+  // The row's own settings drawer (`.card__settings`), captured when the
+  // Generate button opened the dialog. Scopes the post-close focus lookup to
+  // this row so a second open drawer can't be hit (round-5 #2).
+  settingsRoot?: HTMLElement | null
 }

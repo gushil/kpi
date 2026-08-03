@@ -327,7 +327,11 @@ export default function EditableForm(props: EditableFormProps) {
       launchAppForSurveyContent()
     }
 
-    stores.surveyState.listen(onSurveyStateChanged)
+    // OC fork (round-5 #6): capture the unsubscribe so this instance stops
+    // hearing surveyState changes on unmount. Without it, every
+    // mounted-then-unmounted EditableForm left a live listener, and the
+    // `setState` below re-entered all of them.
+    const unlistenSurveyState = stores.surveyState.listen(onSurveyStateChanged)
 
     return () => {
       // OC fork: drop the cached form style on unmount.
@@ -338,6 +342,9 @@ export default function EditableForm(props: EditableFormProps) {
       // settings-drawer close path, so release every Generate-button React
       // root and drop any dialog request still pointing at the old form.
       unmountAll()
+      if (typeof unlistenSurveyState === 'function') {
+        unlistenSurveyState()
+      }
       stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
     }
   }, [])
@@ -387,73 +394,70 @@ export default function EditableForm(props: EditableFormProps) {
   // Generate buttons (see openclinica/generateButtonBridge.tsx).
   //
   // Focus-on-close is owned here, not by the package: the dialog is embedded
-  // and the builder is inert while it's open, so the package's captured-opener
-  // restore doesn't reliably land in this host (verified live). Apply focuses
-  // the panel's expression field (below); a *dismiss* (Cancel / × / Escape)
-  // returns focus to the panel's Generate button. This ref tells the two apart
-  // — the package calls onApply then onClose, so an Apply sets it before the
-  // close fires.
+  // and the builder is inert while it's open, so the package no longer attempts
+  // its own focus restore (round-5 B/D). The package calls onApply then onClose,
+  // so `closeGenerateDialog` (bound to onClose) is the SINGLE close + focus
+  // site — `applyGeneratedExpression` (onApply) only writes and flags the
+  // outcome, never closes, which is what previously double-fired the close and
+  // defeated Apply-focus (round-5 #1). This ref tells the close which way to
+  // send focus: a successful Apply → the panel's expression field; a dismiss,
+  // rejection, or error → the panel's Generate button.
   const closingViaApplyRef = useRef(false)
   function closeGenerateDialog() {
     const wasApply = closingViaApplyRef.current
     closingViaApplyRef.current = false
-    const attribute = state[GENERATE_REQUEST_KEY]?.attribute
+    const request = state[GENERATE_REQUEST_KEY]
+    const attribute = request?.attribute
+    // Scope the focus lookup to the row's own settings drawer so a second open
+    // drawer — or a group + child row sharing a class — can't be hit (round-5 #2).
+    const root: ParentNode = request?.settingsRoot instanceof HTMLElement ? request.settingsRoot : document
     stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
-    if (!wasApply && attribute) {
-      // Dismiss (P1.1 AC6): return focus to the Generate button after the
-      // dialog unmounts and the builder's inert clears (same deferral the
-      // Apply-focus path uses).
-      window.setTimeout(() => focusGenerateButton(attribute), 0)
+    if (!attribute) {
+      return
     }
+    // Defer past the dialog unmount + inert clear (focusing an inert element is
+    // a silent no-op). One timer, one target — no competing focus writes.
+    window.setTimeout(() => {
+      if (wasApply) {
+        focusPanelInput(attribute, root) // P1.3 AC4
+      } else {
+        focusGenerateButton(attribute, root) // P1.1 AC6
+      }
+    }, 0)
   }
 
   function applyGeneratedExpression(expression: string) {
+    // Never closes the dialog itself — the package's onClose (closeGenerateDialog)
+    // is the single close site (round-5 #1). This only writes and flags the
+    // focus target for that close.
     const request = state[GENERATE_REQUEST_KEY]
     if (!request?.row || !request?.attribute) {
-      closeGenerateDialog()
       return
     }
     // The write path lives in openclinica/applyExpression.ts (unit-tested);
-    // this handler only maps the outcome onto user feedback + dialog state.
+    // this handler only maps the outcome onto user feedback + focus intent.
     const outcome = applyExpressionToRow(request.row, request.attribute, expression)
-    if (outcome.status === 'error') {
-      // Missing RowDetail, detached row, or a throw mid-write: the dialog
-      // closes on Apply regardless, so surface an error instead of letting a
-      // silent no-op look like a saved value (PR#273 rounds 2–3).
-      console.error(
-        'Logic Builder: could not apply generated expression —',
-        outcome.reason,
-        request.attribute,
-      )
-      alertify.error(t('Could not apply the generated expression. Please try again.'))
-      closeGenerateDialog()
+    if (outcome.status === 'applied') {
+      // Send focus to the panel's expression field on close (not the Generate
+      // button).
+      closingViaApplyRef.current = true
       return
     }
-    if (outcome.storedMismatch) {
-      // The skip-logic facade re-serialized the expression and dropped what it
-      // couldn't resolve (PR#273 round-3): make the loss visible before it
-      // leaves Draft rather than silently saving a reduced expression.
-      console.warn(
-        'Logic Builder: this panel could not represent the applied expression as written',
-        outcome.storedMismatch,
-      )
+    if (outcome.status === 'rejected') {
+      // The skip-logic facade could not represent every clause and dropped the
+      // references it can't resolve; applyExpressionToRow already reverted the
+      // write, so nothing was persisted (round-5 #5). Report which references
+      // were unresolved and leave focus to return to the Generate button.
+      const names = outcome.unresolved.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
+      console.warn('Logic Builder: refused a lossy apply and reverted; unresolved references', outcome.unresolved, request.attribute)
       alertify.error(
-        t(
-          'Part of the applied expression could not be represented in this panel (it may reference a question that does not exist on this form) and will not be saved as written. Review the panel before saving.',
-        ),
+        t('The generated expression references ##refs## which do not exist on this form, so it was not applied. Nothing was changed.').replace('##refs##', names),
       )
+      return
     }
-    const attribute = request.attribute
-    // Mark this close as an Apply so closeGenerateDialog focuses the expression
-    // field (below), not the Generate button.
-    closingViaApplyRef.current = true
-    closeGenerateDialog()
-    // P1.3 AC4: Apply moves focus to the panel's expression field. Wait for
-    // React to commit the dialog unmount first — the builder stays inert until
-    // then, and focusing an inert element is a silent no-op.
-    window.setTimeout(() => {
-      focusPanelInput(attribute)
-    }, 0)
+    // status === 'error': missing RowDetail, detached row, or a throw mid-write.
+    console.error('Logic Builder: could not apply generated expression —', outcome.reason, request.attribute)
+    alertify.error(t('Could not apply the generated expression. Please try again.'))
   }
 
   // Defensive (PR#273 #2): if a generate request ever carries an attribute that
