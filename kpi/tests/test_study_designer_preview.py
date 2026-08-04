@@ -75,6 +75,61 @@ class DecorateSnapshotWithStudyDesignerPreviewTest(TestCase):
         self.assertNotIn(b'media_base_url', sent_request.body)
         self.assertEqual(sent_request.headers['Authorization'], 'Bearer test-token')
 
+    @override_settings(
+        ENKETO_FORM_OC_INSTANCE_URL=(
+            'https://build.test/form-service/api/storage/artifacts/'
+            'clinicaldata.xml'
+        )
+    )
+    @patch('kpi.utils.study_designer_preview.KeycloakOpenID')
+    @patch('kpi.utils.study_designer_preview._cached_client_secret')
+    @patch('kpi.utils.study_designer_preview._cached_realm_name')
+    @responses.activate
+    def test_rewrites_users_and_clinicaldata_instance_refs(
+        self, mock_realm, mock_secret, mock_keycloak
+    ):
+        self._mock_keycloak(mock_realm, mock_secret, mock_keycloak)
+        responses.add(
+            responses.POST,
+            self.form_service_url,
+            body=(
+                '<h:html><h:head><model>'
+                '<instance id="_users" src="jr://file-csv/users.xml"/>'
+                '<instance id="clinicaldata" src="jr://file/clinicaldata.xml"/>'
+                '</model></h:head></h:html>'
+            ),
+            status=200,
+        )
+
+        decorate_snapshot_with_study_designer_preview(self.snapshot, self.request)
+
+        self.assertIn(
+            'https://build.test/form-service/api/storage/artifacts/users.xml',
+            self.snapshot.xml,
+        )
+        self.assertIn(
+            'https://build.test/form-service/api/storage/artifacts/'
+            'clinicaldata.xml',
+            self.snapshot.xml,
+        )
+        self.assertNotIn('jr://file-csv/users.xml', self.snapshot.xml)
+        self.assertNotIn('jr://file/clinicaldata.xml', self.snapshot.xml)
+
+    @patch('kpi.utils.study_designer_preview.KeycloakOpenID')
+    @patch('kpi.utils.study_designer_preview._cached_client_secret')
+    @patch('kpi.utils.study_designer_preview._cached_realm_name')
+    @responses.activate
+    def test_leaves_xml_without_users_or_clinicaldata_refs_unchanged(
+        self, mock_realm, mock_secret, mock_keycloak
+    ):
+        self._mock_keycloak(mock_realm, mock_secret, mock_keycloak)
+        body = '<h:html><!-- decorated, no users/clinicaldata refs --></h:html>'
+        responses.add(responses.POST, self.form_service_url, body=body, status=200)
+
+        decorate_snapshot_with_study_designer_preview(self.snapshot, self.request)
+
+        self.assertEqual(self.snapshot.xml, body)
+
     @patch('kpi.utils.study_designer_preview.KeycloakOpenID')
     @patch('kpi.utils.study_designer_preview._cached_client_secret')
     @patch('kpi.utils.study_designer_preview._cached_realm_name')
