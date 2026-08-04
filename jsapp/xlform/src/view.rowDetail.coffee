@@ -208,8 +208,9 @@ module.exports = do ->
 
       Backbone.on('ocCustomEvent', @onOcCustomEvent, @)
       Backbone.on('ocConsentRowsEvent', @onOcConsentRowsEvent, @)
-      @_onOcFormStyleChangeBound = => @onOcFormStyleChange()
-      window.addEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
+      if @onOcFormStyleChange?
+        @_onOcFormStyleChangeBound = => @onOcFormStyleChange()
+        window.addEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
 
       return
 
@@ -1227,7 +1228,7 @@ module.exports = do ->
       if @is_form_style_theme_grid()
         # Switching TO grid — render the sections
         if questionType is 'group'
-          @_afterRenderGroupCols(@get_width_token_from_model_value())
+          @_afterRenderGroupCols(@get_width_from_model_value())
         else
           @_afterRenderWidth()
       else
