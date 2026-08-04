@@ -399,13 +399,15 @@ export default function EditableForm(props: EditableFormProps) {
   //
   // Focus-on-close is owned here, not by the package: the dialog is embedded
   // and the builder is inert while it's open, so the package no longer attempts
-  // its own focus restore (round-5 B/D). The package calls onApply then onClose,
-  // so `closeGenerateDialog` (bound to onClose) is the SINGLE close + focus
-  // site — `applyGeneratedExpression` (onApply) only writes and flags the
-  // outcome, never closes, which is what previously double-fired the close and
-  // defeated Apply-focus (round-5 #1). This ref tells the close which way to
-  // send focus: a successful Apply → the panel's expression field; a dismiss,
-  // rejection, or error → the panel's Generate button.
+  // its own focus restore (round-5 B/D). The package calls onApply and closes
+  // (onClose) ONLY when onApply reports the write persisted (round-6): a
+  // successful apply returns true → the package dismisses and
+  // `closeGenerateDialog` runs; a rejected/failed apply returns false → the
+  // package keeps the dialog open so the user's prompt + proposal survive, and
+  // `closeGenerateDialog` never runs. `closeGenerateDialog` (bound to onClose)
+  // remains the SINGLE close + focus site (round-5 #1). This ref tells that
+  // close which way to send focus: a successful Apply → the panel's expression
+  // field; a dismiss (×/Escape) → the panel's Generate button.
   const closingViaApplyRef = useRef(false)
   function closeGenerateDialog() {
     const wasApply = closingViaApplyRef.current
@@ -430,38 +432,44 @@ export default function EditableForm(props: EditableFormProps) {
     }, 0)
   }
 
-  function applyGeneratedExpression(expression: string) {
-    // Never closes the dialog itself — the package's onClose (closeGenerateDialog)
-    // is the single close site (round-5 #1). This only writes and flags the
-    // focus target for that close.
+  // Bound to the package's onApply. Returns whether the expression was actually
+  // persisted: true → the package dismisses the dialog (closeGenerateDialog runs
+  // and focuses the panel input); false → the package keeps the dialog open so a
+  // rejected/failed apply doesn't discard the user's prompt + proposal (round-6).
+  // Never closes the dialog itself — closeGenerateDialog (onClose) is the single
+  // close site (round-5 #1).
+  function applyGeneratedExpression(expression: string): boolean {
     const request = state[GENERATE_REQUEST_KEY]
     if (!request?.row || !request?.attribute) {
-      return
+      return false
     }
     // The write path lives in openclinica/applyExpression.ts (unit-tested);
     // this handler only maps the outcome onto user feedback + focus intent.
     const outcome = applyExpressionToRow(request.row, request.attribute, expression)
     if (outcome.status === 'applied') {
-      // Send focus to the panel's expression field on close (not the Generate
-      // button).
+      // Persisted. Flag the focus target for the package-driven close (the
+      // panel's expression field, not the Generate button) and report success.
       closingViaApplyRef.current = true
-      return
+      return true
     }
     if (outcome.status === 'rejected') {
       // The skip-logic facade could not represent every clause and dropped the
       // references it can't resolve; applyExpressionToRow already reverted the
       // write, so nothing was persisted (round-5 #5). Report which references
-      // were unresolved and leave focus to return to the Generate button.
+      // were unresolved; return false so the dialog stays open for the user to
+      // adjust the prompt and retry without retyping (round-6).
       const names = outcome.unresolved.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
       console.warn('Logic Builder: refused a lossy apply and reverted; unresolved references', outcome.unresolved, request.attribute)
       alertify.error(
         t('The generated expression references ##refs## which do not exist on this form, so it was not applied. Nothing was changed.').replace('##refs##', names),
       )
-      return
+      return false
     }
     // status === 'error': missing RowDetail, detached row, or a throw mid-write.
+    // Keep the dialog open (return false) so the proposal isn't lost.
     console.error('Logic Builder: could not apply generated expression —', outcome.reason, request.attribute)
     alertify.error(t('Could not apply the generated expression. Please try again.'))
+    return false
   }
 
   // Defensive (PR#273 #2): if a generate request ever carries an attribute that
