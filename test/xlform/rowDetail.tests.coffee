@@ -794,13 +794,73 @@ do ->
     it 'extracts wN when it appears first', ->
       expect(getWidthFromModelValue('w2 minimal')).toBe('w2')
 
-    it 'returns last matched wN when multiple present (highest wins)', ->
-      # iterates w1..w10 in order, last match wins
+    it 'returns highest-numbered wN when multiple present', ->
       result = getWidthFromModelValue('w2 w5')
       expect(result).toBe('w5')
 
-    it 'does not match partial token: w11 returns null', ->
+    it 'returns null for an unsupported (out-of-range) token: w11', ->
+      # w11 is a real, fully-formed token — it is just not one of the
+      # w1-w10 options this reader is limited to. It must not be confused
+      # with "no width stored" by callers; see getWidthTokenFromModelValue
+      # below for the reader that preserves the raw out-of-range value.
       expect(getWidthFromModelValue('w11')).toBe(null)
+
+    it 'returns null when the only present token is out of range: w14', ->
+      expect(getWidthFromModelValue('w14')).toBe(null)
+
+    it 'returns null when the highest present token is out of range: "w3 w14"', ->
+      expect(getWidthFromModelValue('w3 w14')).toBe(null)
+
+  ###############################################################
+  # Item width helpers: getWidthTokenFromModelValue
+  ###############################################################
+  describe 'getWidthTokenFromModelValue', ->
+    {getWidthTokenFromModelValue} = require('../../jsapp/xlform/src/view.rowDetail')
+
+    it 'returns null for null', ->
+      expect(getWidthTokenFromModelValue(null)).toBe(null)
+
+    it 'returns null for empty string', ->
+      expect(getWidthTokenFromModelValue('')).toBe(null)
+
+    it 'returns null when no wN token present', ->
+      expect(getWidthTokenFromModelValue('minimal')).toBe(null)
+
+    it 'returns w1 for "w1"', ->
+      expect(getWidthTokenFromModelValue('w1')).toBe('w1')
+
+    it 'returns w10 for "w10"', ->
+      expect(getWidthTokenFromModelValue('w10')).toBe('w10')
+
+    it 'preserves an out-of-range token: "w14" returns "w14", not null', ->
+      expect(getWidthTokenFromModelValue('w14')).toBe('w14')
+
+    it 'extracts an out-of-range token from a combined appearance value', ->
+      expect(getWidthTokenFromModelValue('table-list w14')).toBe('w14')
+
+    it 'returns highest-numbered wN when multiple in-range tokens are present', ->
+      expect(getWidthTokenFromModelValue('w2 w5')).toBe('w5')
+
+    it 'returns highest-numbered wN regardless of string order', ->
+      expect(getWidthTokenFromModelValue('w5 w2')).toBe('w5')
+
+    it 'returns the out-of-range token when it is highest: "w3 w14"', ->
+      expect(getWidthTokenFromModelValue('w3 w14')).toBe('w14')
+
+    it 'does not match a partial token: "w14x" returns null', ->
+      expect(getWidthTokenFromModelValue('w14x')).toBe(null)
+
+    it 'does not match a token glued to a preceding letter: "aw14" returns null', ->
+      expect(getWidthTokenFromModelValue('aw14')).toBe(null)
+
+    it 'does not match a leading-zero token: "w01" returns null', ->
+      expect(getWidthTokenFromModelValue('w01')).toBe(null)
+
+    it 'does not match "w0"', ->
+      expect(getWidthTokenFromModelValue('w0')).toBe(null)
+
+    it 'skips a leading-zero token in favor of a real one in the same value', ->
+      expect(getWidthTokenFromModelValue('w01 w5')).toBe('w5')
 
   ###############################################################
   # Item width helpers: buildWidthPillText
@@ -825,6 +885,9 @@ do ->
 
     it 'out-of-range w5 in G=4 → "w5"', ->
       expect(buildWidthPillText('w5', 4)).toBe('w5')
+
+    it 'out-of-range w14 in G=4 → "w14"', ->
+      expect(buildWidthPillText('w14', 4)).toBe('w14')
 
     it 'w1 in G=5 → "1 of 5"', ->
       expect(buildWidthPillText('w1', 5)).toBe('1 of 5')
