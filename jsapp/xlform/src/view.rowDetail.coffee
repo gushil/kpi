@@ -208,8 +208,16 @@ module.exports = do ->
 
       Backbone.on('ocCustomEvent', @onOcCustomEvent, @)
       Backbone.on('ocConsentRowsEvent', @onOcConsentRowsEvent, @)
+      @_onOcFormStyleChangeBound = => @onOcFormStyleChange()
+      window.addEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
 
       return
+
+    remove: ->
+      if @_onOcFormStyleChangeBound
+        window.removeEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
+      Backbone.off(null, null, @)
+      super
 
     render: ()->
       rendered = @html()
@@ -1209,6 +1217,25 @@ module.exports = do ->
       else
         @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0).hide()
         @_afterRenderLegacy()
+
+    # Re-render the grid-only sections (Columns in Grid + Item Width) when the
+    # form style changes, so they appear/disappear immediately without requiring
+    # the user to interact further with the panel.
+    onOcFormStyleChange: ->
+      return unless @isCardGridType()
+      questionType = @model_type()
+      if @is_form_style_theme_grid()
+        # Switching TO grid — render the sections
+        if questionType is 'group'
+          @_afterRenderGroupCols(@get_width_token_from_model_value())
+        else
+          @_afterRenderWidth()
+      else
+        # Switching AWAY from grid — remove the sections immediately
+        if questionType is 'group'
+          @rowView.cardSettingsWrap.find('.js-group-cols-wrap').remove()
+        else
+          @rowView.cardSettingsWrap.find('.js-item-width-wrap').remove()
 
     # -------------------------------------------------------------------------
     # Card grid path (select_one / select_multiple)
