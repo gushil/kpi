@@ -97,7 +97,7 @@ const commonOptions = {
       '#': path.join(__dirname, '..', 'jsapp', 'js'), // TODO: someday rename "js" to "src".
       js: path.join(__dirname, '..', 'jsapp', 'js'), // within scss files only, sass-loader doesn't handle # char.
       scss: path.join(__dirname, '..', 'jsapp', 'scss'), // within scss files only.
-      // OC fork: dedupe React so the symlinked `@openclinica/logic-builder`
+      // OC fork: dedupe React so the git-pinned `@openclinica/logic-builder`
       // (which externalizes react/react-dom) binds to kpi's single React 18
       // copy instead of its own dev-dependency React.
       react: path.join(__dirname, '../node_modules/react'),
