@@ -469,7 +469,11 @@ module.exports = do ->
       # live-refresh bindings) so re-opening the drawer doesn't accumulate
       # duplicate handlers bound to stale, detached inputs.
       @stopListening()
-      @$('.card__settings').detach()
+      # Detach THIS row's own drawer (the node captured at expand), not a fresh
+      # `.card__settings` query — on a group row that selector also matches nested
+      # child-row drawers and would detach them too (Copilot review). Falls back
+      # to the scoped query only if the capture is somehow missing.
+      (@cardSettingsWrap ? @$('.card__settings').eq(0)).detach()
 
     clone: (event) ->
       parent = @model._parent

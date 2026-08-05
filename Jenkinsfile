@@ -53,6 +53,12 @@ pipeline {
                         apt-get install -y --no-install-recommends python3 git
                         ln -sf /usr/bin/python3 /usr/bin/python
                         rm -rf /var/lib/apt/lists/*
+                        # Scope the token to a throwaway gitconfig (never the persistent
+                        # ~/.gitconfig, which can linger with reuseNode). GIT_CONFIG_GLOBAL
+                        # points git — and the git children npm spawns — at it; the trap
+                        # wipes it on exit, success or failure.
+                        export GIT_CONFIG_GLOBAL="$(mktemp)"
+                        trap 'rm -f "$GIT_CONFIG_GLOBAL"' EXIT
                         git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
                         npm ci --legacy-peer-deps --cache /tmp/.npm-cache
                         npm run test:unit
