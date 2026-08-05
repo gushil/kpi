@@ -211,6 +211,12 @@ module.exports = do ->
 
       return
 
+    remove: ->
+      if @_onOcFormStyleChangeBound
+        document.removeEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
+      Backbone.off(null, null, @)
+      super
+
     render: ()->
       rendered = @html()
       if rendered
@@ -233,7 +239,7 @@ module.exports = do ->
           val = @model.get('value')
           if val is true or val in $configs.truthyValues
             $el.prop('checked', true)
-      @model.on 'change:value', reflectValueInEl
+      @listenTo @model, 'change:value', reflectValueInEl
       reflectValueInEl()
 
       $el.on 'change', ()=>
@@ -278,7 +284,7 @@ module.exports = do ->
             $el.val(modelVal)
 
       reflectValueInEl()
-      @model.on 'change:value', reflectValueInEl
+      @listenTo @model, 'change:value', reflectValueInEl
 
       detectAndChangeValue = () =>
         $elVal = $el.val()
@@ -1173,7 +1179,7 @@ module.exports = do ->
 
     model_get_parent_group: ->
       parent_group = null
-      if @model._parent._parent._parent? and @model._parent._parent._parent.constructor.key == 'group'
+      if @model?._parent?._parent?._parent? and @model._parent._parent._parent.constructor.key == 'group'
         parent_group = @model._parent._parent._parent
       parent_group
 
@@ -1205,10 +1211,42 @@ module.exports = do ->
 
     afterRender: ->
       if @isCardGridType()
+        # Register the ocFormStyleChange listener here (not in initialize) so the
+        # gate, the _appearanceDV back-ref, and the listener are all set together
+        # only for card-grid types. Non-card-grid types never register or leak.
+        @rowView._appearanceDV = @
+        @_onOcFormStyleChangeBound = => @onOcFormStyleChange()
+        document.addEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
         @_afterRenderCardGrid()
       else
         @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0).hide()
         @_afterRenderLegacy()
+
+    # Re-render the grid-only sections (Columns in Grid + Item Width) when the
+    # form style changes, so they appear/disappear immediately without requiring
+    # the user to interact further with the panel.
+    onOcFormStyleChange: ->
+      # Guard against deleted rows — row.detach() nulls _parent, and walking
+      # _parent._parent._parent in model_get_parent_group would throw.
+      return unless @model?._parent?
+      return unless @isCardGridType()
+      questionType = @model_type()
+      if @is_form_style_theme_grid()
+        # Switching TO grid — render the sections.
+        # Use get_width_token_from_model_value (not get_width_from_model_value) to
+        # preserve out-of-range tokens like w14 from migrated 3.x forms (OC-28306).
+        if questionType is 'group'
+          @_afterRenderGroupCols(@get_width_token_from_model_value())
+        else
+          @_afterRenderWidth()
+      else
+        # Switching AWAY from grid — remove the sections immediately.
+        # Selectors below must stay in sync with those used by _afterRenderGroupCols
+        # and _afterRenderWidth; if either changes its wrapper class, update here too.
+        if questionType is 'group'
+          @rowView.cardSettingsWrap.find('.js-group-cols-wrap').remove()
+        else
+          @rowView.cardSettingsWrap.find('.js-item-width-wrap').remove()
 
     # -------------------------------------------------------------------------
     # Card grid path (select_one / select_multiple)
@@ -1296,7 +1334,7 @@ module.exports = do ->
         toggleSection() if evt.key in ['Enter', ' ']
 
       # Keep pill fresh when model changes from outside (e.g. loading)
-      @model.on 'change:value', =>
+      @listenTo @model, 'change:value', =>
         if $section.hasClass('is-collapsed')
           val = @model.get('value') or ''
           { card, columnCount, customText } = parseAppearanceValue(val, questionType)
