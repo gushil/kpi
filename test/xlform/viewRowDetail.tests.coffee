@@ -931,6 +931,7 @@ do ->
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
+        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
       })
@@ -993,6 +994,7 @@ do ->
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
+        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
       })
@@ -1039,6 +1041,7 @@ do ->
 
       @ctx =
         rowView: cardSettingsWrap: @cardSettingsWrap
+        model: _parent: {}
         isCardGridType: -> true
         is_form_style_theme_grid: -> false
         model_type: -> 'select_one'
