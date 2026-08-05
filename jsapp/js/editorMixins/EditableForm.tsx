@@ -333,7 +333,7 @@ export default function EditableForm(props: EditableFormProps) {
     sessionStorage.setItem(FORM_STYLE_CACHE_NAME, settingsStyle ?? '')
     // OC fork: notify open Question Options panels to re-render grid-only
     // sections (Columns in Grid, Item Width) immediately on style change.
-    window.dispatchEvent(new CustomEvent('ocFormStyleChange'))
+    document.dispatchEvent(new CustomEvent('ocFormStyleChange'))
     onSurveyChangeDebounced()
   }
 

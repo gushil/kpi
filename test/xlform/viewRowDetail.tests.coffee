@@ -1023,3 +1023,61 @@ do ->
       expect($paragraphCard.length).toBe(1)
       $paragraphCard.trigger('click')
       expect(@detail.get('value')).toBe('multiline w14')
+
+  ###############################################################
+  # view.rowDetail: DetailViewMixins.appearance — onOcFormStyleChange
+  ###############################################################
+  describe 'view.rowDetail.DetailViewMixins.appearance: onOcFormStyleChange()', ->
+    beforeEach ->
+      window.t ?= (str) -> str
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+
+      # Minimal cardSettingsWrap with stub grid-only section elements
+      @$groupColsWrap = $('<div class="js-group-cols-wrap">').appendTo($('body'))
+      @$itemWidthWrap = $('<div class="js-item-width-wrap">').appendTo($('body'))
+      @cardSettingsWrap = $('<div class="card__settings">')
+        .append(@$groupColsWrap)
+        .append(@$itemWidthWrap)
+        .appendTo($('body'))
+
+      @ctx =
+        rowView: cardSettingsWrap: @cardSettingsWrap
+        isCardGridType: -> true
+        is_form_style_theme_grid: -> false
+        model_type: -> 'select_one'
+        _afterRenderGroupCols: jasmine.createSpy('_afterRenderGroupCols')
+        _afterRenderWidth: jasmine.createSpy('_afterRenderWidth')
+        get_width_from_model_value: -> null
+
+    afterEach ->
+      @cardSettingsWrap.remove()
+
+    it 'returns early when not a card grid type', ->
+      @ctx.isCardGridType = -> false
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(@ctx._afterRenderWidth).not.toHaveBeenCalled()
+
+    it 'switching TO grid on a non-group calls _afterRenderWidth', ->
+      @ctx.is_form_style_theme_grid = -> true
+      @ctx.model_type = -> 'select_one'
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(@ctx._afterRenderWidth).toHaveBeenCalled()
+
+    it 'switching TO grid on a group calls _afterRenderGroupCols', ->
+      @ctx.is_form_style_theme_grid = -> true
+      @ctx.model_type = -> 'group'
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(@ctx._afterRenderGroupCols).toHaveBeenCalled()
+
+    it 'switching AWAY from grid on a non-group removes .js-item-width-wrap', ->
+      @ctx.is_form_style_theme_grid = -> false
+      @ctx.model_type = -> 'select_one'
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(@cardSettingsWrap.find('.js-item-width-wrap').length).toBe(0)
+
+    it 'switching AWAY from grid on a group removes .js-group-cols-wrap', ->
+      @ctx.is_form_style_theme_grid = -> false
+      @ctx.model_type = -> 'group'
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(@cardSettingsWrap.find('.js-group-cols-wrap').length).toBe(0)

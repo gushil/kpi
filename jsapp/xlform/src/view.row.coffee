@@ -450,6 +450,12 @@ module.exports = do ->
       ``
 
     _cleanupExpandedRender: ->
+      # Remove the appearance DetailView so its ocFormStyleChange listener is
+      # unregistered before the settings panel detaches (remove() never fires
+      # otherwise because _cleanupExpandedRender only detaches the DOM).
+      if @_appearanceDV
+        @_appearanceDV.remove()
+        @_appearanceDV = null
       @$('.card__settings').detach()
 
     clone: (event) ->

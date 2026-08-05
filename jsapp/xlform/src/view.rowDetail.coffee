@@ -208,15 +208,17 @@ module.exports = do ->
 
       Backbone.on('ocCustomEvent', @onOcCustomEvent, @)
       Backbone.on('ocConsentRowsEvent', @onOcConsentRowsEvent, @)
+      # onOcFormStyleChange is defined only in DetailViewMixins.appearance, so
+      # non-appearance views must not subscribe to this event.
       if @onOcFormStyleChange?
         @_onOcFormStyleChangeBound = => @onOcFormStyleChange()
-        window.addEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
+        document.addEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
 
       return
 
     remove: ->
       if @_onOcFormStyleChangeBound
-        window.removeEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
+        document.removeEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
       Backbone.off(null, null, @)
       super
 
@@ -1214,6 +1216,9 @@ module.exports = do ->
 
     afterRender: ->
       if @isCardGridType()
+        # Store a back-reference so _cleanupExpandedRender can call remove() and
+        # clear the ocFormStyleChange listener before the settings panel detaches.
+        @rowView._appearanceDV = @
         @_afterRenderCardGrid()
       else
         @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0).hide()
@@ -1232,7 +1237,9 @@ module.exports = do ->
         else
           @_afterRenderWidth()
       else
-        # Switching AWAY from grid — remove the sections immediately
+        # Switching AWAY from grid — remove the sections immediately.
+        # Selectors below must stay in sync with those used by _afterRenderGroupCols
+        # and _afterRenderWidth; if either changes its wrapper class, update here too.
         if questionType is 'group'
           @rowView.cardSettingsWrap.find('.js-group-cols-wrap').remove()
         else
