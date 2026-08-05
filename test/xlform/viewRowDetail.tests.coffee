@@ -1044,7 +1044,7 @@ do ->
         model_type: -> 'select_one'
         _afterRenderGroupCols: ->
         _afterRenderWidth: ->
-        get_width_from_model_value: -> null
+        get_width_token_from_model_value: -> null
 
     it 'returns early when not a card grid type', ->
       widthCalled = false

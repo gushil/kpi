@@ -818,6 +818,10 @@ module.exports = do ->
     _deleteRow: (row) ->
       $row = $("li[data-row-id='#{row.cid}']")
       parent = row._parent._parent
+      # Clean up any expanded settings panel before detach so the
+      # ocFormStyleChange listener and _appearanceDV are properly removed.
+      rowView = @__rowViews.get(row.cid)
+      rowView?.toggleSettings(false) if rowView?._settingsExpanded
       row.detach()
       # this slideUp is for add/remove row animation
       $row.addClass('survey__row--deleted')

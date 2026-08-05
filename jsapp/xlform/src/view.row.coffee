@@ -451,12 +451,13 @@ module.exports = do ->
 
     _cleanupExpandedRender: ->
       # Remove the appearance DetailView so its ocFormStyleChange listener is
-      # unregistered before the settings panel detaches (remove() never fires
-      # otherwise because _cleanupExpandedRender only detaches the DOM).
+      # unregistered before the settings panel detaches.
       if @_appearanceDV
         @_appearanceDV.remove()
         @_appearanceDV = null
-      @$('.card__settings').detach()
+      # Scope to this view's own panel via the stored ref to avoid detaching
+      # descendant rows' expanded panels when collapsing a group.
+      @cardSettingsWrap?.detach()
 
     clone: (event) ->
       parent = @model._parent
@@ -537,6 +538,9 @@ module.exports = do ->
       return
 
     _deleteGroup: () ->
+      # Clean up any expanded settings panel before detach so the
+      # ocFormStyleChange listener and _appearanceDV are properly removed.
+      @toggleSettings(false) if @_settingsExpanded
       @model.splitApart()
       @model._parent._parent.trigger('remove', @model)
       @surveyView.survey.trigger('change')
