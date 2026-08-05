@@ -17,13 +17,7 @@
  */
 import type { RefObject } from 'react'
 
-export type ExpressionTab =
-  | 'calculation'
-  | 'default'
-  | 'constraint'
-  | 'required'
-  | 'relevant'
-  | 'repeatCount'
+export type ExpressionTab = 'calculation' | 'default' | 'constraint' | 'required' | 'relevant' | 'repeatCount'
 
 export interface FormFieldChoice {
   readonly value: string

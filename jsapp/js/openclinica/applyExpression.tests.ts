@@ -1,13 +1,10 @@
 import chai from 'chai'
-import { applyExpressionToRow, focusPanelInput, focusGenerateButton } from './applyExpression'
+import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from './applyExpression'
 
 // Minimal Backbone-ish fakes: a row hands out a RowDetail via get(attribute)
 // and its survey via getSurvey(); the detail exposes set()/getValue().
 function makeRow(options: { detail?: any; survey?: any } = {}) {
-  const detail =
-    'detail' in options
-      ? options.detail
-      : { set: jest.fn(), getValue: jest.fn() }
+  const detail = 'detail' in options ? options.detail : { set: jest.fn(), getValue: jest.fn() }
   const survey = 'survey' in options ? options.survey : { trigger: jest.fn() }
   const row = {
     get: jest.fn(() => detail),
@@ -212,13 +209,12 @@ describe('focusGenerateButton (P1.1 AC6, dismiss)', () => {
   })
 
   it("focuses the panel's Generate button by its accessible name", () => {
-    document.body.innerHTML =
-      '<button aria-label="Generate Relevant Logic with AI">Generate</button>'
+    document.body.innerHTML = '<button aria-label="Generate Relevant Logic with AI">Generate</button>'
     const focused = focusGenerateButton('relevant')
     chai.expect(focused).to.equal(true)
-    chai.expect((document.activeElement as HTMLElement)?.getAttribute('aria-label')).to.equal(
-      'Generate Relevant Logic with AI',
-    )
+    chai
+      .expect((document.activeElement as HTMLElement)?.getAttribute('aria-label'))
+      .to.equal('Generate Relevant Logic with AI')
   })
 
   it('scopes to the requested attribute when several Generate buttons are present', () => {

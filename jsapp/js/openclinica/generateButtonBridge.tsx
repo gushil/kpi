@@ -14,7 +14,7 @@
 import React from 'react'
 
 import { GenerateButton } from '@openclinica/logic-builder'
-import { createRoot, type Root } from 'react-dom/client'
+import { type Root, createRoot } from 'react-dom/client'
 import { stores } from '#/stores'
 import { GENERATE_REQUEST_KEY, columnToTab } from './logicBuilderTabs'
 

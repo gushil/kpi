@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Text } from '@mantine/core'
+// OC fork (P1.1): AI Generator dialog + Logic Builder wiring.
+import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openclinica/logic-builder'
 import alertify from 'alertifyjs'
 import cx from 'classnames'
 import clonedeep from 'lodash.clonedeep'
@@ -52,6 +54,10 @@ import {
   update_states,
 } from '#/constants'
 import envStore from '#/envStore'
+import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
+import { unmountAll } from '#/openclinica/generateButtonBridge'
+import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
+import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 import pageState from '#/pageState.store'
 import type { RouterProp } from '#/router/legacy'
 import { ROUTES } from '#/router/routerConstants'
@@ -73,12 +79,6 @@ import SurveyScope from '../models/surveyScope'
 import { type SurveyStateStoreData, stores } from '../stores'
 import { escapeHtml, recordKeys } from '../utils'
 import AssetNavigator from './AssetNavigator'
-// OC fork (P1.1): AI Generator dialog + Logic Builder wiring.
-import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openclinica/logic-builder'
-import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
-import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
-import { applyExpressionToRow, focusPanelInput, focusGenerateButton } from '#/openclinica/applyExpression'
-import { unmountAll } from '#/openclinica/generateButtonBridge'
 
 const ErrorMessage = makeBem(null, 'error-message')
 const ErrorMessage__strong = makeBem(null, 'error-message__header', 'strong')
@@ -459,9 +459,15 @@ export default function EditableForm(props: EditableFormProps) {
       // were unresolved; return false so the dialog stays open for the user to
       // adjust the prompt and retry without retyping (round-6).
       const names = outcome.unresolved.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
-      console.warn('Logic Builder: refused a lossy apply and reverted; unresolved references', outcome.unresolved, request.attribute)
+      console.warn(
+        'Logic Builder: refused a lossy apply and reverted; unresolved references',
+        outcome.unresolved,
+        request.attribute,
+      )
       alertify.error(
-        t('The generated expression references ##refs## which do not exist on this form, so it was not applied. Nothing was changed.').replace('##refs##', names),
+        t(
+          'The generated expression references ##refs## which do not exist on this form, so it was not applied. Nothing was changed.',
+        ).replace('##refs##', names),
       )
       return false
     }

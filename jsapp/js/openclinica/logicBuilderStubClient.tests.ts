@@ -1,5 +1,5 @@
-import chai from 'chai'
 import type { GenerationRequest } from '@openclinica/logic-builder'
+import chai from 'chai'
 import { logicBuilderStubClient } from './logicBuilderStubClient'
 
 function makeRequest(overrides: Partial<GenerationRequest> = {}): GenerationRequest {
@@ -26,7 +26,10 @@ describe('logicBuilderStubClient (P1.1)', () => {
     jest.advanceTimersByTime(400)
     const result = await promise
     chai.expect(result.kind).to.equal('success')
-    chai.expect((result as any).expression).to.be.a('string').and.not.equal('')
+    chai
+      .expect((result as any).expression)
+      .to.be.a('string')
+      .and.not.equal('')
   })
 
   it('resolves a labeled kind: failure when the prompt contains "fail"', async () => {
@@ -34,7 +37,10 @@ describe('logicBuilderStubClient (P1.1)', () => {
     jest.advanceTimersByTime(400)
     const result = await promise
     chai.expect(result.kind).to.equal('failure')
-    chai.expect((result as any).error).to.be.a('string').and.not.equal('')
+    chai
+      .expect((result as any).error)
+      .to.be.a('string')
+      .and.not.equal('')
   })
 
   it('rejects immediately when the signal is already aborted', async () => {
