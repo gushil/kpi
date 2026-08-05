@@ -4,7 +4,15 @@
     "paths": {
       "#/*": ["./jsapp/js/*"],
       "js/*": ["./jsapp/js/*"], // for scss files only.
-      "scss/*": ["./jsapp/scss/*"] // for scss files only.
+      "scss/*": ["./jsapp/scss/*"], // for scss files only.
+      // OC fork: @openclinica/logic-builder is a private optionalDependency.
+      // Resolve the real package when installed (local dev, Jenkins/prod image);
+      // fall back to the committed CI stub when it's absent (public CI). Tried
+      // in order, first match wins.
+      "@openclinica/logic-builder": [
+        "./node_modules/@openclinica/logic-builder",
+        "./jsapp/js/openclinica/logic-builder-stub"
+      ]
     },
     "target": "es2017",
     "module": "es2020",

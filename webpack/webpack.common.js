@@ -9,6 +9,24 @@ const outputPath = path.resolve(__dirname, '../jsapp/compiled/')
 // ExtractTranslationKeysPlugin, for one, just fails if this directory doesn't exist
 fs.mkdirSync(outputPath, { recursive: true })
 
+// OC fork: @openclinica/logic-builder is a private optionalDependency. Use the
+// real package wherever it's installed (local dev, Jenkins/prod image); fall
+// back to the committed CI stub only when it's absent (public CI, which can't
+// clone the private repo). Aliasing the bare specifier (with `$` for an exact
+// match) and the side-effect `/style.css` covers both imports.
+const logicBuilderAlias = (() => {
+  try {
+    require.resolve('@openclinica/logic-builder/package.json')
+    return {} // installed → normal node_modules resolution (respects its exports)
+  } catch {
+    const stub = path.join(__dirname, '..', 'jsapp', 'js', 'openclinica', 'logic-builder-stub')
+    return {
+      '@openclinica/logic-builder$': path.join(stub, 'index.tsx'),
+      '@openclinica/logic-builder/style.css': path.join(stub, 'style.css'),
+    }
+  }
+})()
+
 // HACK: we needed to define this postcss-loader because of a problem with
 // including CSS files from node_modules directory, i.e. this build error:
 // `Error: No PostCSS Config found in: /srv/node_modules/…`
@@ -102,6 +120,7 @@ const commonOptions = {
       // copy instead of its own dev-dependency React.
       react: path.join(__dirname, '../node_modules/react'),
       'react-dom': path.join(__dirname, '../node_modules/react-dom'),
+      ...logicBuilderAlias,
     },
     // HACKFIX: needed because of https://github.com/react-dnd/react-dnd/issues/3423
     fallback: {
