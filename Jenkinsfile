@@ -43,15 +43,21 @@ pipeline {
                 DEBIAN_FRONTEND = 'noninteractive'
             }
             steps {
-                sh '''
-                    set -e
-                    apt-get update -qq
-                    apt-get install -y --no-install-recommends python3
-                    ln -sf /usr/bin/python3 /usr/bin/python
-                    rm -rf /var/lib/apt/lists/*
-                    npm ci --legacy-peer-deps --cache /tmp/.npm-cache
-                    npm run test:unit
-                '''
+                // OC fork: authenticate the private @openclinica/logic-builder clone.
+                // Single-quoted sh body -> ${GH_TOKEN} expands in the shell from the
+                // masked credential env var, never in Groovy (so it isn't logged).
+                withCredentials([string(credentialsId: 'jenkins-github-token-as-password', variable: 'GH_TOKEN')]) {
+                    sh '''
+                        set -e
+                        apt-get update -qq
+                        apt-get install -y --no-install-recommends python3 git
+                        ln -sf /usr/bin/python3 /usr/bin/python
+                        rm -rf /var/lib/apt/lists/*
+                        git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+                        npm ci --legacy-peer-deps --cache /tmp/.npm-cache
+                        npm run test:unit
+                    '''
+                }
             }
         }
 
@@ -83,7 +89,14 @@ pipeline {
                         docker buildx create --name arm64builder --node arm64 --platform linux/aarch64
                         docker buildx inspect --bootstrap --builder arm64builder
                        """
-                    sh "docker buildx build --builder arm64builder --platform linux/aarch64 -t ${registry}:${tag_version} --push ."
+                    // OC fork: pass the GitHub token to BuildKit as a secret so the
+                    // Dockerfile's npm-install stage can clone the private
+                    // @openclinica/logic-builder (id must match the Dockerfile's
+                    // `--mount=type=secret,id=gh_token`). `env=GH_TOKEN` reads it from
+                    // the masked credential env var, so it never appears in the log.
+                    withCredentials([string(credentialsId: 'jenkins-github-token-as-password', variable: 'GH_TOKEN')]) {
+                        sh "docker buildx build --builder arm64builder --platform linux/aarch64 --secret id=gh_token,env=GH_TOKEN -t ${registry}:${tag_version} --push ."
+                    }
                   }
                 else {
                     sh "echo 'Skipping this step'" 
