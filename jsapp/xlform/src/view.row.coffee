@@ -469,11 +469,15 @@ module.exports = do ->
       # live-refresh bindings) so re-opening the drawer doesn't accumulate
       # duplicate handlers bound to stale, detached inputs.
       @stopListening()
-      # Detach THIS row's own drawer (the node captured at expand), not a fresh
-      # `.card__settings` query — on a group row that selector also matches nested
-      # child-row drawers and would detach them too (Copilot review). Falls back
-      # to the scoped query only if the capture is somehow missing.
-      (@cardSettingsWrap ? @$('.card__settings').eq(0)).detach()
+      # Remove the appearance DetailView so its ocFormStyleChange listener is
+      # unregistered before the settings panel detaches.
+      if @_appearanceDV
+        @_appearanceDV.remove()
+        @_appearanceDV = null
+      # Scope to this view's own panel via the stored ref to avoid detaching
+      # descendant rows' expanded panels when collapsing a group. Upstream now
+      # does this too — same intent as the OC fork's earlier scoped detach.
+      @cardSettingsWrap?.detach()
 
     clone: (event) ->
       parent = @model._parent
@@ -554,6 +558,9 @@ module.exports = do ->
       return
 
     _deleteGroup: () ->
+      # Clean up any expanded settings panel before detach so the
+      # ocFormStyleChange listener and _appearanceDV are properly removed.
+      @toggleSettings(false) if @_settingsExpanded
       @model.splitApart()
       @model._parent._parent.trigger('remove', @model)
       @surveyView.survey.trigger('change')

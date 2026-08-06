@@ -906,3 +906,180 @@ do ->
       # Then select placeholder
       $contactDataSelect.val('select').trigger('change')
       expect(@row.getValue('instance::oc:contactdata')).toBe('')
+
+  ###############################################################
+  # OC-28306 — a stored width token outside w1-w10 (e.g. "w14") must be
+  # shown with an advisory (not silently treated as unset/default) and
+  # must survive an edit to an unrelated control in the same panel.
+  ###############################################################
+
+  describe 'view.rowDetail.DetailViewMixins: "appearance" (group) — out-of-range Columns in Grid width', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      sessionStorage.setItem('kpi.editable-form.form-style', 'theme-grid')
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @survey = new $model.Survey()
+      @survey.rows.add(type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w14')
+      @row = @survey.rows.at(0)
+      @detail = @row.get('appearance')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+      @$el = $('<div/>')
+      @$cardSettingsWrap = $('<div><div class="js-card-settings-appearance"></div></div>')
+      @mixin_ctx = $.extend({}, @mixin, {
+        cid: 'cid_grp_appearance'
+        $el: @$el
+        $: (sel) => @$el.find(sel)
+        model: @detail
+        listenTo: ->
+        Templates: @viewRowDetail.Templates
+        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+      })
+      # html() must run first: it creates @$select_width, which afterRender()
+      # (via _afterRenderCardGrid/_writeModelValue) depends on.
+      @mixin_ctx.html()
+    afterEach ->
+      window.xlfHideWarnings = false
+      sessionStorage.removeItem('kpi.editable-form.form-style')
+
+    it 'shows the out-of-range advisory and highlights no card (not card 4)', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      $wrap = @$cardSettingsWrap.find('.js-group-cols-wrap')
+      expect($wrap.length).toBe(1)
+      expect($wrap.find('.group-cols-card.is-selected').length).toBe(0)
+      expect($wrap.find('.group-cols-card.is-default').length).toBe(0)
+      $advisory = $wrap.find('.group-cols__advisory')
+      expect($advisory.length).toBe(1)
+      expect($advisory.text().indexOf('w14')).not.toBe(-1)
+
+    it 'shows the raw stored token as the collapsed-state pill, not "4 columns"', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      $pill = @$cardSettingsWrap.find('.js-group-cols-pill')
+      expect($pill.text()).toBe('w14')
+
+    it 'preserves the out-of-range width when only the Appearance card is changed', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      $tableListCard = @$el.find('.appearance-card[data-card-slug="table-list"]')
+      expect($tableListCard.length).toBe(1)
+      $tableListCard.trigger('click')
+      expect(@detail.get('value')).toBe('table-list w14')
+
+    it 'clears the advisory and default-card state once the user picks a real column count', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      $wrap = @$cardSettingsWrap.find('.js-group-cols-wrap')
+      $card6 = $wrap.find('.group-cols-card[data-cols="6"]')
+      expect($card6.length).toBe(1)
+      $card6.trigger('click')
+      expect($wrap.find('.group-cols__advisory').length).toBe(0)
+      expect($card6.hasClass('is-selected')).toBe(true)
+      expect(@detail.get('value')).toBe('w6')
+
+  describe 'view.rowDetail.DetailViewMixins: "appearance" (item) — out-of-range Item width', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      sessionStorage.setItem('kpi.editable-form.form-style', 'theme-grid')
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @survey = new $model.Survey()
+      @survey.rows.add(type: 'text', name: 'q1', label: 'Q1', appearance: 'w14')
+      @row = @survey.rows.at(0)
+      @detail = @row.get('appearance')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+      @$el = $('<div/>')
+      # _afterRenderWidth inserts the item-width section as a sibling right
+      # before '.js-card-settings-advanced-toggle' (see OC-28234).
+      @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>')
+      @mixin_ctx = $.extend({}, @mixin, {
+        cid: 'cid_item_appearance'
+        $el: @$el
+        $: (sel) => @$el.find(sel)
+        model: @detail
+        listenTo: ->
+        Templates: @viewRowDetail.Templates
+        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+      })
+      @mixin_ctx.html()
+    afterEach ->
+      window.xlfHideWarnings = false
+      sessionStorage.removeItem('kpi.editable-form.form-style')
+
+    it 'shows the out-of-range advisory and highlights no width card', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      $wrap = @$cardSettingsWrap.find('.js-item-width-wrap')
+      expect($wrap.length).toBe(1)
+      expect($wrap.find('.width-card.is-selected').length).toBe(0)
+      $advisory = $wrap.find('.item-width__advisory')
+      expect($advisory.length).toBe(1)
+      expect($advisory.text().indexOf('w14')).not.toBe(-1)
+
+    it 'shows the raw stored token in the collapsed-state pill, not "Full width"', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      $pill = @$cardSettingsWrap.find('.js-item-width-pill')
+      # buildWidthPillText has no dedicated out-of-range copy, so both the
+      # label and the raw token render as "w14" — redundant but not wrong.
+      expect($pill.text().trim()).toBe('w14 · w14')
+
+    it 'preserves the out-of-range width when only the Appearance card is changed', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      $paragraphCard = @$el.find('.appearance-card[data-card-slug="paragraph"]')
+      expect($paragraphCard.length).toBe(1)
+      $paragraphCard.trigger('click')
+      expect(@detail.get('value')).toBe('multiline w14')
+
+  ###############################################################
+  # view.rowDetail: DetailViewMixins.appearance — onOcFormStyleChange
+  ###############################################################
+  describe 'view.rowDetail.DetailViewMixins.appearance: onOcFormStyleChange()', ->
+    beforeEach ->
+      window.t ?= (str) -> str
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+
+      @cardSettingsWrap = $('<div class="card__settings">')
+        .append($('<div class="js-group-cols-wrap">'))
+        .append($('<div class="js-item-width-wrap">'))
+
+      @ctx =
+        rowView: cardSettingsWrap: @cardSettingsWrap
+        model: _parent: {}
+        isCardGridType: -> true
+        is_form_style_theme_grid: -> false
+        model_type: -> 'select_one'
+        _afterRenderGroupCols: ->
+        _afterRenderWidth: ->
+        get_width_token_from_model_value: -> null
+
+    it 'returns early when not a card grid type', ->
+      widthCalled = false
+      @ctx.isCardGridType = -> false
+      @ctx._afterRenderWidth = -> widthCalled = true
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(widthCalled).toBe(false)
+
+    it 'switching TO grid on a non-group calls _afterRenderWidth', ->
+      widthCalled = false
+      @ctx.is_form_style_theme_grid = -> true
+      @ctx.model_type = -> 'select_one'
+      @ctx._afterRenderWidth = -> widthCalled = true
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(widthCalled).toBe(true)
+
+    it 'switching TO grid on a group calls _afterRenderGroupCols', ->
+      groupColsCalled = false
+      @ctx.is_form_style_theme_grid = -> true
+      @ctx.model_type = -> 'group'
+      @ctx._afterRenderGroupCols = -> groupColsCalled = true
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(groupColsCalled).toBe(true)
+
+    it 'switching AWAY from grid on a non-group removes .js-item-width-wrap', ->
+      @ctx.is_form_style_theme_grid = -> false
+      @ctx.model_type = -> 'select_one'
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(@cardSettingsWrap.find('.js-item-width-wrap').length).toBe(0)
+
+    it 'switching AWAY from grid on a group removes .js-group-cols-wrap', ->
+      @ctx.is_form_style_theme_grid = -> false
+      @ctx.model_type = -> 'group'
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(@cardSettingsWrap.find('.js-group-cols-wrap').length).toBe(0)

@@ -212,6 +212,12 @@ module.exports = do ->
 
       return
 
+    remove: ->
+      if @_onOcFormStyleChangeBound
+        document.removeEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
+      Backbone.off(null, null, @)
+      super
+
     render: ()->
       rendered = @html()
       if rendered
@@ -234,7 +240,7 @@ module.exports = do ->
           val = @model.get('value')
           if val is true or val in $configs.truthyValues
             $el.prop('checked', true)
-      @model.on 'change:value', reflectValueInEl
+      @listenTo @model, 'change:value', reflectValueInEl
       reflectValueInEl()
 
       $el.on 'change', ()=>
@@ -279,7 +285,7 @@ module.exports = do ->
             $el.val(modelVal)
 
       reflectValueInEl()
-      @model.on 'change:value', reflectValueInEl
+      @listenTo @model, 'change:value', reflectValueInEl
 
       detectAndChangeValue = () =>
         $elVal = $el.val()
@@ -1141,12 +1147,37 @@ module.exports = do ->
 
   WIDTH_OPTIONS = ("w#{n}" for n in [1..10])
 
-  getWidthFromModelValue = (modelValue) ->
+  # Raw stored width token, any magnitude (e.g. "w14"). Used wherever the
+  # actual saved value must be preserved or displayed, since a value outside
+  # w1-w10 is still real data and must never be treated as "unset".
+  # Highest-numbered token wins when more than one is present. Tokens with a
+  # leading zero (e.g. "w01") are deliberately NOT matched — WIDTH_OPTIONS
+  # only ever produces canonical forms ("w1".."w10"), so a leading-zero
+  # variant would otherwise be preserved here as "in range" (e.g. "w01"
+  # parses to 1) while getWidthFromModelValue's exact-string check treats it
+  # as unsupported, an inconsistency between the two readers.
+  getWidthTokenFromModelValue = (modelValue) ->
     return null unless modelValue?
-    found = null
-    for w in WIDTH_OPTIONS
-      found = w if new RegExp("\\b#{w}\\b").test(modelValue)
-    found
+    best = null
+    bestN = -1
+    re = /\bw([1-9]\d*)\b/g
+    while (m = re.exec(modelValue))
+      n = parseInt(m[1], 10)
+      if n > bestN
+        bestN = n
+        best = m[0]
+    best
+
+  # Supported picker option only (w1-w10) — null for both "unset" and "stored
+  # but unsupported" (e.g. "w14"). Only safe for call sites that hand the
+  # result to something that can only represent w1-w10, such as
+  # @$select_width or the fixed-size card grids.
+  # Note: picks the highest RAW token first, then range-checks it — it does
+  # not fall back to the highest in-range token. A malformed mixed value
+  # like "w3 w14" is null here (unsupported), not "w3" as it was previously.
+  getWidthFromModelValue = (modelValue) ->
+    token = getWidthTokenFromModelValue(modelValue)
+    if token? and token in WIDTH_OPTIONS then token else null
 
   getParentGroupCols = (mixin) ->
     parent_group = mixin.model_get_parent_group()
@@ -1240,7 +1271,7 @@ module.exports = do ->
 
     model_get_parent_group: ->
       parent_group = null
-      if @model._parent._parent._parent? and @model._parent._parent._parent.constructor.key == 'group'
+      if @model?._parent?._parent?._parent? and @model._parent._parent._parent.constructor.key == 'group'
         parent_group = @model._parent._parent._parent
       parent_group
 
@@ -1267,12 +1298,47 @@ module.exports = do ->
     get_width_from_model_value: ->
       getWidthFromModelValue(@model.get('value'))
 
+    get_width_token_from_model_value: ->
+      getWidthTokenFromModelValue(@model.get('value'))
+
     afterRender: ->
       if @isCardGridType()
+        # Register the ocFormStyleChange listener here (not in initialize) so the
+        # gate, the _appearanceDV back-ref, and the listener are all set together
+        # only for card-grid types. Non-card-grid types never register or leak.
+        @rowView._appearanceDV = @
+        @_onOcFormStyleChangeBound = => @onOcFormStyleChange()
+        document.addEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
         @_afterRenderCardGrid()
       else
         @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0).hide()
         @_afterRenderLegacy()
+
+    # Re-render the grid-only sections (Columns in Grid + Item Width) when the
+    # form style changes, so they appear/disappear immediately without requiring
+    # the user to interact further with the panel.
+    onOcFormStyleChange: ->
+      # Guard against deleted rows — row.detach() nulls _parent, and walking
+      # _parent._parent._parent in model_get_parent_group would throw.
+      return unless @model?._parent?
+      return unless @isCardGridType()
+      questionType = @model_type()
+      if @is_form_style_theme_grid()
+        # Switching TO grid — render the sections.
+        # Use get_width_token_from_model_value (not get_width_from_model_value) to
+        # preserve out-of-range tokens like w14 from migrated 3.x forms (OC-28306).
+        if questionType is 'group'
+          @_afterRenderGroupCols(@get_width_token_from_model_value())
+        else
+          @_afterRenderWidth()
+      else
+        # Switching AWAY from grid — remove the sections immediately.
+        # Selectors below must stay in sync with those used by _afterRenderGroupCols
+        # and _afterRenderWidth; if either changes its wrapper class, update here too.
+        if questionType is 'group'
+          @rowView.cardSettingsWrap.find('.js-group-cols-wrap').remove()
+        else
+          @rowView.cardSettingsWrap.find('.js-item-width-wrap').remove()
 
     # -------------------------------------------------------------------------
     # Card grid path (select_one / select_multiple)
@@ -1333,7 +1399,7 @@ module.exports = do ->
 
       # For groups: Columns in Grid as own section after Appearance; for non-groups: item width picker
       if questionType is 'group'
-        @_afterRenderGroupCols(@get_width_from_model_value())
+        @_afterRenderGroupCols(@get_width_token_from_model_value())
       else
         @_afterRenderWidth()
 
@@ -1360,7 +1426,7 @@ module.exports = do ->
         toggleSection() if evt.key in ['Enter', ' ']
 
       # Keep pill fresh when model changes from outside (e.g. loading)
-      @model.on 'change:value', =>
+      @listenTo @model, 'change:value', =>
         if $section.hasClass('is-collapsed')
           val = @model.get('value') or ''
           { card, columnCount, customText } = parseAppearanceValue(val, questionType)
@@ -1421,7 +1487,12 @@ module.exports = do ->
       value = buildModelValue(@_card, @_columnCount, @_customText)
       if @is_form_style_theme_grid()
         width_val = @$select_width.val()
-        if width_val and width_val isnt 'select'
+        width_val = null unless width_val and width_val isnt 'select'
+        # @$select_width can only represent w1-w10, so a width outside that
+        # range is never reflected there — fall back to whatever token is
+        # still on the model so it isn't destroyed on an unrelated edit.
+        width_val ?= getWidthTokenFromModelValue(@model.get('value') or '')
+        if width_val
           value = if value then "#{value} #{width_val}" else width_val
       @model.set 'value', value
 
@@ -1520,7 +1591,7 @@ module.exports = do ->
               select_value = select_model_value
               modelValue = modelValue.split(select_value).join('')
 
-            width_model_value = @get_width_from_model_value()
+            width_model_value = @get_width_token_from_model_value()
             if width_model_value?
               select_width_value = width_model_value
               modelValue = modelValue.split(select_width_value).join('')
@@ -1556,7 +1627,7 @@ module.exports = do ->
           $input = @$('input')
           if modelValue? and modelValue != ''
             modelValue = modelValue.trim()
-            width_model_value = @get_width_from_model_value()
+            width_model_value = @get_width_token_from_model_value()
             if width_model_value?
               modelValue = modelValue.split(width_model_value).join('').trim()
             if modelValue != ''
@@ -1578,7 +1649,7 @@ module.exports = do ->
       groupCols = getParentGroupCols(@)
       groupName = getParentGroupName(@)
       modelValue = @model.get('value') or ''
-      currentW  = getWidthFromModelValue(modelValue)
+      currentW  = getWidthTokenFromModelValue(modelValue)
 
       # Context line text
       if groupName?
@@ -1739,7 +1810,7 @@ module.exports = do ->
       $grid = $('<div/>', { class: 'group-cols__grid' })
       for numCols in [1..10]
         isSelected = currentSelCols is numCols
-        isDefaultCard = numCols is DEFAULT_COLS and not currentSelCols?
+        isDefaultCard = numCols is DEFAULT_COLS and not currentSelCols? and not outOfRange
         $card = $('<div/>', {
           class: "group-cols-card#{if isSelected then ' is-selected' else ''}#{if isDefaultCard then ' is-default' else ''}"
           'data-cols': numCols
@@ -1765,9 +1836,12 @@ module.exports = do ->
       @rowView.cardSettingsWrap.find('.js-card-settings-appearance').eq(0).after($wrap)
 
       refreshPill = =>
-        numCols = currentSelCols ? DEFAULT_COLS
-        colWord = if numCols is 1 then t('column') else t('columns')
-        $pill.text(if currentSelCols? then "#{numCols} #{colWord} · w#{numCols}" else "#{numCols} #{colWord}")
+        if outOfRange
+          $pill.text(storedVal)
+        else
+          numCols = currentSelCols ? DEFAULT_COLS
+          colWord = if numCols is 1 then t('column') else t('columns')
+          $pill.text(if currentSelCols? then "#{numCols} #{colWord} · w#{numCols}" else "#{numCols} #{colWord}")
 
       refreshPill()
       $pill.show()
@@ -1775,6 +1849,8 @@ module.exports = do ->
       selectCols = (el) =>
         numCols = parseInt($(el).data('cols'), 10)
         currentSelCols = numCols
+        outOfRange = false
+        $body.find('.group-cols__advisory').remove()
         @$select_width.val("w#{numCols}")
         if @_card?
           @_writeModelValue()
@@ -1822,7 +1898,7 @@ module.exports = do ->
 
     _refreshWidthPill: ($pill) ->
       groupCols = getParentGroupCols(@)
-      currentW  = getWidthFromModelValue(@model.get('value') or '')
+      currentW  = getWidthTokenFromModelValue(@model.get('value') or '')
       unless currentW?
         currentW = if groupCols is 4 then 'w4' else "w#{groupCols}"
       label = buildWidthPillText(currentW, groupCols)
@@ -1921,7 +1997,7 @@ module.exports = do ->
 
       # Preserve item width token managed by the Item width section
       if @is_form_style_theme_grid()
-        existingWidth = getWidthFromModelValue(@model.get('value') or '')
+        existingWidth = getWidthTokenFromModelValue(@model.get('value') or '')
         if existingWidth
           model_set_value = if model_set_value != '' then "#{model_set_value} #{existingWidth}" else existingWidth
 
@@ -1953,7 +2029,7 @@ module.exports = do ->
           model_set_value = select_width_value
       else if @is_form_style_theme_grid()
         # Non-group textbox: preserve item width token
-        existingWidth = getWidthFromModelValue(@model.get('value') or '')
+        existingWidth = getWidthTokenFromModelValue(@model.get('value') or '')
         if existingWidth
           model_set_value = if model_set_value != '' then "#{model_set_value} #{existingWidth}" else existingWidth
 
@@ -2464,6 +2540,7 @@ module.exports = do ->
   viewRowDetail.buildModelValue = buildModelValue
   viewRowDetail.buildPillText = buildPillText
   viewRowDetail.getWidthFromModelValue = getWidthFromModelValue
+  viewRowDetail.getWidthTokenFromModelValue = getWidthTokenFromModelValue
   viewRowDetail.buildWidthPillText = buildWidthPillText
 
   viewRowDetail
