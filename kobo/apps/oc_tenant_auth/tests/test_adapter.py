@@ -88,3 +88,17 @@ class SyncLoginStateTestCase(TestCase):
 
         self.assertTrue(KeycloakTenantUser.objects.filter(UID='kc-uid-1').exists())
         self.assertIs(self.request.session['oc_customer_shared_infra'], False)
+
+    def test_reads_user_type_from_nested_userinfo_claim(self, mock_get, mock_subdomain):
+        # Real Keycloak responses nest userContext under extra_data['userinfo'].
+        self._mock_customer_response(mock_get, True)
+        self.sociallogin.account.extra_data = {
+            'userinfo': {
+                'https://www.openclinica.com/userContext': {'userType': 'Business Admin'},
+            },
+        }
+
+        sync_login_state(self.request, self.user, self.sociallogin)
+
+        kc_user = KeycloakTenantUser.objects.get(UID='kc-uid-1')
+        self.assertEqual(kc_user.user_type, 'Business Admin')

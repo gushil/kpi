@@ -46,6 +46,11 @@ def _decode_jwt_payload(token):
     return json.loads(base64.urlsafe_b64decode(part))
 
 
+def _extra_data_claim(extra_data, key):
+    """allauth extra_data claim, falling back to its nested userinfo location."""
+    return extra_data.get(key) or extra_data.get('userinfo', {}).get(key)
+
+
 class TenantAwareSocialAccountAdapter(DefaultSocialAccountAdapter):
     """
     allauth SocialAccountAdapter for OpenClinica multi-tenant Keycloak OIDC.
@@ -93,10 +98,8 @@ class TenantAwareSocialAccountAdapter(DefaultSocialAccountAdapter):
 
         # UID not found — Keycloak may have re-created the user with a new UUID.
         # Fall back to username lookup and re-key the stored UID if matched.
-        preferred_username = sociallogin.account.extra_data.get(
-            'preferred_username'
-        ) or sociallogin.account.extra_data.get('userinfo', {}).get(
-            'preferred_username'
+        preferred_username = _extra_data_claim(
+            sociallogin.account.extra_data, 'preferred_username'
         )
         if not preferred_username:
             LOGGER.error(
@@ -166,6 +169,10 @@ class TenantAwareSocialAccountAdapter(DefaultSocialAccountAdapter):
 
 
 USER_CONTEXT_CLAIM = 'https://www.openclinica.com/userContext'
+
+
+def _get_user_context(extra_data):
+    return _extra_data_claim(extra_data, USER_CONTEXT_CLAIM) or {}
 
 
 def _store_user_info(request, user_uuid):
@@ -246,7 +253,7 @@ def sync_login_state(request, user, sociallogin):
         request.session['oc_token_validated_at'] = time.time()
         request.session['oc_fd_base_username'] = user.username.rsplit('+', 1)[0]
 
-    user_type = extra_data.get(USER_CONTEXT_CLAIM, {}).get('userType', '')
+    user_type = _get_user_context(extra_data).get('userType', '')
 
     KeycloakTenantUser.objects.update_or_create(
         UID=uid,
