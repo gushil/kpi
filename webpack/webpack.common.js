@@ -16,9 +16,16 @@ fs.mkdirSync(outputPath, { recursive: true })
 // match) and the side-effect `/style.css` covers both imports.
 const logicBuilderAlias = (() => {
   try {
-    require.resolve('@openclinica/logic-builder/package.json')
+    // Probe the BARE specifier: it resolves through the package's `exports` map
+    // (which only exposes `.` and `./style.css`) to dist/, so it proves the
+    // package is installed AND built. Probing `<pkg>/package.json` throws
+    // ERR_PACKAGE_PATH_NOT_EXPORTED even when installed (round-7: that made
+    // every build silently bundle the stub).
+    require.resolve('@openclinica/logic-builder')
+    console.log('[logic-builder] bundling the real @openclinica/logic-builder package')
     return {} // installed → normal node_modules resolution (respects its exports)
   } catch {
+    console.log('[logic-builder] private package absent — bundling the CI stub')
     const stub = path.join(__dirname, '..', 'jsapp', 'js', 'openclinica', 'logic-builder-stub')
     return {
       '@openclinica/logic-builder$': path.join(stub, 'index.tsx'),
