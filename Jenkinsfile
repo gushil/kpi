@@ -44,9 +44,16 @@ pipeline {
             }
             steps {
                 // OC fork: authenticate the private @openclinica/logic-builder clone.
+                // The credential is a Username-with-password (username + GitHub token),
+                // so bind it with usernamePassword — a string() binding fails with
+                // "is of type 'Username with password' where StringCredentials was
+                // expected". usernameVariable is a required parameter of the binding;
+                // GH_USER is intentionally unused (masked, stage-scoped) — the URL uses
+                // the fixed x-access-token username so an empty/misconfigured stored
+                // username can't break auth (GitHub ignores the username for PATs).
                 // Single-quoted sh body -> ${GH_TOKEN} expands in the shell from the
                 // masked credential env var, never in Groovy (so it isn't logged).
-                withCredentials([string(credentialsId: 'jenkins-github-token-as-password', variable: 'GH_TOKEN')]) {
+                withCredentials([usernamePassword(credentialsId: 'jenkins-github-token-as-password', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
                     sh '''
                         set -e
                         apt-get update -qq
@@ -98,9 +105,13 @@ pipeline {
                     // OC fork: pass the GitHub token to BuildKit as a secret so the
                     // Dockerfile's npm-install stage can clone the private
                     // @openclinica/logic-builder (id must match the Dockerfile's
-                    // `--mount=type=secret,id=gh_token`). `env=GH_TOKEN` reads it from
-                    // the masked credential env var, so it never appears in the log.
-                    withCredentials([string(credentialsId: 'jenkins-github-token-as-password', variable: 'GH_TOKEN')]) {
+                    // `--mount=type=secret,id=gh_token`). The credential is a
+                    // Username-with-password, so bind with usernamePassword and feed
+                    // only the password component (the token) to BuildKit; `env=GH_TOKEN`
+                    // reads the masked env var, so it never appears in the log.
+                    // usernameVariable is required by the binding — GH_USER is unused
+                    // here (the Dockerfile authenticates as x-access-token).
+                    withCredentials([usernamePassword(credentialsId: 'jenkins-github-token-as-password', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
                         sh "docker buildx build --builder arm64builder --platform linux/aarch64 --secret id=gh_token,env=GH_TOKEN -t ${registry}:${tag_version} --push ."
                     }
                   }
