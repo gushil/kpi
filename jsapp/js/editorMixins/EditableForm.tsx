@@ -55,6 +55,7 @@ import {
 } from '#/constants'
 import envStore from '#/envStore'
 import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
+import { makeBuilderInert } from '#/openclinica/builderInert'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
 import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
@@ -261,6 +262,10 @@ export default function EditableForm(props: EditableFormProps) {
   })
 
   const formWrapRef = useRef<HTMLDivElement>(null)
+  // OC fork (P1.1 AC2): wraps the scroll container's children so the host can
+  // inert the content INSIDE .form-builder__contents without inerting the
+  // scroller itself (see the builder-inert effect + makeBuilderInert).
+  const builderContentsInnerRef = useRef<HTMLDivElement>(null)
   // OC fork (P1.1): ref on the whole builder so the AI dialog can make it inert
   // (aside + header + form content), keeping Save / Preview / Manage Languages
   // unclickable while it is open (PR#273 #10). The dialog portals to <body>, so
@@ -495,6 +500,23 @@ export default function EditableForm(props: EditableFormProps) {
     }
   }, [generateRequest])
 
+  // OC fork (P1.1 AC2 "scrollable but inert", design §5.4): while the AI
+  // Generator dialog is open, inert the builder's interactive regions — the
+  // aside, the header, and the contents-inner wrapper — but never the scroll
+  // container itself. Inerting the whole .form-builder-wrapper (the original
+  // approach, via the package's inertRoot) made hit-testing skip the scroller
+  // too, so wheel events never reached it and the form stopped scrolling.
+  // Owned by the host because the inert boundary is host-DOM-specific.
+  const generateDialogOpen = Boolean(
+    generateRequest?.row && generateRequest?.attribute && columnToTab(generateRequest.attribute),
+  )
+  useEffect(() => {
+    if (!generateDialogOpen) {
+      return
+    }
+    return makeBuilderInert(formBuilderWrapRef.current, builderContentsInnerRef.current)
+  }, [generateDialogOpen])
+
   function renderAiGeneratorDialog() {
     const request = state[GENERATE_REQUEST_KEY]
     if (!request?.row || !request?.attribute) {
@@ -530,7 +552,10 @@ export default function EditableForm(props: EditableFormProps) {
           currentExpression,
         }}
         client={logicBuilderStubClient}
-        inertRoot={formBuilderWrapRef.current}
+        // inertRoot deliberately NOT passed: the host owns the inert boundary
+        // (see the builder-inert effect) because inerting the whole wrapper
+        // would make the scroll container unhittable and break AC2's
+        // "scrollable but inert".
         onApply={applyGeneratedExpression}
         onClose={closeGenerateDialog}
       />
@@ -1836,12 +1861,17 @@ export default function EditableForm(props: EditableFormProps) {
             {renderFormBuilderHeader()}
 
             <bem.FormBuilder__contents>
-              {state.asset && <FormLockedMessage asset={state.asset} />}
+              {/* OC fork (P1.1 AC2): layout-neutral wrapper so the AI dialog's
+                  inert boundary can cover the scroller's CONTENT while the
+                  scroll container itself stays hit-testable (scrollable). */}
+              <div ref={builderContentsInnerRef} className='form-builder__contents-inner'>
+                {state.asset && <FormLockedMessage asset={state.asset} />}
 
-              {hasBackgroundAudio() && renderBackgroundAudioWarning()}
+                {hasBackgroundAudio() && renderBackgroundAudioWarning()}
 
-              <div ref={formWrapRef} className='form-wrap'>
-                {!state.surveyAppRendered && renderNotLoadedMessage()}
+                <div ref={formWrapRef} className='form-wrap'>
+                  {!state.surveyAppRendered && renderNotLoadedMessage()}
+                </div>
               </div>
             </bem.FormBuilder__contents>
           </bem.FormBuilder>
