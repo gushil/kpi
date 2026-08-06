@@ -78,8 +78,14 @@ class SyncLoginStateTestCase(TestCase):
         self.assertIs(self.request.session['oc_customer_shared_infra'], True)
         kc_user = KeycloakTenantUser.objects.get(UID='kc-uid-1')
         self.assertEqual(kc_user.user_type, 'Business Admin')
+        self.assertEqual(
+            mock_get.call_args.kwargs['headers']['Authorization'],
+            f'Bearer {self.access_token}',
+        )
 
-    def test_creates_keycloak_tenant_user_on_first_login(self, mock_get, mock_subdomain):
+    def test_creates_keycloak_tenant_user_on_first_login(
+        self, mock_get, mock_subdomain
+    ):
         self._mock_customer_response(mock_get, False)
 
         self.assertFalse(KeycloakTenantUser.objects.filter(UID='kc-uid-1').exists())
@@ -89,12 +95,16 @@ class SyncLoginStateTestCase(TestCase):
         self.assertTrue(KeycloakTenantUser.objects.filter(UID='kc-uid-1').exists())
         self.assertIs(self.request.session['oc_customer_shared_infra'], False)
 
-    def test_reads_user_type_from_nested_userinfo_claim(self, mock_get, mock_subdomain):
+    def test_reads_user_type_from_nested_userinfo_claim(
+        self, mock_get, mock_subdomain
+    ):
         # Real Keycloak responses nest userContext under extra_data['userinfo'].
         self._mock_customer_response(mock_get, True)
         self.sociallogin.account.extra_data = {
             'userinfo': {
-                'https://www.openclinica.com/userContext': {'userType': 'Business Admin'},
+                'https://www.openclinica.com/userContext': {
+                    'userType': 'Business Admin',
+                },
             },
         }
 
@@ -103,7 +113,9 @@ class SyncLoginStateTestCase(TestCase):
         kc_user = KeycloakTenantUser.objects.get(UID='kc-uid-1')
         self.assertEqual(kc_user.user_type, 'Business Admin')
 
-    def test_handles_null_user_context_claim_without_raising(self, mock_get, mock_subdomain):
+    def test_handles_null_user_context_claim_without_raising(
+        self, mock_get, mock_subdomain
+    ):
         # A userContext claim present but set to null must not crash login.
         self._mock_customer_response(mock_get, True)
         self.sociallogin.token.token = _make_jwt({
