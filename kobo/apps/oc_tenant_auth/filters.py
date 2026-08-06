@@ -43,13 +43,10 @@ class SubdomainFilter(filters.BaseFilterBackend):
 
 class SubdomainAwareObjectPermissionsFilter(KpiObjectPermissionsFilter):
     """
-    OC customization: extends KpiObjectPermissionsFilter to include library
-    items (question/block/template/collection) owned by users in the caller's
-    Keycloak subdomain. Surveys are still governed by standard permissions.
+    OC customization: extends KpiObjectPermissionsFilter to include all
+    assets owned by users in the caller's Keycloak subdomain.
     Falls back to standard behavior when the user has no Keycloak record.
     """
-
-    _LIBRARY_ASSET_TYPES = ('question', 'block', 'template', 'collection')
 
     def filter_queryset(self, request, queryset, view):
         standard = super().filter_queryset(request, queryset, view)
@@ -58,19 +55,18 @@ class SubdomainAwareObjectPermissionsFilter(KpiObjectPermissionsFilter):
             return standard
         try:
             subdomain_user_ids = get_subdomain_user_ids(user)
-            subdomain_library_qs = Asset.objects.filter(
+            subdomain_qs = Asset.objects.filter(
                 owner__in=subdomain_user_ids,
-                asset_type__in=self._LIBRARY_ASSET_TYPES,
             ).values('pk')
         except KeycloakModel.DoesNotExist:
             return standard
         except Exception:
             logger.exception(
-                'Unexpected error while building subdomain library filter for user %s',
+                'Unexpected error while building subdomain filter for user %s',
                 user,
             )
             raise
         # Union via DB-level subqueries — avoids materialising pk sets into Python.
         return queryset.filter(
-            Q(pk__in=standard.values('pk')) | Q(pk__in=subdomain_library_qs)
+            Q(pk__in=standard.values('pk')) | Q(pk__in=subdomain_qs)
         )
