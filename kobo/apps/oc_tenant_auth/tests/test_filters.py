@@ -37,7 +37,19 @@ class SubdomainAwareObjectPermissionsFilterTestCase(TestCase):
 
     def test_includes_survey_owned_by_same_subdomain_user(self):
         filter_backend = SubdomainAwareObjectPermissionsFilter()
-        qs = filter_backend.filter_queryset(self.request, Asset.objects.all(), self.view)
+        qs = filter_backend.filter_queryset(
+            self.request, Asset.objects.all(), self.view
+        )
+        self.assertIn(self.survey, qs)
+
+    def test_includes_survey_owned_by_same_subdomain_user_on_detail_view(self):
+        # The base KpiObjectPermissionsFilter takes a different branch when
+        # view.detail is True; confirm the subdomain union still applies.
+        self.view.detail = True
+        filter_backend = SubdomainAwareObjectPermissionsFilter()
+        qs = filter_backend.filter_queryset(
+            self.request, Asset.objects.all(), self.view
+        )
         self.assertIn(self.survey, qs)
 
     def test_excludes_survey_owned_by_different_subdomain_user(self):
@@ -50,5 +62,7 @@ class SubdomainAwareObjectPermissionsFilterTestCase(TestCase):
         )
 
         filter_backend = SubdomainAwareObjectPermissionsFilter()
-        qs = filter_backend.filter_queryset(self.request, Asset.objects.all(), self.view)
+        qs = filter_backend.filter_queryset(
+            self.request, Asset.objects.all(), self.view
+        )
         self.assertNotIn(other_survey, qs)
