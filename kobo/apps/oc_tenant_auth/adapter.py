@@ -236,7 +236,7 @@ def sync_login_state(request, user, sociallogin):
         try:
             token_payload = _decode_jwt_payload(access_token)
             roles = get_roles(token_payload)
-            token_user_context = token_payload.get(USER_CONTEXT_CLAIM, {})
+            token_user_context = token_payload.get(USER_CONTEXT_CLAIM) or {}
         except Exception as exc:
             LOGGER.warning('Failed to decode access_token: %s', exc)
     user.is_staff = 'admin' in roles or 'superuser' in roles

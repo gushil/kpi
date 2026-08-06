@@ -102,3 +102,15 @@ class SyncLoginStateTestCase(TestCase):
 
         kc_user = KeycloakTenantUser.objects.get(UID='kc-uid-1')
         self.assertEqual(kc_user.user_type, 'Business Admin')
+
+    def test_handles_null_user_context_claim_without_raising(self, mock_get, mock_subdomain):
+        # A userContext claim present but set to null must not crash login.
+        self._mock_customer_response(mock_get, True)
+        self.sociallogin.token.token = _make_jwt({
+            'https://www.openclinica.com/userContext': None,
+            'realm_access': {'roles': []},
+        })
+
+        sync_login_state(self.request, self.user, self.sociallogin)
+
+        self.assertNotIn('oc_customer_shared_infra', self.request.session)
