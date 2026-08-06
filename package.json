@@ -266,5 +266,8 @@
     "workerDirectory": [
       "msw-mocks"
     ]
+  },
+  "optionalDependencies": {
+    "@openclinica/logic-builder": "github:OpenClinica/logic-builder#8faa854e888458256f0c682cb3330980ec17d02e"
   }
 }

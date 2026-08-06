@@ -76,10 +76,16 @@ module.exports = do ->
   class validationLogicHelpers.ValidationLogicHandCodeHelper extends $skipLogicHelpers.SkipLogicHandCodeHelper
     @criteria_value = @criteria
     render: ($destination) ->
-      $destination.replaceWith(@$handCode)
+      # OC fork (PR#273 round-7): render INTO the destination like the skip-logic
+      # hand-code helper — replaceWith() detached the constraint panel's render
+      # anchor (.skiplogic__main), so every later change:value re-render landed in
+      # the detached node, and this input sat outside the .skiplogic__main scope
+      # the post-Apply focus lookup searches. The helper context empties the
+      # destination before each render, so nothing accumulates; the mode-selector
+      # button no longer needs to swap the anchor back, only to switch helpers.
+      $destination.append(@$handCode)
       @button.render().attach_to @$handCode
       @button.bind_event 'click', () =>
-        @$handCode.replaceWith($destination)
         @context.use_mode_selector_helper()
       @$handCode.on('change', () =>
         @criteria = @criteria_value.replace(/&quot;/g, '"');

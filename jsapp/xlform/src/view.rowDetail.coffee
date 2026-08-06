@@ -9,6 +9,7 @@ $hxl = require './view.rowDetail.hxlDict'
 $viewRowDetailSkipLogic = require './view.rowDetail.SkipLogic'
 $viewTemplates = require './view.templates'
 $rowTemplates = require './view.row.templates'
+generateButtonBridge = require '#/openclinica/generateButtonBridge'
 
 module.exports = do ->
   viewRowDetail = {}
@@ -610,6 +611,22 @@ module.exports = do ->
     html: -> false
     insertInDOM: (rowView)-> return
 
+  # OC fork (P1.1, PR#273 round-3): before rebuilding a skip-logic/validation
+  # facade (postInitialize), release the survey listeners its current state and
+  # criterion presenters registered — otherwise every rebuild leaks listeners
+  # bound to the replaced facade. Mirrors the existing cleanup idiom in
+  # mv.skipLogicHelpers: `use_mode_selector_helper`'s
+  # `survey.off null, null, @state` and criterion remove()'s
+  # `survey.off null, null, presenter`.
+  releaseFacadeSurveyListeners = (model) ->
+    survey = model?.getSurvey?()
+    state = model?.facade?.context?.state
+    return unless survey and state
+    survey.off(null, null, state)
+    if state.presenters
+      survey.off(null, null, presenter) for presenter in state.presenters
+    return
+
   viewRowDetail.DetailViewMixins.relevant =
     html: ->
       @$el.addClass("card__settings__fields--active")
@@ -619,15 +636,46 @@ module.exports = do ->
       """
 
     afterRender: ->
+      # OC fork (P1.1): .skiplogic__extras (holding the AI Generate button) is
+      # rendered ABOVE .skiplogic__main so the button sits at the top of the
+      # panel, matching the other logic panels. It must NEVER be inside
+      # .skiplogic__main — the facade calls .empty() on that node every mode switch.
       @$el.find(".relevant__editor").html("""
-        <div class="skiplogic__main"></div>
         <p class="skiplogic__extras">
         </p>
+        <div class="skiplogic__main"></div>
       """)
 
       @target_element = @$('.skiplogic__main')
 
       @model.facade.render @target_element
+
+      generateButtonBridge.mountGenerateButton(
+        @$('.skiplogic__extras').get(0)
+        { row: @model._parent, attribute: 'relevant' }
+      )
+
+      # OC fork (PR#273 #2): the skip-logic facade is seeded from the model value
+      # once and cached, so an external write (e.g. applying an AI-generated
+      # expression) leaves the panel showing the old value and can silently
+      # overwrite the applied one. Rebuild the facade from the current value and
+      # re-render whenever value changes underneath us. change:value fires only
+      # on such external writes here (typing updates facade state + a survey
+      # 'change', not model.set('value')), so this never fights the user's own
+      # edits. Bound on the long-lived rowView so _cleanupExpandedRender's
+      # stopListening tears it down (no duplicate handlers across drawer opens).
+      # change:value can also fire from undo/redo, paste, or a bulk import — not
+      # just the AI dialog's Apply — and Backbone dispatches it synchronously
+      # from .set(), so an uncaught throw here would propagate out of that
+      # unrelated operation. Contain it (PR#273 #3).
+      @rowView.listenTo(@model, 'change:value', =>
+        try
+          releaseFacadeSurveyListeners(@model)
+          @model.postInitialize()
+          @model.facade.render(@target_element)
+        catch e
+          console.error('Logic Builder: failed to refresh the relevant panel after a value change', e)
+      )
 
     insertInDOM: (rowView) ->
       @_insertInDOM rowView.cardSettingsWrap.find('.js-card-settings-relevant-logic').eq(0)
@@ -640,15 +688,45 @@ module.exports = do ->
       </div>
       """
     afterRender: ->
+      # OC fork (P1.1): .skiplogic__extras (holding the AI Generate button) is
+      # rendered ABOVE .skiplogic__main so the button sits at the top of the
+      # panel, matching the other logic panels. It must NEVER be inside
+      # .skiplogic__main — the facade calls .empty() on that node every mode switch.
       @$el.find(".constraint__editor").html("""
-        <div class="skiplogic__main"></div>
         <p class="skiplogic__extras">
         </p>
+        <div class="skiplogic__main"></div>
       """)
 
       @target_element = @$('.skiplogic__main')
 
       @model.facade.render @target_element
+
+      generateButtonBridge.mountGenerateButton(
+        @$('.skiplogic__extras').get(0)
+        { row: @model._parent, attribute: 'constraint' }
+      )
+
+      # OC fork (PR#273 #2): see the identical note on the relevant panel above.
+      # The validation-criteria facade is likewise seeded once and cached, so
+      # rebuild + re-render it when the value changes underneath us. Same
+      # non-Apply triggers and synchronous dispatch as the relevant panel, so
+      # contain any throw (PR#273 #3).
+      @rowView.listenTo(@model, 'change:value', =>
+        try
+          releaseFacadeSurveyListeners(@model)
+          @model.postInitialize()
+          # Re-capture the render anchor from the live DOM in case a helper ever
+          # replaces it again (round-7: the hand-code helper used to replaceWith()
+          # the anchor, so @target_element pointed at a detached node and every
+          # later refresh rendered offscreen). Falls back to the original capture
+          # when the query comes up empty.
+          liveTarget = @$('.skiplogic__main')
+          @target_element = liveTarget if liveTarget.length > 0
+          @model.facade.render(@target_element)
+        catch e
+          console.error('Logic Builder: failed to refresh the constraint panel after a value change', e)
+      )
 
     insertInDOM: (rowView) ->
       @_insertInDOM rowView.cardSettingsWrap.find('.js-card-settings-validation-criteria')
@@ -900,6 +978,27 @@ module.exports = do ->
       modelValue = @model.getValue()
       if modelValue?
         @$input.val(modelValue)
+      # OC fork (P1.1): AI Generate button in the Repeat Count panel header.
+      generateButtonBridge.mountGenerateButton(
+        @$el.find('.repeat-count-panel__header').get(0)
+        { row: @model._parent, attribute: 'repeat_count' }
+      )
+      # OC fork (P1.1): keep the visible field in sync when the AI dialog's
+      # Apply writes directly to the model — otherwise the input still shows
+      # whatever it had at drawer-open time until the drawer is
+      # closed/reopened. Guarded by a value comparison so the user's own
+      # typing (which already wrote this exact value via fireChange above)
+      # never re-triggers a redundant DOM write. This DetailView instance is
+      # recreated on every drawer open, so the listener is registered on the
+      # long-lived @rowView (via listenTo) rather than on this instance —
+      # @rowView's @stopListening() in _cleanupExpandedRender (view.row.coffee)
+      # tears it down on close, instead of accumulating a new handler each
+      # time the drawer reopens.
+      refreshRepeatCountInput = =>
+        modelVal = @model.get('value') or ''
+        if @$input.val() isnt modelVal
+          @$input.val(modelVal)
+      @rowView.listenTo(@model, 'change:value', refreshRepeatCountInput)
 
   # handled by mandatorySettingSelector
   viewRowDetail.DetailViewMixins.required =

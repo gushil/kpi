@@ -4,7 +4,22 @@
     "paths": {
       "#/*": ["./jsapp/js/*"],
       "js/*": ["./jsapp/js/*"], // for scss files only.
-      "scss/*": ["./jsapp/scss/*"] // for scss files only.
+      "scss/*": ["./jsapp/scss/*"], // for scss files only.
+      // OC fork: @openclinica/logic-builder is a private optionalDependency.
+      // Resolve the real package when installed (local dev, Jenkins/prod image);
+      // fall back to the committed CI stub when it's absent (public CI). Tried
+      // in order, first match wins.
+      "@openclinica/logic-builder": [
+        "./node_modules/@openclinica/logic-builder",
+        "./jsapp/js/openclinica/logic-builder-stub"
+      ],
+      // Side-effect CSS import in generateButtonBridge.tsx; same real-first,
+      // stub-fallback so the eslint import resolver finds it when the package
+      // is absent (public CI).
+      "@openclinica/logic-builder/style.css": [
+        "./node_modules/@openclinica/logic-builder/dist/style.css",
+        "./jsapp/js/openclinica/logic-builder-stub/style.css"
+      ]
     },
     "target": "es2017",
     "module": "es2020",
