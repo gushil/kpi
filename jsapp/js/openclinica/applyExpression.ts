@@ -86,8 +86,11 @@ export function applyExpressionToRow(row: any, attribute: string, expression: st
   try {
     const value = NEWLINE_STRIPPING_ATTRIBUTES.has(attribute) ? expression.replace(/\r?\n/g, '') : expression
     if (FACADE_ATTRIBUTES.has(attribute)) {
-      // Capture the serialized prior value so a lossy write can be reverted.
-      const previous = String(detail.getValue?.() ?? '')
+      // Capture the RAW stored value so a lossy write reverts to exactly what
+      // was there. getValue() is the facade's reserialization, which itself
+      // drops clauses it can't resolve — reverting to it would silently reduce
+      // pre-existing content while the toast claims nothing changed (round-7).
+      const previous = String(detail.get?.('value') ?? '')
       detail.set('value', value)
       // `relevant`/`constraint` are not in the auto-`change` whitelist, so
       // trigger it explicitly (idempotent for every attribute) to enable Save.

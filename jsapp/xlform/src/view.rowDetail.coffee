@@ -716,6 +716,13 @@ module.exports = do ->
         try
           releaseFacadeSurveyListeners(@model)
           @model.postInitialize()
+          # Re-capture the render anchor from the live DOM in case a helper ever
+          # replaces it again (round-7: the hand-code helper used to replaceWith()
+          # the anchor, so @target_element pointed at a detached node and every
+          # later refresh rendered offscreen). Falls back to the original capture
+          # when the query comes up empty.
+          liveTarget = @$('.skiplogic__main')
+          @target_element = liveTarget if liveTarget.length > 0
           @model.facade.render(@target_element)
         catch e
           console.error('Logic Builder: failed to refresh the constraint panel after a value change', e)

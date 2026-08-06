@@ -13,15 +13,24 @@ function makeRow(options: { detail?: any; survey?: any } = {}) {
   return { row, detail, survey }
 }
 
-// A facade-backed RowDetail whose getValue() returns a scripted sequence: the
-// pre-write serialization first (captured to restore on a lossy apply), then
-// the post-write serialization the drop-detection compares against.
-function makeFacadeRow(getValues: string[]) {
-  const getValue = jest.fn()
-  for (const v of getValues) getValue.mockReturnValueOnce(v)
-  getValue.mockReturnValue(getValues[getValues.length - 1] ?? '')
-  const detail = { set: jest.fn(), getValue }
-  return makeRow({ detail })
+// A facade-backed RowDetail modeled faithfully: `get('value')` returns the RAW
+// stored attribute (updated by set), while `getValue()` returns the facade's
+// re-serialization of the current raw value — the lossy round-trip that drops
+// clauses it can't resolve and reformats the rest (round-7). `serialize` is the
+// per-test facade behavior.
+function makeFacadeRow(opts: { raw?: string; serialize?: (raw: string) => string } = {}) {
+  const serialize = opts.serialize ?? ((raw: string) => raw)
+  let value = opts.raw ?? ''
+  const set = jest.fn((_key: string, v: string) => {
+    value = v
+  })
+  const detail = {
+    set,
+    get: jest.fn((key: string) => (key === 'value' ? value : undefined)),
+    getValue: jest.fn(() => serialize(value)),
+  }
+  const made = makeRow({ detail })
+  return { ...made, rawValue: () => value }
 }
 
 describe('applyExpressionToRow (P1.3)', () => {
@@ -65,7 +74,7 @@ describe('applyExpressionToRow (P1.3)', () => {
 
   it('keeps newlines for relevant (manual entry keeps them there too)', () => {
     // Stored form keeps both field refs → a clean apply, newlines preserved.
-    const { row, detail } = makeFacadeRow(['', '${A} = 1\nand ${B} = 2'])
+    const { row, detail } = makeFacadeRow()
     const outcome = applyExpressionToRow(row, 'relevant', '${A} = 1\nand ${B} = 2')
     chai.expect(outcome).to.deep.equal({ status: 'applied' })
     chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1\nand ${B} = 2')
@@ -74,14 +83,14 @@ describe('applyExpressionToRow (P1.3)', () => {
   it('does not flag a date() wrapper the serializer adds (round-5 #3 false positive)', () => {
     // DateOperator wraps a bare date literal in date('…') on serialize; the
     // field ref ${visit_date} survives, so this is a clean apply, not a drop.
-    const { row } = makeFacadeRow(['', "${visit_date} > date('2024-01-01')"])
+    const { row } = makeFacadeRow({ serialize: () => "${visit_date} > date('2024-01-01')" })
     const outcome = applyExpressionToRow(row, 'constraint', "${visit_date} > '2024-01-01'")
     chai.expect(outcome).to.deep.equal({ status: 'applied' })
   })
 
   it('does not flag quotes the serializer adds around an unquoted value (round-5 #3)', () => {
     // TextOperator wraps an unquoted value in quotes; ${subject_code} survives.
-    const { row } = makeFacadeRow(['', "${subject_code} = '123'"])
+    const { row } = makeFacadeRow({ serialize: () => "${subject_code} = '123'" })
     const outcome = applyExpressionToRow(row, 'constraint', '${subject_code} = 123')
     chai.expect(outcome).to.deep.equal({ status: 'applied' })
   })
@@ -91,7 +100,8 @@ describe('applyExpressionToRow (P1.3)', () => {
     // persist a silently-reduced expression, restore the previous value and
     // report a rejection.
     const previous = '${A} = 1'
-    const { row, detail } = makeFacadeRow([previous, '${A} = 1'])
+    const dropNope = (raw: string) => raw.replace(/ and \$\{NOPE\} = 2/, '')
+    const { row, detail } = makeFacadeRow({ raw: previous, serialize: dropNope })
     const outcome = applyExpressionToRow(row, 'constraint', '${A} = 1 and ${NOPE} = 2')
     chai.expect(outcome).to.deep.equal({
       status: 'rejected',
@@ -107,7 +117,7 @@ describe('applyExpressionToRow (P1.3)', () => {
   })
 
   it('refuses and reverts a total clause-drop', () => {
-    const { row, detail } = makeFacadeRow(['', ''])
+    const { row, detail } = makeFacadeRow({ serialize: (raw) => (raw.includes('${AGE}') ? '' : raw) })
     const outcome = applyExpressionToRow(row, 'relevant', '${AGE} >= 18')
     chai.expect(outcome.status).to.equal('rejected')
     chai.expect((outcome as any).unresolved).to.deep.equal(['${AGE}'])
@@ -115,6 +125,34 @@ describe('applyExpressionToRow (P1.3)', () => {
       ['value', '${AGE} >= 18'],
       ['value', ''],
     ])
+  })
+
+  it("reverts to the RAW stored text, never the facade's reserialization of it (round-7)", () => {
+    // The pre-existing raw value ALREADY holds a clause the facade drops on its
+    // own serialize pass (${typo_field} — deleted/renamed on the form). A
+    // rejected apply must restore exactly that raw text: capturing `previous`
+    // via getValue() would restore the facade's reduced round-trip and silently
+    // lose the clause while the toast claims nothing changed.
+    const raw = '${real_field} = 1 and ${typo_field} = 2'
+    const lossy = (s: string) => s.replace(/ and \$\{typo_field\} = 2/, '').replace(/\$\{AGE\} >= 18/, '')
+    const { row, detail, rawValue } = makeFacadeRow({ raw, serialize: lossy })
+    const outcome = applyExpressionToRow(row, 'relevant', '${AGE} >= 18')
+    chai.expect(outcome.status).to.equal('rejected')
+    // The revert wrote the raw original — clause intact — not the lossy form.
+    chai.expect(detail.set.mock.calls[detail.set.mock.calls.length - 1]).to.deep.equal(['value', raw])
+    chai.expect(rawValue()).to.equal(raw)
+  })
+
+  it('preserves the raw value when the rejected proposal is textually identical to it (round-7)', () => {
+    // Applying text identical to the current raw value: Backbone fires no
+    // change:value, the facade never rebuilds, and stored reads back the
+    // already-lossy serialization — a spurious "drop" report. Whatever the
+    // outcome, the raw attribute must come through byte-identical.
+    const raw = '${real_field} = 1 and ${typo_field} = 2'
+    const lossy = (s: string) => s.replace(/ and \$\{typo_field\} = 2/, '')
+    const { row, rawValue } = makeFacadeRow({ raw, serialize: lossy })
+    applyExpressionToRow(row, 'relevant', raw)
+    chai.expect(rawValue()).to.equal(raw)
   })
 
   it('does not consult getValue for non-facade attributes', () => {
