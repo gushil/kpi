@@ -1285,3 +1285,60 @@ do ->
       expect($paragraphCard.length).toBe(1)
       $paragraphCard.trigger('click')
       expect(detail.get('value')).toBe('multiline')
+
+  ###############################################################
+  # OC-28400: _writeWidthValue must sync $select_width so that a
+  # subsequent _writeModelValue call does not overwrite the newly
+  # selected width with the stale value from render time.
+  ###############################################################
+  describe 'view.rowDetail.DetailViewMixins.appearance: _writeWidthValue syncs $select_width', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      sessionStorage.setItem('kpi.editable-form.form-style', 'theme-grid')
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @survey = new $model.Survey()
+      @survey.rows.add(type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w4')
+      @group = @survey.rows.at(0)
+      @group.rows.add(type: 'select_one', name: 'q1', label: 'Q1', appearance: 'w3')
+      @row = @group.rows.at(0)
+      @detail = @row.get('appearance')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+      @$el = $('<div/>')
+      @$cardSettingsWrap = $("""
+        <div>
+          <div class="js-card-settings-appearance">
+            <span class="js-appearance-pill"></span>
+            <button class="js-appearance-toggle"></button>
+          </div>
+          <div class="js-card-settings-advanced-toggle"></div>
+        </div>
+      """)
+      @mixin_ctx = $.extend({}, @mixin, {
+        cid: 'cid_q1_appearance'
+        $el: @$el
+        $: (sel) => @$el.find(sel)
+        model: @detail
+        listenTo: ->
+        Templates: @viewRowDetail.Templates
+        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+      })
+      @mixin_ctx.html()
+    afterEach ->
+      window.xlfHideWarnings = false
+      sessionStorage.removeItem('kpi.editable-form.form-style')
+
+    it 'preserves newly selected width when appearance is changed after width', ->
+      # afterRender syncs @$select_width to the stored "w3"
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      # Simulate clicking width card "w2" (user changes from w3 to w2)
+      @mixin_ctx._writeWidthValue.call(@mixin_ctx, 'w2')
+      # Simulate clicking appearance card "paragraph"
+      @mixin_ctx._card = 'paragraph'
+      @mixin_ctx._columnCount = null
+      @mixin_ctx._customText = null
+      @mixin_ctx._writeModelValue.call(@mixin_ctx)
+      # Width must be w2 (new selection), not the stale w3 from render time
+      val = @detail.get('value')
+      expect(val.indexOf('w2')).not.toBe(-1)
+      expect(val.indexOf('w3')).toBe(-1)
