@@ -1023,3 +1023,91 @@ do ->
       expect($paragraphCard.length).toBe(1)
       $paragraphCard.trigger('click')
       expect(@detail.get('value')).toBe('multiline w14')
+
+  ###############################################################
+  # OC-28401 — a "Custom" appearance card has no keyword the grid
+  # theme can infer a default width from (unlike the built-in
+  # cards), so the *effective* width must be written explicitly.
+  # Previously, if the item width was never explicitly touched (the
+  # default width applies implicitly, no "wN" token on the model),
+  # switching to "Custom" produced e.g. "other" with the width
+  # silently dropped instead of "other w4".
+  ###############################################################
+
+  describe 'view.rowDetail.DetailViewMixins: "appearance" (item) — Custom appearance width (OC-28401)', ->
+    makeCtx = (@_this, groupCols) ->
+      survey = new (require('../../jsapp/xlform/src/_model')).Survey(survey: [
+        {type: 'group', name: 'grp1', label: 'Group 1', appearance: (if groupCols? then "w#{groupCols}" else undefined), __rows: [
+          {type: 'text', name: 'q1', label: 'Q1'}
+        ]}
+      ])
+      group = survey.rows.at(0)
+      row = group.rows.at(0)
+      detail = row.get('appearance')
+      viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      mixin = viewRowDetail.DetailViewMixins.appearance
+      $el = $('<div/>')
+      $cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>')
+      mixin_ctx = $.extend({}, mixin, {
+        cid: 'cid_item_appearance'
+        $el: $el
+        $: (sel) -> $el.find(sel)
+        model: detail
+        Templates: viewRowDetail.Templates
+        rowView: { cardSettingsWrap: $cardSettingsWrap, model: row }
+      })
+      mixin_ctx.html()
+      { mixin_ctx, $el, $cardSettingsWrap, detail }
+
+    beforeEach ->
+      window.xlfHideWarnings = true
+      sessionStorage.setItem('kpi.editable-form.form-style', 'theme-grid')
+    afterEach ->
+      window.xlfHideWarnings = false
+      sessionStorage.removeItem('kpi.editable-form.form-style')
+
+    it 'writes the implicit default width (w4) once appearance is switched to Custom, with width left untouched', ->
+      { mixin_ctx, $el, detail } = makeCtx(@, null)
+      mixin_ctx.afterRender.call(mixin_ctx)
+      expect(detail.get('value')).toBe('')
+      $customCard = $el.find('.appearance-card[data-card-slug="custom"]')
+      expect($customCard.length).toBe(1)
+      $customCard.trigger('click')
+      expect(detail.get('value')).toBe('other w4')
+
+    it 'writes the group\'s actual default width (not w4) when the group has a non-default column count', ->
+      { mixin_ctx, $el, detail } = makeCtx(@, 6)
+      mixin_ctx.afterRender.call(mixin_ctx)
+      $customCard = $el.find('.appearance-card[data-card-slug="custom"]')
+      $customCard.trigger('click')
+      expect(detail.get('value')).toBe('other w6')
+
+    it 'keeps an explicitly-picked width when appearance is switched to Custom afterwards', ->
+      { mixin_ctx, $el, $cardSettingsWrap, detail } = makeCtx(@, null)
+      mixin_ctx.afterRender.call(mixin_ctx)
+      $w2card = $cardSettingsWrap.find('.js-item-width-wrap .width-card[data-width-slug="w2"]')
+      expect($w2card.length).toBe(1)
+      $w2card.trigger('click')
+      expect(detail.get('value')).toBe('w2')
+      $customCard = $el.find('.appearance-card[data-card-slug="custom"]')
+      $customCard.trigger('click')
+      expect(detail.get('value')).toBe('other w2')
+
+    it 'preserves the custom text typed after switching to Custom, alongside the implicit default width', ->
+      { mixin_ctx, $el, detail } = makeCtx(@, null)
+      mixin_ctx.afterRender.call(mixin_ctx)
+      $customCard = $el.find('.appearance-card[data-card-slug="custom"]')
+      $customCard.trigger('click')
+      $input = $el.find('.appearance-custom-input')
+      expect($input.length).toBe(1)
+      $input.val('compact')
+      $input.trigger('change')
+      expect(detail.get('value')).toBe('compact w4')
+
+    it 'does not add an explicit width to a non-Custom card when width is left unchanged (no behavior change)', ->
+      { mixin_ctx, $el, detail } = makeCtx(@, null)
+      mixin_ctx.afterRender.call(mixin_ctx)
+      $paragraphCard = $el.find('.appearance-card[data-card-slug="paragraph"]')
+      expect($paragraphCard.length).toBe(1)
+      $paragraphCard.trigger('click')
+      expect(detail.get('value')).toBe('multiline')
