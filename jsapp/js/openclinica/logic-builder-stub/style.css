@@ -1,0 +1,3 @@
+/* CI-only stand-in for `@openclinica/logic-builder/style.css` (see index.tsx).
+   The real package ships the actual styles; this empty file just lets webpack
+   resolve the side-effect CSS import when the private package is absent. */

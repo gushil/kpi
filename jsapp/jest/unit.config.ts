@@ -1,6 +1,21 @@
 import type { Config } from 'jest'
 import { defaults } from 'jest-config'
 
+// OC fork: @openclinica/logic-builder is a private optionalDependency. Map the
+// bare specifier to the committed CI stub only when the real package isn't
+// installed (public CI); otherwise let jest resolve the real one. Its
+// `/style.css` import is already covered by the CSS mapper below.
+const logicBuilderMap = ((): Record<string, string> => {
+  try {
+    require.resolve('@openclinica/logic-builder')
+    return {}
+  } catch {
+    return {
+      '^@openclinica/logic-builder$': '<rootDir>/../js/openclinica/logic-builder-stub/index.tsx',
+    }
+  }
+})()
+
 // Config to run ☕ unit tests using the Jest runner
 //
 // To run the unit tests: 🏃
@@ -22,6 +37,7 @@ const config: Config = {
   moduleNameMapper: {
     // ℹ️ same aliases as in webpack.common.js (module.resolve.alias)
     '^#/(.*)$': '<rootDir>/../js/$1', // 📁 'js/*'
+    ...logicBuilderMap, // 🧩 CI stub for the private @openclinica/logic-builder when absent
     // 🎨 mock all CSS modules imported (styles.root = 'root')
     '\\.(css|scss)$': 'identity-obj-proxy',
   },

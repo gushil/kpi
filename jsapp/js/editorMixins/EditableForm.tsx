@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Text } from '@mantine/core'
+// OC fork (P1.1): AI Generator dialog + Logic Builder wiring.
+import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openclinica/logic-builder'
 import alertify from 'alertifyjs'
 import cx from 'classnames'
 import clonedeep from 'lodash.clonedeep'
@@ -52,6 +54,10 @@ import {
   update_states,
 } from '#/constants'
 import envStore from '#/envStore'
+import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
+import { unmountAll } from '#/openclinica/generateButtonBridge'
+import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
+import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 import pageState from '#/pageState.store'
 import type { RouterProp } from '#/router/legacy'
 import { ROUTES } from '#/router/routerConstants'
@@ -175,6 +181,57 @@ interface EditableFormState extends SurveyStateStoreData {
 }
 
 /**
+ * OC fork (P1.1): best-effort read of the survey's fields to give the AI
+ * Generator dialog some context. The STUB client ignores it, so any failure
+ * here is non-fatal — we fall back to an empty field list.
+ */
+function buildFieldContext(row: any): FormFieldContext {
+  try {
+    const survey = row?.getSurvey?.()
+    if (!survey?.forEachRow) {
+      return { fields: [] }
+    }
+    // Mutable local we build up, then hand off as the readonly context field.
+    const fields: FormField[] = []
+    survey.forEachRow(
+      (r: any) => {
+        let name = ''
+        try {
+          name = r.getValue('name') || ''
+        } catch (e) {
+          console.warn('Logic Builder: failed to read a field name for AI context', e)
+          name = ''
+        }
+        if (!name) {
+          return
+        }
+        let type = ''
+        try {
+          type = String(r.getValue('type') || '')
+        } catch (e) {
+          console.warn('Logic Builder: failed to read a field type for AI context', e)
+          type = ''
+        }
+        let label = ''
+        try {
+          const rawLabel = r.getValue('label')
+          label = Array.isArray(rawLabel) ? String(rawLabel[0] ?? '') : String(rawLabel ?? '')
+        } catch (e) {
+          console.warn('Logic Builder: failed to read a field label for AI context', e)
+          label = ''
+        }
+        fields.push({ name, type, label })
+      },
+      { includeGroups: false },
+    )
+    return { fields }
+  } catch (e) {
+    console.warn('Logic Builder: failed to build field context; using empty list', e)
+    return { fields: [] }
+  }
+}
+
+/**
  * This is a component that displays Form Builder's header and aside. It is also
  * responsible for rendering the survey editor app (all our coffee code). See
  * the `launchAppForSurveyContent` method below for all the magic.
@@ -204,6 +261,11 @@ export default function EditableForm(props: EditableFormProps) {
   })
 
   const formWrapRef = useRef<HTMLDivElement>(null)
+  // OC fork (P1.1): ref on the whole builder so the AI dialog can make it inert
+  // (aside + header + form content), keeping Save / Preview / Manage Languages
+  // unclickable while it is open (PR#273 #10). The dialog portals to <body>, so
+  // it itself stays interactive.
+  const formBuilderWrapRef = useRef<HTMLDivElement>(null)
   const cascadeRef = useRef<HTMLTextAreaElement>(null)
 
   const onSurveyChangeDebounced = debounce(onSurveyChange, 200)
@@ -269,13 +331,25 @@ export default function EditableForm(props: EditableFormProps) {
       launchAppForSurveyContent()
     }
 
-    stores.surveyState.listen(onSurveyStateChanged)
+    // OC fork (round-5 #6): capture the unsubscribe so this instance stops
+    // hearing surveyState changes on unmount. Without it, every
+    // mounted-then-unmounted EditableForm left a live listener, and the
+    // `setState` below re-entered all of them.
+    const unlistenSurveyState = stores.surveyState.listen(onSurveyStateChanged)
 
     return () => {
       // OC fork: drop the cached form style on unmount.
       sessionStorage.removeItem(FORM_STYLE_CACHE_NAME)
       unpreventClosingTab()
       cleanupAppForSurveyContent()
+      // OC fork (P1.1, PR#273 round-3): leaving the Form Designer bypasses the
+      // settings-drawer close path, so release every Generate-button React
+      // root and drop any dialog request still pointing at the old form.
+      unmountAll()
+      if (typeof unlistenSurveyState === 'function') {
+        unlistenSurveyState()
+      }
+      stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
     }
   }, [])
 
@@ -319,6 +393,150 @@ export default function EditableForm(props: EditableFormProps) {
     }))
   }
 
+  // OC fork (P1.1): AI Generator dialog open/close/apply, driven by the
+  // `generateRequest` pushed onto `stores.surveyState` by the Backbone-side
+  // Generate buttons (see openclinica/generateButtonBridge.tsx).
+  //
+  // Focus-on-close is owned here, not by the package: the dialog is embedded
+  // and the builder is inert while it's open, so the package no longer attempts
+  // its own focus restore (round-5 B/D). The package calls onApply and closes
+  // (onClose) ONLY when onApply reports the write persisted (round-6): a
+  // successful apply returns true → the package dismisses and
+  // `closeGenerateDialog` runs; a rejected/failed apply returns false → the
+  // package keeps the dialog open so the user's prompt + proposal survive, and
+  // `closeGenerateDialog` never runs. `closeGenerateDialog` (bound to onClose)
+  // remains the SINGLE close + focus site (round-5 #1). This ref tells that
+  // close which way to send focus: a successful Apply → the panel's expression
+  // field; a dismiss (×/Escape) → the panel's Generate button.
+  const closingViaApplyRef = useRef(false)
+  function closeGenerateDialog() {
+    const wasApply = closingViaApplyRef.current
+    closingViaApplyRef.current = false
+    const request = state[GENERATE_REQUEST_KEY]
+    const attribute = request?.attribute
+    // Scope the focus lookup to the row's own settings drawer so a second open
+    // drawer — or a group + child row sharing a class — can't be hit (round-5 #2).
+    const root: ParentNode = request?.settingsRoot instanceof HTMLElement ? request.settingsRoot : document
+    stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
+    if (!attribute) {
+      return
+    }
+    // Defer past the dialog unmount + inert clear (focusing an inert element is
+    // a silent no-op). One timer, one target — no competing focus writes.
+    window.setTimeout(() => {
+      if (wasApply) {
+        focusPanelInput(attribute, root) // P1.3 AC4
+      } else {
+        focusGenerateButton(attribute, root) // P1.1 AC6
+      }
+    }, 0)
+  }
+
+  // Bound to the package's onApply. Returns whether the expression was actually
+  // persisted: true → the package dismisses the dialog (closeGenerateDialog runs
+  // and focuses the panel input); false → the package keeps the dialog open so a
+  // rejected/failed apply doesn't discard the user's prompt + proposal (round-6).
+  // Never closes the dialog itself — closeGenerateDialog (onClose) is the single
+  // close site (round-5 #1).
+  function applyGeneratedExpression(expression: string): boolean {
+    const request = state[GENERATE_REQUEST_KEY]
+    if (!request?.row || !request?.attribute) {
+      return false
+    }
+    // The write path lives in openclinica/applyExpression.ts (unit-tested);
+    // this handler only maps the outcome onto user feedback + focus intent.
+    const outcome = applyExpressionToRow(request.row, request.attribute, expression)
+    if (outcome.status === 'applied') {
+      // Persisted. Flag the focus target for the package-driven close (the
+      // panel's expression field, not the Generate button) and report success.
+      closingViaApplyRef.current = true
+      return true
+    }
+    if (outcome.status === 'rejected') {
+      // The skip-logic facade could not represent every clause and dropped the
+      // references it can't resolve; applyExpressionToRow already reverted the
+      // write, so nothing was persisted (round-5 #5). Report which references
+      // were unresolved; return false so the dialog stays open for the user to
+      // adjust the prompt and retry without retyping (round-6).
+      const names = outcome.unresolved.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
+      console.warn(
+        'Logic Builder: refused a lossy apply and reverted; unresolved references',
+        outcome.unresolved,
+        request.attribute,
+      )
+      alertify.error(
+        t(
+          'The generated expression references ##refs## which do not exist on this form, so it was not applied. Nothing was changed.',
+        ).replace('##refs##', names),
+      )
+      return false
+    }
+    // status === 'error': missing RowDetail, detached row, or a throw mid-write.
+    // Keep the dialog open (return false) so the proposal isn't lost.
+    console.error('Logic Builder: could not apply generated expression —', outcome.reason, request.attribute)
+    alertify.error(t('Could not apply the generated expression. Please try again.'))
+    return false
+  }
+
+  // Defensive (PR#273 #2): if a generate request ever carries an attribute that
+  // maps to no logic tab, the dialog can't render for it — clear the dangling
+  // request (so a clicked Generate doesn't silently do nothing) and leave a
+  // trace. Done in an effect, not during render, to avoid setState-in-render.
+  // In practice unreachable: the Generate button is only mounted for mappable
+  // columns (generateButtonBridge.mountGenerateButton).
+  const generateRequest = state[GENERATE_REQUEST_KEY]
+  useEffect(() => {
+    if (generateRequest?.attribute && !columnToTab(generateRequest.attribute)) {
+      console.warn(
+        'Logic Builder: no logic tab maps to the generate-request attribute; clearing it',
+        generateRequest.attribute,
+      )
+      stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
+    }
+  }, [generateRequest])
+
+  function renderAiGeneratorDialog() {
+    const request = state[GENERATE_REQUEST_KEY]
+    if (!request?.row || !request?.attribute) {
+      return null
+    }
+    const tab = columnToTab(request.attribute)
+    if (!tab) {
+      // No dialog for an unmappable attribute; the effect above clears the
+      // dangling request + logs (PR#273 #2). Can't reset state during render.
+      return null
+    }
+    let currentExpression = ''
+    try {
+      currentExpression = request.row.get(request.attribute)?.get?.('value') || ''
+    } catch (e) {
+      console.warn('Logic Builder: failed to read current expression for the dialog', e)
+      currentExpression = ''
+    }
+    let itemName = ''
+    try {
+      itemName = request.row.getValue?.('name') || request.row.get?.('name')?.get?.('value') || ''
+    } catch (e) {
+      console.warn('Logic Builder: failed to read item name for the dialog', e)
+      itemName = ''
+    }
+    return (
+      <AiGeneratorDialog
+        open
+        scope={{
+          itemName,
+          attribute: tab,
+          fields: buildFieldContext(request.row),
+          currentExpression,
+        }}
+        client={logicBuilderStubClient}
+        inertRoot={formBuilderWrapRef.current}
+        onApply={applyGeneratedExpression}
+        onClose={closeGenerateDialog}
+      />
+    )
+  }
+
   function onStyleChange(newStyle: null | FormStyleDefinition) {
     let settingsStyle: FormStyleName | undefined
     if (newStyle !== null) {
@@ -331,6 +549,9 @@ export default function EditableForm(props: EditableFormProps) {
     }))
     // OC fork: cache the selected form style so it survives a re-launch.
     sessionStorage.setItem(FORM_STYLE_CACHE_NAME, settingsStyle ?? '')
+    // OC fork: notify open Question Options panels to re-render grid-only
+    // sections (Columns in Grid, Item Width) immediately on style change.
+    document.dispatchEvent(new CustomEvent('ocFormStyleChange'))
     onSurveyChangeDebounced()
   }
 
@@ -1608,7 +1829,7 @@ export default function EditableForm(props: EditableFormProps) {
           */
           state.preventNavigatingOut && <Prompt />
         }
-        <div className='form-builder-wrapper'>
+        <div className='form-builder-wrapper' ref={formBuilderWrapRef}>
           {renderAside()}
 
           <bem.FormBuilder>
@@ -1648,6 +1869,9 @@ export default function EditableForm(props: EditableFormProps) {
               <Modal.Body>{renderCascadePopup()}</Modal.Body>
             </Modal>
           )}
+
+          {/* OC fork (P1.1): AI Generator dialog (portals to document.body itself). */}
+          {renderAiGeneratorDialog()}
         </div>
       </>
     </DocumentTitle>

@@ -12,6 +12,7 @@ $viewMandatorySetting = require('./view.mandatorySetting')
 $acceptedFilesView = require('./view.acceptedFiles')
 $viewRowDetail = require('./view.rowDetail')
 renderKobomatrix = require('#/formbuild/renderInBackbone').renderKobomatrix
+generateButtonBridge = require('#/openclinica/generateButtonBridge')
 hasRowRestriction = require('#/components/locking/lockingUtils').hasRowRestriction
 getRowLockingProfile = require('#/components/locking/lockingUtils').getRowLockingProfile
 isRowLocked = require('#/components/locking/lockingUtils').isRowLocked
@@ -450,7 +451,33 @@ module.exports = do ->
       ``
 
     _cleanupExpandedRender: ->
-      @$('.card__settings').detach()
+      # OC fork (P1.1): unmount any Logic Builder "Generate" React roots mounted
+      # into this drawer before detaching it, so React roots don't leak.
+      # Scope with @cardSettingsWrap — the node captured at expand time that
+      # the buttons were mounted under — NOT a fresh `.card__settings` query:
+      # an unscoped query can match a nested child row's drawer, and an empty
+      # query's `.get(0)` is `undefined`, which unmountAll reads as "unmount
+      # everything on the page" (PR#273 round-3). If the node is gone, skip —
+      # the Form Designer teardown's unscoped unmountAll() sweeps leftovers.
+      scopeEl = @cardSettingsWrap?.get(0)
+      if scopeEl
+        generateButtonBridge.unmountAll(scopeEl)
+      else
+        console.warn('Logic Builder: no settings wrap captured for this drawer; skipping scoped Generate-button cleanup')
+      # OC fork (P1.1): tear down the model listeners registered via @listenTo
+      # in _expandedRender (e.g. the calculation/default/repeat_count panel
+      # live-refresh bindings) so re-opening the drawer doesn't accumulate
+      # duplicate handlers bound to stale, detached inputs.
+      @stopListening()
+      # Remove the appearance DetailView so its ocFormStyleChange listener is
+      # unregistered before the settings panel detaches.
+      if @_appearanceDV
+        @_appearanceDV.remove()
+        @_appearanceDV = null
+      # Scope to this view's own panel via the stored ref to avoid detaching
+      # descendant rows' expanded panels when collapsing a group. Upstream now
+      # does this too — same intent as the OC fork's earlier scoped detach.
+      @cardSettingsWrap?.detach()
 
     clone: (event) ->
       parent = @model._parent
@@ -531,6 +558,9 @@ module.exports = do ->
       return
 
     _deleteGroup: () ->
+      # Clean up any expanded settings panel before detach so the
+      # ocFormStyleChange listener and _appearanceDV are properly removed.
+      @toggleSettings(false) if @_settingsExpanded
       @model.splitApart()
       @model._parent._parent.trigger('remove', @model)
       @surveyView.survey.trigger('change')
@@ -835,6 +865,11 @@ module.exports = do ->
         @cardSettingsWrap.find('.js-default-value-tab').removeClass('default-value-tab--hidden')
         $defaultPanel = $($viewTemplates.$$render('row.defaultValuePanel'))
         $defaultPanel.appendTo(@cardSettingsWrap.find('.js-card-settings-default-value'))
+        # OC fork (P1.1): AI Generate button in the Default Value panel header.
+        generateButtonBridge.mountGenerateButton(
+          $defaultPanel.find('.default-value-panel__header').get(0)
+          { row: @model, attribute: 'default' }
+        )
         $defaultTextarea = $defaultPanel.find('.js-default-value-input')
         currentVal = defaultModel.get('value') or ''
         $defaultTextarea.val(currentVal)
@@ -854,6 +889,24 @@ module.exports = do ->
             evt.preventDefault()
             $defaultTextarea.blur()
 
+        # OC fork (P1.1): keep the visible field in sync when the AI dialog's
+        # Apply writes directly to the model — otherwise the textarea still
+        # shows whatever it had at drawer-open time until the drawer is
+        # closed/reopened. Guarded by a value comparison so the user's own
+        # typing (which already wrote this exact value via updateDefaultModel
+        # above) never re-triggers a redundant DOM write. Bound via listenTo
+        # so _cleanupExpandedRender's @stopListening() removes it on close,
+        # instead of accumulating a new handler on every drawer open.
+        refreshDefaultInput = ->
+          modelVal = defaultModel.get('value') or ''
+          if $defaultTextarea.val() isnt modelVal
+            $defaultTextarea.val(modelVal)
+            if modelVal
+              scrollHeight = $defaultTextarea.prop('scrollHeight')
+              $defaultTextarea.css('height', '')
+              $defaultTextarea.css('height', scrollHeight)
+        @listenTo(defaultModel, 'change:value', refreshDefaultInput)
+
       # Calculation panel setup
       typesWithoutCalculation = ['note', 'image', 'audio', 'video', 'file']
       calculationModel = @model.get('calculation')
@@ -862,6 +915,11 @@ module.exports = do ->
         @cardSettingsWrap.find('.js-calculation-tab').removeClass('calculation-tab--hidden')
         $calcPanel = $($viewTemplates.$$render('row.calculationPanel'))
         $calcPanel.appendTo(@cardSettingsWrap.find('.js-card-settings-calculation'))
+        # OC fork (P1.1): AI Generate button in the Calculation panel header.
+        generateButtonBridge.mountGenerateButton(
+          $calcPanel.find('.calculation-panel__header').get(0)
+          { row: @model, attribute: 'calculation' }
+        )
 
         $calcTextarea = $calcPanel.find('.js-calculation-input')
         currentCalcVal = calculationModel.get('value') or ''
@@ -883,6 +941,20 @@ module.exports = do ->
           if evt.key is 'Enter' or evt.keyCode is 13
             evt.preventDefault()
             $calcTextarea.blur()
+
+        # OC fork (P1.1): keep the visible field in sync when the AI dialog's
+        # Apply writes directly to the model — see matching comment above
+        # refreshDefaultInput for the full rationale (guarded write, listenTo
+        # + @stopListening() teardown in _cleanupExpandedRender).
+        refreshCalculationInput = ->
+          modelVal = calculationModel.get('value') or ''
+          if $calcTextarea.val() isnt modelVal
+            $calcTextarea.val(modelVal)
+            if modelVal
+              scrollHeight = $calcTextarea.prop('scrollHeight')
+              $calcTextarea.css('height', '')
+              $calcTextarea.css('height', scrollHeight)
+        @listenTo(calculationModel, 'change:value', refreshCalculationInput)
 
         if questionType is 'calculate'
           $calcTabError = @cardSettingsWrap.find('.js-calculation-tab-error')

@@ -28,6 +28,12 @@
 FROM node:20.19-bookworm-slim AS npm-install
 WORKDIR /srv/src/kpi
 
+# OC fork: git + CA certs so `npm clean-install` can fetch the private
+# @openclinica/logic-builder git dependency (the slim image ships neither).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # This is our non-root user 1000.
 RUN chown node:node .
 
@@ -53,8 +59,19 @@ COPY --chown=node:node --parents \
 # Run npm clean-install as non-root user,
 # and clean the cache for space.
 USER node
-RUN npm clean-install \
-    && npm cache clean --force
+# OC fork: authenticate the private @openclinica/logic-builder clone with a
+# BuildKit secret (Jenkins passes `--secret id=gh_token`). The token is written
+# only to a throwaway gitconfig deleted before this layer is committed, so it
+# never persists in the image; it rewrites the lockfile's git+ssh URL to
+# token-authenticated HTTPS. The final `test -d` fails the build if the real
+# package didn't install — so an image can never silently ship without it.
+RUN --mount=type=secret,id=gh_token,uid=1000 \
+    export GIT_CONFIG_GLOBAL=/tmp/gitconfig \
+    && git config --global url."https://x-access-token:$(cat /run/secrets/gh_token)@github.com/".insteadOf "ssh://git@github.com/" \
+    && npm clean-install \
+    && npm cache clean --force \
+    && rm -f /tmp/gitconfig \
+    && test -d node_modules/@openclinica/logic-builder/dist
 
 # Results in /srv/src/kpi/:
 #   All the sources copied above, plus the generated:

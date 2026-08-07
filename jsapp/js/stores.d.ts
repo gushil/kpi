@@ -28,9 +28,10 @@ export interface SurveyStateStore {
 
   /**
    * Reflux method: specific to the older createStore syntax.
-   * Allows components to listen to store updates.
+   * Allows components to listen to store updates. Returns an unsubscribe
+   * function (Reflux's listen contract) — call it to stop listening.
    */
-  listen(callback: (changes: any) => void): void
+  listen(callback: (changes: any) => void): () => void
 }
 
 export interface Stores {

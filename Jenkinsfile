@@ -43,15 +43,34 @@ pipeline {
                 DEBIAN_FRONTEND = 'noninteractive'
             }
             steps {
-                sh '''
-                    set -e
-                    apt-get update -qq
-                    apt-get install -y --no-install-recommends python3
-                    ln -sf /usr/bin/python3 /usr/bin/python
-                    rm -rf /var/lib/apt/lists/*
-                    npm ci --legacy-peer-deps --cache /tmp/.npm-cache
-                    npm run test:unit
-                '''
+                // OC fork: authenticate the private @openclinica/logic-builder clone.
+                // The credential is a Username-with-password (username + GitHub token),
+                // so bind it with usernamePassword — a string() binding fails with
+                // "is of type 'Username with password' where StringCredentials was
+                // expected". usernameVariable is a required parameter of the binding;
+                // GH_USER is intentionally unused (masked, stage-scoped) — the URL uses
+                // the fixed x-access-token username so an empty/misconfigured stored
+                // username can't break auth (GitHub ignores the username for PATs).
+                // Single-quoted sh body -> ${GH_TOKEN} expands in the shell from the
+                // masked credential env var, never in Groovy (so it isn't logged).
+                withCredentials([usernamePassword(credentialsId: 'jenkins-github-token-as-password', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
+                    sh '''
+                        set -e
+                        apt-get update -qq
+                        apt-get install -y --no-install-recommends python3 git
+                        ln -sf /usr/bin/python3 /usr/bin/python
+                        rm -rf /var/lib/apt/lists/*
+                        # Scope the token to a throwaway gitconfig (never the persistent
+                        # ~/.gitconfig, which can linger with reuseNode). GIT_CONFIG_GLOBAL
+                        # points git — and the git children npm spawns — at it; the trap
+                        # wipes it on exit, success or failure.
+                        export GIT_CONFIG_GLOBAL="$(mktemp)"
+                        trap 'rm -f "$GIT_CONFIG_GLOBAL"' EXIT
+                        git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+                        npm ci --legacy-peer-deps --cache /tmp/.npm-cache
+                        npm run test:unit
+                    '''
+                }
             }
         }
 
@@ -83,7 +102,18 @@ pipeline {
                         docker buildx create --name arm64builder --node arm64 --platform linux/aarch64
                         docker buildx inspect --bootstrap --builder arm64builder
                        """
-                    sh "docker buildx build --builder arm64builder --platform linux/aarch64 -t ${registry}:${tag_version} --push ."
+                    // OC fork: pass the GitHub token to BuildKit as a secret so the
+                    // Dockerfile's npm-install stage can clone the private
+                    // @openclinica/logic-builder (id must match the Dockerfile's
+                    // `--mount=type=secret,id=gh_token`). The credential is a
+                    // Username-with-password, so bind with usernamePassword and feed
+                    // only the password component (the token) to BuildKit; `env=GH_TOKEN`
+                    // reads the masked env var, so it never appears in the log.
+                    // usernameVariable is required by the binding — GH_USER is unused
+                    // here (the Dockerfile authenticates as x-access-token).
+                    withCredentials([usernamePassword(credentialsId: 'jenkins-github-token-as-password', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
+                        sh "docker buildx build --builder arm64builder --platform linux/aarch64 --secret id=gh_token,env=GH_TOKEN -t ${registry}:${tag_version} --push ."
+                    }
                   }
                 else {
                     sh "echo 'Skipping this step'" 

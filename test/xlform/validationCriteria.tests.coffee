@@ -294,3 +294,58 @@ do ->
     it 'creates an EmptyOperator for "empty" type', ->
       op = factory.create_operator('empty', null, 0)
       expect(op instanceof $skipLogic.EmptyOperator).toBe(true)
+
+  ###############################################################
+  # OC fork (PR#273 round-7): the hand-code helper must render INTO the panel's
+  # anchor (.skiplogic__main), not replaceWith() it — replacing detaches the
+  # node the constraint DetailView re-renders into on every change:value, so
+  # every later refresh lands in a detached subtree, and the hand-code input
+  # ends up outside the .skiplogic__main scope the post-Apply focus lookup uses.
+  ###############################################################
+  describe 'validationCriteria: ValidationLogicHandCodeHelper.render()', ->
+
+    $ = require('jquery')
+    $validationLogicHelpers = require('../../jsapp/xlform/src/mv.validationLogicHelpers')
+
+    makeWidget = ->
+      w = {}
+      w.render = -> w
+      w.attach_to = -> w
+      w.bind_event = -> w
+      w.val = -> ''
+      w
+    makeHelper = (criteria) ->
+      view_factory =
+        create_textarea: -> makeWidget()
+        create_button: -> makeWidget()
+        survey: { trigger: -> }
+      context =
+        helper_factory: { current_question: { cid: 'q1' } }
+        view_factory: { survey: { trigger: -> } }
+        use_mode_selector_helper: ->
+      new $validationLogicHelpers.ValidationLogicHandCodeHelper(criteria, null, view_factory, context)
+
+    it 'renders into the destination, keeping the anchor alive with the input inside it', ->
+      $container = $('<div class="skiplogic__main"></div>').appendTo(document.body)
+      makeHelper('. >= 18').render($container)
+      # The anchor must survive the render (change:value refreshes render into
+      # this same node)…
+      expect(document.body.contains($container.get(0))).toBe(true)
+      # …and the hand-code input must be INSIDE it, where the post-Apply focus
+      # selector (.skiplogic__main input) can find it.
+      expect($container.find('#q1-handcode').length).toBe(1)
+      $container.remove()
+      return
+
+    it 'supports the context render cycle: empty + re-render into the same anchor', ->
+      $container = $('<div class="skiplogic__main"></div>').appendTo(document.body)
+      makeHelper('. >= 18').render($container)
+      # The helper context empties the destination before each render (mode
+      # switches, change:value rebuilds) — a fresh helper must render into the
+      # SAME still-attached node.
+      $container.empty()
+      makeHelper('. < 5').render($container)
+      expect(document.body.contains($container.get(0))).toBe(true)
+      expect($container.find('#q1-handcode').val()).toBe('. < 5')
+      $container.remove()
+      return
