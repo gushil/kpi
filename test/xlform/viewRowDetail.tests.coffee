@@ -1113,6 +1113,7 @@ do ->
         $el: $el
         $: (sel) -> $el.find(sel)
         model: detail
+        listenTo: ->
         Templates: viewRowDetail.Templates
         rowView: { cardSettingsWrap: $cardSettingsWrap, model: row }
       })
