@@ -36,7 +36,9 @@ export function redirectToLogin() {
 
 export function getCurrentPath(): string {
   const route = location.hash.split('#')
-  return route.length > 1 ? route[1] : ''
+  // Strip query string so path comparisons (isMyLibraryRoute etc.) work correctly
+  // even when a query param (e.g. ?econsent=ACTIVE) is present in the hash.
+  return route.length > 1 ? route[1].split('?')[0] : ''
 }
 
 /**
