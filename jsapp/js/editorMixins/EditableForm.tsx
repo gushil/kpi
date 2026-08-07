@@ -55,10 +55,10 @@ import {
 } from '#/constants'
 import envStore from '#/envStore'
 import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
-import { makeBuilderInert } from '#/openclinica/builderInert'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
 import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
+import { useBuilderInert } from '#/openclinica/useBuilderInert'
 import pageState from '#/pageState.store'
 import type { RouterProp } from '#/router/legacy'
 import { ROUTES } from '#/router/routerConstants'
@@ -266,10 +266,11 @@ export default function EditableForm(props: EditableFormProps) {
   // inert the content INSIDE .form-builder__contents without inerting the
   // scroller itself (see the builder-inert effect + makeBuilderInert).
   const builderContentsInnerRef = useRef<HTMLDivElement>(null)
-  // OC fork (P1.1): ref on the whole builder so the AI dialog can make it inert
-  // (aside + header + form content), keeping Save / Preview / Manage Languages
-  // unclickable while it is open (PR#273 #10). The dialog portals to <body>, so
-  // it itself stays interactive.
+  // OC fork (P1.1): root the builder-inert effect resolves the aside/header
+  // from while the AI dialog is open (useBuilderInert). The wrapper itself is
+  // NEVER inerted — that would make the scroll container inside it unhittable
+  // and break AC2's "scrollable but inert". The dialog portals to <body>, so
+  // it stays interactive either way.
   const formBuilderWrapRef = useRef<HTMLDivElement>(null)
   const cascadeRef = useRef<HTMLTextAreaElement>(null)
 
@@ -490,15 +491,18 @@ export default function EditableForm(props: EditableFormProps) {
   // In practice unreachable: the Generate button is only mounted for mappable
   // columns (generateButtonBridge.mountGenerateButton).
   const generateRequest = state[GENERATE_REQUEST_KEY]
+  // One tab lookup shared by the dangling-request effect, the inert effect,
+  // and renderAiGeneratorDialog (review PR#286 — was recomputed per call site).
+  const generateTab = generateRequest?.attribute ? columnToTab(generateRequest.attribute) : undefined
   useEffect(() => {
-    if (generateRequest?.attribute && !columnToTab(generateRequest.attribute)) {
+    if (generateRequest?.attribute && !generateTab) {
       console.warn(
         'Logic Builder: no logic tab maps to the generate-request attribute; clearing it',
         generateRequest.attribute,
       )
       stores.surveyState.setState({ [GENERATE_REQUEST_KEY]: null })
     }
-  }, [generateRequest])
+  }, [generateRequest, generateTab])
 
   // OC fork (P1.1 AC2 "scrollable but inert", design §5.4): while the AI
   // Generator dialog is open, inert the builder's interactive regions — the
@@ -507,25 +511,16 @@ export default function EditableForm(props: EditableFormProps) {
   // approach, via the package's inertRoot) made hit-testing skip the scroller
   // too, so wheel events never reached it and the form stopped scrolling.
   // Owned by the host because the inert boundary is host-DOM-specific.
-  const generateDialogOpen = Boolean(
-    generateRequest?.row && generateRequest?.attribute && columnToTab(generateRequest.attribute),
-  )
-  useEffect(() => {
-    if (!generateDialogOpen) {
-      return
-    }
-    return makeBuilderInert(formBuilderWrapRef.current, builderContentsInnerRef.current)
-  }, [generateDialogOpen])
+  const generateDialogOpen = Boolean(generateRequest?.row && generateTab)
+  useBuilderInert(generateDialogOpen, formBuilderWrapRef, builderContentsInnerRef)
 
   function renderAiGeneratorDialog() {
-    const request = state[GENERATE_REQUEST_KEY]
-    if (!request?.row || !request?.attribute) {
-      return null
-    }
-    const tab = columnToTab(request.attribute)
-    if (!tab) {
-      // No dialog for an unmappable attribute; the effect above clears the
-      // dangling request + logs (PR#273 #2). Can't reset state during render.
+    const request = generateRequest
+    const tab = generateTab
+    if (!request?.row || !tab) {
+      // No dialog without a row, and none for an unmappable attribute — the
+      // dangling-request effect above clears + logs the latter (PR#273 #2).
+      // Can't reset state during render.
       return null
     }
     let currentExpression = ''

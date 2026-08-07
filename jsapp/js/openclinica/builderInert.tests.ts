@@ -65,6 +65,16 @@ describe('makeBuilderInert (P1.1 AC2 — scrollable but inert)', () => {
     }
   })
 
+  it('does not remove a pre-existing inert attribute on restore (review PR#286)', () => {
+    // If something else already inerted a region (e.g. another overlay), our
+    // restore must put back the state we found, not clear it.
+    const { wrapper, inner, aside } = buildDom()
+    aside?.setAttribute('inert', '')
+    const restore = makeBuilderInert(wrapper, inner)
+    restore()
+    chai.expect(aside?.hasAttribute('inert')).to.equal(true)
+  })
+
   it('preserves a pre-existing aria-hidden value across apply/restore', () => {
     const { wrapper, inner, aside } = buildDom()
     aside?.setAttribute('aria-hidden', 'false')
@@ -78,6 +88,14 @@ describe('makeBuilderInert (P1.1 AC2 — scrollable but inert)', () => {
     const { wrapper, header, inner } = buildDom({ aside: false })
     makeBuilderInert(wrapper, inner)
     chai.expect(header.hasAttribute('inert')).to.equal(true)
+    chai.expect(inner.hasAttribute('inert')).to.equal(true)
+  })
+
+  it('tolerates a missing header (not rendered) and still inerts the rest (review PR#286)', () => {
+    const { wrapper, inner, aside } = buildDom()
+    wrapper.querySelector('.form-builder-header')?.remove()
+    makeBuilderInert(wrapper, inner)
+    chai.expect(aside?.hasAttribute('inert')).to.equal(true)
     chai.expect(inner.hasAttribute('inert')).to.equal(true)
   })
 
