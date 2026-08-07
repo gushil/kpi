@@ -28,9 +28,23 @@ interface AttrSnapshot {
  * element's prior attribute state; both directions tolerate nulls.
  */
 export function makeBuilderInert(wrapper: HTMLElement | null, contentsInner: HTMLElement | null): () => void {
+  const resolve = (selector: string): HTMLElement | null => {
+    if (!wrapper) {
+      return null
+    }
+    const el = wrapper.querySelector<HTMLElement>(selector)
+    if (!el) {
+      // The aside/header are resolved by class name; if one is missing while
+      // the wrapper exists, inert silently covers less and the form behind the
+      // dialog becomes editable — leave a trace rather than fail open silently
+      // (same rationale as mountGenerateButton's missing-anchor warning).
+      console.warn('Logic Builder: builder-inert region not found; the dialog backdrop may stay interactive', selector)
+    }
+    return el
+  }
   const targets: (HTMLElement | null)[] = [
-    wrapper?.querySelector<HTMLElement>('.form-builder-aside') ?? null,
-    wrapper?.querySelector<HTMLElement>('.form-builder-header') ?? null,
+    resolve('.form-builder-aside'),
+    resolve('.form-builder-header'),
     contentsInner,
   ]
   const snapshots: AttrSnapshot[] = []

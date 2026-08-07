@@ -85,18 +85,42 @@ describe('makeBuilderInert (P1.1 AC2 — scrollable but inert)', () => {
   })
 
   it('tolerates a missing aside (not rendered) and still inerts the rest', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
     const { wrapper, header, inner } = buildDom({ aside: false })
     makeBuilderInert(wrapper, inner)
     chai.expect(header.hasAttribute('inert')).to.equal(true)
     chai.expect(inner.hasAttribute('inert')).to.equal(true)
+    warnSpy.mockRestore()
+  })
+
+  it('warns when an expected region is missing, so a renamed class cannot fail open silently (subagent review)', () => {
+    // The aside/header are resolved by class name; if those classes are ever
+    // renamed, inert would silently cover less and the form behind the dialog
+    // would become editable. A console.warn leaves a trace (same rationale as
+    // mountGenerateButton's missing-anchor warning).
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const { wrapper, inner } = buildDom({ aside: false })
+    makeBuilderInert(wrapper, inner)
+    chai.expect(warnSpy.mock.calls.length).to.equal(1)
+    chai.expect(warnSpy.mock.calls[0].join(' ')).to.match(/form-builder-aside/)
+    warnSpy.mockRestore()
+  })
+
+  it('does not warn when the wrapper itself is absent (legitimate pre-mount no-op)', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    makeBuilderInert(null, null)
+    chai.expect(warnSpy.mock.calls.length).to.equal(0)
+    warnSpy.mockRestore()
   })
 
   it('tolerates a missing header (not rendered) and still inerts the rest (review PR#286)', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
     const { wrapper, inner, aside } = buildDom()
     wrapper.querySelector('.form-builder-header')?.remove()
     makeBuilderInert(wrapper, inner)
     chai.expect(aside?.hasAttribute('inert')).to.equal(true)
     chai.expect(inner.hasAttribute('inert')).to.equal(true)
+    warnSpy.mockRestore()
   })
 
   it('is a safe no-op for null inputs', () => {
