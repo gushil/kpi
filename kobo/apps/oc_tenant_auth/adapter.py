@@ -8,6 +8,7 @@ from allauth.core.exceptions import ImmediateHttpResponse
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.core.cache import cache
+from django.db import transaction
 from django.http import HttpResponseForbidden
 
 from .backend import get_realm_name, get_client_secret
@@ -104,7 +105,17 @@ def sync_login_state(request, user, sociallogin):
     """
     Refreshes session/role/user_type on every login — save_user() only
     runs on signup, so relying on it there staled these values (OC-28410).
+
+    Catches and logs failures instead of raising, since user_logged_in
+    propagates exceptions synchronously and could otherwise block login.
     """
+    try:
+        _sync_login_state(request, user, sociallogin)
+    except Exception as exc:
+        LOGGER.error('sync_login_state failed for user %s: %s', user.pk, exc)
+
+
+def _sync_login_state(request, user, sociallogin):
     subdomain = get_subdomain(request)
     extra_data = sociallogin.account.extra_data
     uid = sociallogin.account.uid
@@ -122,9 +133,6 @@ def sync_login_state(request, user, sociallogin):
             token_user_context = token_payload.get(USER_CONTEXT_CLAIM) or {}
         except Exception as exc:
             LOGGER.warning('Failed to decode access_token: %s', exc)
-    user.is_staff = 'admin' in roles or 'superuser' in roles
-    user.is_superuser = 'superuser' in roles
-    user.save(update_fields=['is_staff', 'is_superuser'])
 
     # Populate OC session values from access token
     if access_token and request:
@@ -138,11 +146,18 @@ def sync_login_state(request, user, sociallogin):
 
     user_type = _get_user_context(extra_data).get('userType', '')
 
-    KeycloakTenantUser.objects.update_or_create(
-        UID=uid,
-        subdomain=subdomain,
-        defaults={'user': user, 'user_type': user_type},
-    )
+    # Same transaction: a crash between these two writes must not leave
+    # is_staff/is_superuser updated but user_type stale, or vice versa.
+    with transaction.atomic():
+        user.is_staff = 'admin' in roles or 'superuser' in roles
+        user.is_superuser = 'superuser' in roles
+        user.save(update_fields=['is_staff', 'is_superuser'])
+
+        KeycloakTenantUser.objects.update_or_create(
+            UID=uid,
+            subdomain=subdomain,
+            defaults={'user': user, 'user_type': user_type},
+        )
 
 
 class TenantAwareSocialAccountAdapter(DefaultSocialAccountAdapter):

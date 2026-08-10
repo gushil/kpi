@@ -126,3 +126,16 @@ class SyncLoginStateTestCase(TestCase):
         sync_login_state(self.request, self.user, self.sociallogin)
 
         self.assertNotIn('oc_customer_shared_infra', self.request.session)
+
+    def test_swallows_unexpected_failure_instead_of_raising(
+        self, mock_get, mock_subdomain
+    ):
+        # A crash here must not propagate: user_logged_in.send() would
+        # otherwise block login for every existing user, not just this one.
+        self._mock_customer_response(mock_get, True)
+        with patch(
+            'kobo.apps.oc_tenant_auth.adapter.KeycloakTenantUser.objects.'
+            'update_or_create',
+            side_effect=Exception('boom'),
+        ):
+            sync_login_state(self.request, self.user, self.sociallogin)
