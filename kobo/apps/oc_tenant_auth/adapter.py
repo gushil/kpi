@@ -51,6 +51,100 @@ def _extra_data_claim(extra_data, key):
     return extra_data.get(key) or extra_data.get('userinfo', {}).get(key)
 
 
+USER_CONTEXT_CLAIM = 'https://www.openclinica.com/userContext'
+
+
+def _get_user_context(extra_data):
+    return _extra_data_claim(extra_data, USER_CONTEXT_CLAIM) or {}
+
+
+def _store_user_info(request, user_uuid):
+    """Store oc_user_uuid in session."""
+    if not user_uuid:
+        LOGGER.error('Empty userUuid received from access_token')
+        return
+    request.session['oc_user_uuid'] = user_uuid
+
+
+def _store_customer_info(request, access_token, customer_uuid):
+    """Store oc_customer_name and oc_customer_shared_infra from Customer API."""
+    if not customer_uuid:
+        LOGGER.error('Empty customerUuid received from access_token')
+        return
+
+    key = f'oc:customer_info:{customer_uuid}'
+    data = cache.get(key)
+    if data is None:
+        customer_url = (
+            f'{settings.OC_BUILD_URL}/customer-service'
+            f'/api/customers/{customer_uuid}'
+        )
+        headers = {'Authorization': f'Bearer {access_token}'}
+        try:
+            response = requests.get(customer_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            raw = response.json()
+            data = {
+                'name': raw.get('name'),
+                'sharedInfra': raw.get('sharedInfra', False),
+            }
+            cache.set(key, data, _CACHE_TTL)
+        except Exception as exc:
+            LOGGER.error(
+                'Failed to retrieve customer info for customerUuid %s: %s',
+                customer_uuid, exc,
+            )
+            return
+
+    request.session['oc_customer_name'] = data['name']
+    request.session['oc_customer_shared_infra'] = data['sharedInfra']
+
+
+def sync_login_state(request, user, sociallogin):
+    """
+    Refreshes session/role/user_type on every login — save_user() only
+    runs on signup, so relying on it there staled these values (OC-28410).
+    """
+    subdomain = get_subdomain(request)
+    extra_data = sociallogin.account.extra_data
+    uid = sociallogin.account.uid
+    access_token = sociallogin.token.token if sociallogin.token else None
+
+    # Sync Keycloak roles → Django is_staff / is_superuser
+    from .backend import get_roles
+
+    roles = []
+    token_user_context = {}
+    if access_token:
+        try:
+            token_payload = _decode_jwt_payload(access_token)
+            roles = get_roles(token_payload)
+            token_user_context = token_payload.get(USER_CONTEXT_CLAIM) or {}
+        except Exception as exc:
+            LOGGER.warning('Failed to decode access_token: %s', exc)
+    user.is_staff = 'admin' in roles or 'superuser' in roles
+    user.is_superuser = 'superuser' in roles
+    user.save(update_fields=['is_staff', 'is_superuser'])
+
+    # Populate OC session values from access token
+    if access_token and request:
+        _store_user_info(request, token_user_context.get('userUuid'))
+        _store_customer_info(
+            request, access_token, token_user_context.get('customerUuid')
+        )
+        request.session['oc_access_token'] = access_token
+        request.session['oc_token_validated_at'] = time.time()
+        request.session['oc_fd_base_username'] = user.username.rsplit('+', 1)[0]
+
+    user_type = _get_user_context(extra_data).get('userType', '')
+
+    KeycloakTenantUser.objects.update_or_create(
+        UID=uid,
+        subdomain=subdomain,
+        defaults={'user': user, 'user_type': user_type},
+    )
+
+
 class TenantAwareSocialAccountAdapter(DefaultSocialAccountAdapter):
     """
     allauth SocialAccountAdapter for OpenClinica multi-tenant Keycloak OIDC.
@@ -166,97 +260,3 @@ class TenantAwareSocialAccountAdapter(DefaultSocialAccountAdapter):
             ea for ea in sociallogin.email_addresses
             if ea.email not in existing
         ]
-
-
-USER_CONTEXT_CLAIM = 'https://www.openclinica.com/userContext'
-
-
-def _get_user_context(extra_data):
-    return _extra_data_claim(extra_data, USER_CONTEXT_CLAIM) or {}
-
-
-def _store_user_info(request, user_uuid):
-    """Store oc_user_uuid in session."""
-    if not user_uuid:
-        LOGGER.error('Empty userUuid received from access_token')
-        return
-    request.session['oc_user_uuid'] = user_uuid
-
-
-def _store_customer_info(request, access_token, customer_uuid):
-    """Store oc_customer_name and oc_customer_shared_infra from Customer API."""
-    if not customer_uuid:
-        LOGGER.error('Empty customerUuid received from access_token')
-        return
-
-    key = f'oc:customer_info:{customer_uuid}'
-    data = cache.get(key)
-    if data is None:
-        customer_url = (
-            f'{settings.OC_BUILD_URL}/customer-service'
-            f'/api/customers/{customer_uuid}'
-        )
-        headers = {'Authorization': f'Bearer {access_token}'}
-        try:
-            response = requests.get(customer_url, headers=headers, timeout=10)
-            response.raise_for_status()
-            raw = response.json()
-            data = {
-                'name': raw.get('name'),
-                'sharedInfra': raw.get('sharedInfra', False),
-            }
-            cache.set(key, data, _CACHE_TTL)
-        except Exception as exc:
-            LOGGER.error(
-                'Failed to retrieve customer info for customerUuid %s: %s',
-                customer_uuid, exc,
-            )
-            return
-
-    request.session['oc_customer_name'] = data['name']
-    request.session['oc_customer_shared_infra'] = data['sharedInfra']
-
-
-def sync_login_state(request, user, sociallogin):
-    """
-    Refreshes session/role/user_type on every login — save_user() only
-    runs on signup, so relying on it there staled these values (OC-28410).
-    """
-    subdomain = get_subdomain(request)
-    extra_data = sociallogin.account.extra_data
-    uid = sociallogin.account.uid
-    access_token = sociallogin.token.token if sociallogin.token else None
-
-    # Sync Keycloak roles → Django is_staff / is_superuser
-    from .backend import get_roles
-
-    roles = []
-    token_user_context = {}
-    if access_token:
-        try:
-            token_payload = _decode_jwt_payload(access_token)
-            roles = get_roles(token_payload)
-            token_user_context = token_payload.get(USER_CONTEXT_CLAIM) or {}
-        except Exception as exc:
-            LOGGER.warning('Failed to decode access_token: %s', exc)
-    user.is_staff = 'admin' in roles or 'superuser' in roles
-    user.is_superuser = 'superuser' in roles
-    user.save(update_fields=['is_staff', 'is_superuser'])
-
-    # Populate OC session values from access token
-    if access_token and request:
-        _store_user_info(request, token_user_context.get('userUuid'))
-        _store_customer_info(
-            request, access_token, token_user_context.get('customerUuid')
-        )
-        request.session['oc_access_token'] = access_token
-        request.session['oc_token_validated_at'] = time.time()
-        request.session['oc_fd_base_username'] = user.username.rsplit('+', 1)[0]
-
-    user_type = _get_user_context(extra_data).get('userType', '')
-
-    KeycloakTenantUser.objects.update_or_create(
-        UID=uid,
-        subdomain=subdomain,
-        defaults={'user': user, 'user_type': user_type},
-    )
