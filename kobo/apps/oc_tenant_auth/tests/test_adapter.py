@@ -139,3 +139,27 @@ class SyncLoginStateTestCase(TestCase):
             side_effect=Exception('boom'),
         ):
             sync_login_state(self.request, self.user, self.sociallogin)
+
+    def test_customer_service_request_failure_does_not_raise(
+        self, mock_get, mock_subdomain
+    ):
+        mock_get.side_effect = ConnectionError('customer-service unreachable')
+
+        sync_login_state(self.request, self.user, self.sociallogin)
+
+        self.assertNotIn('oc_customer_shared_infra', self.request.session)
+        kc_user = KeycloakTenantUser.objects.get(UID='kc-uid-1')
+        self.assertEqual(kc_user.user_type, 'Business Admin')
+
+    def test_demotes_stale_admin_role_on_next_login(self, mock_get, mock_subdomain):
+        self._mock_customer_response(mock_get, True)
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save()
+
+        # realm_access.roles is [] in setUp — Keycloak no longer grants admin.
+        sync_login_state(self.request, self.user, self.sociallogin)
+
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_staff)
+        self.assertFalse(self.user.is_superuser)
