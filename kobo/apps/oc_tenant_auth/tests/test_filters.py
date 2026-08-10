@@ -1,6 +1,7 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, TestCase
 from model_bakery import baker
 from rest_framework.request import Request
@@ -66,3 +67,42 @@ class SubdomainAwareObjectPermissionsFilterTestCase(TestCase):
             self.request, Asset.objects.all(), self.view
         )
         self.assertNotIn(other_survey, qs)
+
+    def test_anonymous_user_returns_standard_queryset_unchanged(self):
+        django_request = RequestFactory().get('/')
+        django_request.user = AnonymousUser()
+        request = Request(django_request)
+        request.user = AnonymousUser()
+
+        sentinel_queryset = MagicMock()
+        filter_backend = SubdomainAwareObjectPermissionsFilter()
+        with patch(
+            'kobo.apps.oc_tenant_auth.filters.KpiObjectPermissionsFilter.'
+            'filter_queryset',
+            return_value=sentinel_queryset,
+        ):
+            result = filter_backend.filter_queryset(
+                request, Asset.objects.all(), self.view
+            )
+
+        self.assertIs(result, sentinel_queryset)
+
+    def test_user_without_keycloak_record_returns_standard_queryset_unchanged(self):
+        user_without_keycloak = baker.make(settings.AUTH_USER_MODEL)
+        django_request = RequestFactory().get('/')
+        django_request.user = user_without_keycloak
+        request = Request(django_request)
+        request.user = user_without_keycloak
+
+        sentinel_queryset = MagicMock()
+        filter_backend = SubdomainAwareObjectPermissionsFilter()
+        with patch(
+            'kobo.apps.oc_tenant_auth.filters.KpiObjectPermissionsFilter.'
+            'filter_queryset',
+            return_value=sentinel_queryset,
+        ):
+            result = filter_backend.filter_queryset(
+                request, Asset.objects.all(), self.view
+            )
+
+        self.assertIs(result, sentinel_queryset)

@@ -70,3 +70,19 @@ class SubdomainAwareAssetSnapshotPermissionTestCase(TestCase):
         self.assertTrue(
             self.permission.has_object_permission(self.request, self.view, self.obj)
         )
+
+    @patch(
+        'kpi.permissions.AssetSnapshotPermission.has_object_permission',
+        return_value=False,
+    )
+    @patch(
+        'kobo.apps.oc_tenant_auth.permissions.is_owner_in_subdomain',
+        return_value=False,
+    )
+    def test_falls_back_to_standard_check_for_different_subdomain(
+        self, mock_subdomain, mock_super
+    ):
+        self.assertFalse(
+            self.permission.has_object_permission(self.request, self.view, self.obj)
+        )
+        mock_super.assert_called_once()
