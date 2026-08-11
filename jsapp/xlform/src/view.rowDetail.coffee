@@ -1145,6 +1145,7 @@ module.exports = do ->
       audio:           audio
       video:           video
       group:           group
+      repeat:          group
       text:            text
       file:            file
       note:            note
