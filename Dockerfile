@@ -262,6 +262,15 @@ COPY . "${KPI_SRC_DIR}"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 COPY --from=pip-dependencies "$VIRTUAL_ENV" "$VIRTUAL_ENV"
 
+# OC fork (OC-28277): carry the sync marker over too. docker/entrypoint.sh
+# re-runs `uv pip sync` at startup whenever this file differs from
+# requirements.txt, and an ABSENT marker counts as differing — which would
+# uninstall oc-logic-builder-server (deliberately not in requirements.txt) on
+# every container start and silently 404 the AI endpoint. Both copies come from
+# the same build context, so they match and the startup sync is skipped, which
+# is what upstream's marker was for.
+COPY --from=pip-dependencies "${TMP_DIR}/pip_dependencies.txt" "${TMP_DIR}/pip_dependencies.txt"
+
 # Copy static production build from 'webpack-build-prod'.
 COPY --from=webpack-build-prod --parents \
     ${KPI_SRC_DIR}/./jsapp/compiled/     \
