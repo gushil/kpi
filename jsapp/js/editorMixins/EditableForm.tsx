@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Text } from '@mantine/core'
 // OC fork (P1.1): AI Generator dialog + Logic Builder wiring.
-import { AiGeneratorDialog, type FormField, type FormFieldContext } from '@openclinica/logic-builder'
+import { AiGeneratorDialog } from '@openclinica/logic-builder'
 import alertify from 'alertifyjs'
 import cx from 'classnames'
 import clonedeep from 'lodash.clonedeep'
@@ -56,6 +56,7 @@ import {
 import envStore from '#/envStore'
 import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
+import { buildFieldContext } from '#/openclinica/logicBuilderContext'
 import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 import { useBuilderInert } from '#/openclinica/useBuilderInert'
@@ -179,57 +180,6 @@ interface EditableFormState extends SurveyStateStoreData {
   surveyAppRendered: boolean
   surveyLoadError: string | undefined
   surveySaveFail: boolean
-}
-
-/**
- * OC fork (P1.1): best-effort read of the survey's fields to give the AI
- * Generator dialog some context. The STUB client ignores it, so any failure
- * here is non-fatal — we fall back to an empty field list.
- */
-function buildFieldContext(row: any): FormFieldContext {
-  try {
-    const survey = row?.getSurvey?.()
-    if (!survey?.forEachRow) {
-      return { fields: [] }
-    }
-    // Mutable local we build up, then hand off as the readonly context field.
-    const fields: FormField[] = []
-    survey.forEachRow(
-      (r: any) => {
-        let name = ''
-        try {
-          name = r.getValue('name') || ''
-        } catch (e) {
-          console.warn('Logic Builder: failed to read a field name for AI context', e)
-          name = ''
-        }
-        if (!name) {
-          return
-        }
-        let type = ''
-        try {
-          type = String(r.getValue('type') || '')
-        } catch (e) {
-          console.warn('Logic Builder: failed to read a field type for AI context', e)
-          type = ''
-        }
-        let label = ''
-        try {
-          const rawLabel = r.getValue('label')
-          label = Array.isArray(rawLabel) ? String(rawLabel[0] ?? '') : String(rawLabel ?? '')
-        } catch (e) {
-          console.warn('Logic Builder: failed to read a field label for AI context', e)
-          label = ''
-        }
-        fields.push({ name, type, label })
-      },
-      { includeGroups: false },
-    )
-    return { fields }
-  } catch (e) {
-    console.warn('Logic Builder: failed to build field context; using empty list', e)
-    return { fields: [] }
-  }
 }
 
 /**
