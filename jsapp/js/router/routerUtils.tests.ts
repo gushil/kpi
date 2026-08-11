@@ -1,5 +1,11 @@
 import chai from 'chai'
-import { getCurrentPath, getCurrentRoutePath, getLoginUrl, isMyLibraryRoute, isPublicCollectionsRoute } from './routerUtils'
+import {
+  getCurrentPath,
+  getCurrentRoutePath,
+  getLoginUrl,
+  isMyLibraryRoute,
+  isPublicCollectionsRoute,
+} from './routerUtils'
 
 function setHash(hash: string) {
   Object.defineProperty(window, 'location', {
