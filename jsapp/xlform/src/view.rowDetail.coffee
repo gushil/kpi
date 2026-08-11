@@ -42,7 +42,7 @@ module.exports = do ->
       return { card: 'custom', columnCount: null, customText: cleaned }
 
     # Group-specific card grid (no Custom card; unknown values default to standard-group)
-    if questionType is 'group'
+    if questionType in ['group', 'repeat']
       if cleaned is 'table-list'
         return { card: 'table-list', columnCount: null, customText: null }
       if cleaned is 'field-list'
@@ -1220,7 +1220,7 @@ module.exports = do ->
 
   viewRowDetail.DetailViewMixins.appearance =
     isCardGridType: ->
-      @model_type() in ['select_one', 'select_multiple', 'date', 'note', 'file', 'text', 'audio', 'video', 'group']
+      @model_type() in ['select_one', 'select_multiple', 'date', 'note', 'file', 'text', 'audio', 'video', 'group', 'repeat']
 
     getTypes: ->
       types =
@@ -1334,7 +1334,7 @@ module.exports = do ->
         # Switching TO grid — render the sections.
         # Use get_width_token_from_model_value (not get_width_from_model_value) to
         # preserve out-of-range tokens like w14 from migrated 3.x forms (OC-28306).
-        if questionType is 'group'
+        if questionType in ['group', 'repeat']
           @_afterRenderGroupCols(@get_width_token_from_model_value())
         else
           @_afterRenderWidth()
@@ -1342,7 +1342,7 @@ module.exports = do ->
         # Switching AWAY from grid — remove the sections immediately.
         # Selectors below must stay in sync with those used by _afterRenderGroupCols
         # and _afterRenderWidth; if either changes its wrapper class, update here too.
-        if questionType is 'group'
+        if questionType in ['group', 'repeat']
           @rowView.cardSettingsWrap.find('.js-group-cols-wrap').remove()
         else
           @rowView.cardSettingsWrap.find('.js-item-width-wrap').remove()
@@ -1381,7 +1381,7 @@ module.exports = do ->
           </div>
         """
       gridClass = 'card__settings__appearance-grid'
-      gridClass += ' card__settings__appearance-grid--group' if questionType is 'group'
+      gridClass += ' card__settings__appearance-grid--group' if questionType in ['group', 'repeat']
       @$el.append($('<div/>', { class: gridClass }).html(cardHtml))
 
       # Render secondary control for initial state
@@ -1405,7 +1405,7 @@ module.exports = do ->
           selectCard(evt.currentTarget)
 
       # For groups: Columns in Grid as own section after Appearance; for non-groups: item width picker
-      if questionType is 'group'
+      if questionType in ['group', 'repeat']
         @_afterRenderGroupCols(@get_width_token_from_model_value())
       else
         @_afterRenderWidth()
