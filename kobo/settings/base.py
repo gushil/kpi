@@ -103,6 +103,11 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 ENKETO_CSRF_COOKIE_NAME = env.str('ENKETO_CSRF_COOKIE_NAME', '__csrf')
 
+# OC fork (OC-28277): Anthropic key for the Logic Builder AI endpoint (which
+# ships in the private oc-logic-builder-server package). Empty = AI off; the
+# endpoint answers 503 and Form Designer degrades to hand-authoring.
+ANTHROPIC_API_KEY = env.str('ANTHROPIC_API_KEY', '')
+
 # Instances of this model will be treated as allowed origins; see
 # https://github.com/ottoyiu/django-cors-headers#cors_model
 CORS_ALLOWED_DOMAINS = ALLOWED_DOMAINS
