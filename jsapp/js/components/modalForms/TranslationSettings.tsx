@@ -20,6 +20,7 @@ import { type LangObject, escapeHtml, getLangString, notify } from '#/utils'
 
 interface TranslationSettingsProps {
   asset: AssetResponse
+  hasUnsavedChanges?: boolean
 }
 
 interface TranslationSettingsState {
@@ -300,6 +301,16 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
     )
   }
 
+  renderSaveDraftMessage() {
+    return (
+      <bem.FormModal m='translation-settings'>
+        <bem.FormModal__item>
+          <bem.FormView__cell>{t('You must save this draft before you can manage languages.')}</bem.FormView__cell>
+        </bem.FormModal__item>
+      </bem.FormModal>
+    )
+  }
+
   renderUndefinedDefaultSettings() {
     return (
       <bem.FormModal m='translation-settings'>
@@ -465,7 +476,7 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
 
     const translations = this.state.translations
     if (!translations || translations?.length === 0) {
-      return this.renderEmptyMessage()
+      return this.props.hasUnsavedChanges ? this.renderSaveDraftMessage() : this.renderEmptyMessage()
     } else if (translations?.length === 1 && translations[0] === null) {
       // use this modal if there are only unnamed translations
       return this.renderUndefinedDefaultSettings()
