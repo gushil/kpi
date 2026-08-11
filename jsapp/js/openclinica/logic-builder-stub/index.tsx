@@ -12,7 +12,8 @@
  * Local dev and the Jenkins/production image install the REAL package and never
  * see this stub (the Dockerfile hard-fails if the real one is missing). The
  * exported TYPES mirror the package's public surface faithfully so kpi's code is
- * still type-checked in CI; the two components are inert (never rendered in CI).
+ * still type-checked in CI; the runtime exports are inert — the two components
+ * never render and the generate client never reaches the network.
  * Keep in sync with the pinned logic-builder version.
  */
 import type { RefObject } from 'react'
@@ -35,12 +36,20 @@ export interface FormFieldContext {
   readonly fields: readonly FormField[]
 }
 
+export interface ItemDefinition {
+  readonly name: string
+  readonly type: string
+  readonly label: string
+  readonly choices?: readonly FormFieldChoice[]
+  readonly logic: Readonly<Record<ExpressionTab, string>>
+}
+
 export interface GenerationRequest {
   readonly prompt: string
   readonly attribute: ExpressionTab
   readonly targetFieldName: string
   readonly fields: FormFieldContext
-  readonly currentExpression: string
+  readonly item: ItemDefinition
 }
 
 export interface GenerationSuccess {
@@ -85,7 +94,7 @@ export interface AiGeneratorDialogProps {
     readonly itemName: string
     readonly attribute: ExpressionTab
     readonly fields: FormFieldContext
-    readonly currentExpression: string
+    readonly item: ItemDefinition
   }
   readonly client: GenerateClient
   readonly inertRoot?: RefObject<HTMLElement> | HTMLElement | null
@@ -96,4 +105,17 @@ export interface AiGeneratorDialogProps {
 
 export function AiGeneratorDialog(_props: AiGeneratorDialogProps): JSX.Element | null {
   return null
+}
+
+export interface HttpGenerateClientOptions {
+  readonly url: string
+  readonly getCsrfToken?: () => string | null
+  readonly fetchImpl?: typeof fetch
+}
+
+// Inert stand-in — CI never calls the network; the real package supplies the client.
+export function createHttpGenerateClient(_options: HttpGenerateClientOptions): GenerateClient {
+  return {
+    generate: async () => ({ kind: 'failure', error: '' }),
+  }
 }
