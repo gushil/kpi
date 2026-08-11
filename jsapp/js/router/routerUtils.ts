@@ -40,6 +40,17 @@ export function getCurrentPath(): string {
 }
 
 /**
+ * Like `getCurrentPath()` but strips the hash query string.
+ * Use this for exact route equality checks (e.g. isMyLibraryRoute) where a
+ * query param such as `?search=...` must not prevent a match.
+ * Do NOT use this for getLoginUrl() — the full path including query params must
+ * be preserved in the `next=` redirect so params like `econsent` survive login.
+ */
+export function getCurrentRoutePath(): string {
+  return getCurrentPath().split('?')[0]
+}
+
+/**
  * Redirects to `getLoginUrl()` if a page that requires authentication
  * is navigated to
  */
@@ -68,11 +79,11 @@ export function isLibraryRoute(): boolean {
 }
 
 export function isMyLibraryRoute(): boolean {
-  return getCurrentPath() === ROUTES.MY_LIBRARY
+  return getCurrentRoutePath() === ROUTES.MY_LIBRARY
 }
 
 export function isPublicCollectionsRoute(): boolean {
-  return getCurrentPath() === ROUTES.PUBLIC_COLLECTIONS
+  return getCurrentRoutePath() === ROUTES.PUBLIC_COLLECTIONS
 }
 
 export function isNewLibraryItemRoute(): boolean {
