@@ -1500,6 +1500,15 @@ module.exports = do ->
         # range is never reflected there — fall back to whatever token is
         # still on the model so it isn't destroyed on an unrelated edit.
         width_val ?= getWidthTokenFromModelValue(@model.get('value') or '')
+        # "Custom" has no keyword the grid theme can infer a default width
+        # from (unlike the built-in cards, e.g. "table-list" or "multiline"),
+        # so if the item width was never explicitly touched (no "wN" token
+        # anywhere yet), make the effective default width explicit instead of
+        # silently dropping it — otherwise it's lost entirely on export.
+        # See OC-28401.
+        if not width_val? and @_card is 'custom'
+          groupCols = getParentGroupCols(@)
+          width_val = if groupCols is 4 then 'w4' else "w#{groupCols}"
         if width_val
           value = if value then "#{value} #{width_val}" else width_val
       @model.set 'value', value
