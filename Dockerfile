@@ -149,6 +149,22 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 COPY ./dependencies/pip/requirements.txt "${TMP_DIR}/pip_dependencies.txt"
 RUN uv pip sync "${TMP_DIR}/pip_dependencies.txt" 1>/dev/null
 
+# OC fork (OC-28277): install the PRIVATE oc-logic-builder-server package (the
+# AI generate-expression endpoint: prompt assembly + Anthropic call). Same
+# BuildKit secret as the npm stage; the token is read from the mount and never
+# lands in a layer. --no-deps is safe ONLY because the `uv pip sync` above has
+# already installed its one runtime dep, requests.
+# The import check is load-bearing: a package that installs but cannot import is
+# a BOOT failure, not a missing feature. router_api_v2 calls find_spec on the
+# .django submodule, which imports the parent package, whose own chain reaches
+# `import requests` — and that raise happens at URLconf import time, killing
+# every request. Fail the build here instead. Pinned by git sha, not dist version.
+ARG LOGIC_BUILDER_SERVER_REF=REPLACE_WITH_MERGED_SHA
+RUN --mount=type=secret,id=gh_token \
+    uv pip install --no-deps \
+      "oc-logic-builder-server @ https://x-access-token:$(cat /run/secrets/gh_token)@github.com/OpenClinica/logic-builder/archive/${LOGIC_BUILDER_SERVER_REF}.tar.gz#subdirectory=server" \
+    && python -c "import oc_logic_builder_server"
+
 RUN rm -rf ${VIRTUAL_ENV}/lib/python*/site-packages/rest_framework/static/rest_framework
 
 #####################################
