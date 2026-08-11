@@ -56,8 +56,8 @@ import {
 import envStore from '#/envStore'
 import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
-import { buildFieldContext } from '#/openclinica/logicBuilderContext'
-import { logicBuilderStubClient } from '#/openclinica/logicBuilderStubClient'
+import { logicBuilderClient } from '#/openclinica/logicBuilderClient'
+import { buildFieldContext, buildItemDefinition } from '#/openclinica/logicBuilderContext'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 import { useBuilderInert } from '#/openclinica/useBuilderInert'
 import pageState from '#/pageState.store'
@@ -473,13 +473,6 @@ export default function EditableForm(props: EditableFormProps) {
       // Can't reset state during render.
       return null
     }
-    let currentExpression = ''
-    try {
-      currentExpression = request.row.get(request.attribute)?.get?.('value') || ''
-    } catch (e) {
-      console.warn('Logic Builder: failed to read current expression for the dialog', e)
-      currentExpression = ''
-    }
     let itemName = ''
     try {
       itemName = request.row.getValue?.('name') || request.row.get?.('name')?.get?.('value') || ''
@@ -494,9 +487,9 @@ export default function EditableForm(props: EditableFormProps) {
           itemName,
           attribute: tab,
           fields: buildFieldContext(request.row),
-          currentExpression,
+          item: buildItemDefinition(request.row),
         }}
-        client={logicBuilderStubClient}
+        client={logicBuilderClient}
         // inertRoot deliberately NOT passed: the host owns the inert boundary
         // (see the builder-inert effect) because inerting the whole wrapper
         // would make the scroll container unhittable and break AC2's

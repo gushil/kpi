@@ -1,6 +1,20 @@
-import type { GenerationRequest } from '@openclinica/logic-builder'
+import type { GenerationRequest, ItemDefinition } from '@openclinica/logic-builder'
 import chai from 'chai'
 import { logicBuilderStubClient } from './logicBuilderStubClient'
+
+const ITEM: ItemDefinition = {
+  name: 'BMI',
+  type: 'decimal',
+  label: 'Body Mass Index',
+  logic: {
+    calculation: '',
+    default: '',
+    constraint: '',
+    required: '',
+    relevant: '',
+    repeatCount: '',
+  },
+}
 
 function makeRequest(overrides: Partial<GenerationRequest> = {}): GenerationRequest {
   return {
@@ -8,7 +22,7 @@ function makeRequest(overrides: Partial<GenerationRequest> = {}): GenerationRequ
     attribute: 'calculation',
     targetFieldName: 'BMI',
     fields: { fields: [] },
-    currentExpression: '',
+    item: ITEM,
     ...overrides,
   }
 }
