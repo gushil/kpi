@@ -1083,3 +1083,116 @@ do ->
       @ctx.model_type = -> 'group'
       @mixin.onOcFormStyleChange.call(@ctx)
       expect(@cardSettingsWrap.find('.js-group-cols-wrap').length).toBe(0)
+
+    it 'switching TO grid on a repeat calls _afterRenderGroupCols', ->
+      groupColsCalled = false
+      @ctx.is_form_style_theme_grid = -> true
+      @ctx.model_type = -> 'repeat'
+      @ctx._afterRenderGroupCols = -> groupColsCalled = true
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(groupColsCalled).toBe(true)
+
+    it 'switching AWAY from grid on a repeat removes .js-group-cols-wrap', ->
+      @ctx.is_form_style_theme_grid = -> false
+      @ctx.model_type = -> 'repeat'
+      @mixin.onOcFormStyleChange.call(@ctx)
+      expect(@cardSettingsWrap.find('.js-group-cols-wrap').length).toBe(0)
+
+  ###############################################################
+  # view.rowDetail: parseAppearanceValue — repeat type
+  ###############################################################
+  describe 'view.rowDetail: parseAppearanceValue() with repeat type', ->
+    beforeEach ->
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      @parse = @viewRowDetail.parseAppearanceValue
+
+    it 'defaults to standard-group card when appearance is empty', ->
+      result = @parse('', 'repeat')
+      expect(result.card).toBe('standard-group')
+      expect(result.columnCount).toBe(null)
+
+    it 'recognises table-list', ->
+      result = @parse('table-list', 'repeat')
+      expect(result.card).toBe('table-list')
+
+    it 'field-list maps to same-screen (matching group behaviour)', ->
+      result = @parse('field-list', 'repeat')
+      expect(result.card).toBe('same-screen')
+
+    it 'w-token is stripped — defaults to standard-group (groups have no column-count card)', ->
+      result = @parse('w3', 'repeat')
+      expect(result.card).toBe('standard-group')
+
+    it 'matches group card set for an unknown value', ->
+      groupResult = @parse('unknown-value', 'group')
+      repeatResult = @parse('unknown-value', 'repeat')
+      expect(repeatResult.card).toBe(groupResult.card)
+
+  ###############################################################
+  # view.rowDetail: isCardGridType — repeat type
+  ###############################################################
+  describe 'view.rowDetail.DetailViewMixins.appearance: isCardGridType() for repeat', ->
+    beforeEach ->
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+
+    it 'returns true for repeat type', ->
+      ctx = model_type: -> 'repeat'
+      expect(@mixin.isCardGridType.call(ctx)).toBe(true)
+
+  ###############################################################
+  # view.rowDetail: appearance panel renders Columns in Grid for repeat
+  ###############################################################
+  describe 'view.rowDetail.DetailViewMixins: "appearance" (repeat) — renders Columns in Grid', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      sessionStorage.setItem('kpi.editable-form.form-style', 'theme-grid')
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @survey = new $model.Survey()
+      @survey.rows.add(type: 'repeat', name: 'rep1', label: 'Repeat 1')
+      @row = @survey.rows.at(0)
+      @detail = @row.get('appearance')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+      @$el = $('<div/>')
+      @$cardSettingsWrap = $('<div><div class="js-card-settings-appearance"></div></div>')
+      @mixin_ctx = $.extend({}, @mixin, {
+        cid: 'cid_rep_appearance'
+        $el: @$el
+        $: (sel) => @$el.find(sel)
+        model: @detail
+        listenTo: ->
+        Templates: @viewRowDetail.Templates
+        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+      })
+      @mixin_ctx.html()
+    afterEach ->
+      window.xlfHideWarnings = false
+      sessionStorage.removeItem('kpi.editable-form.form-style')
+
+    it 'renders the Columns in Grid section (.js-group-cols-wrap)', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      expect(@$cardSettingsWrap.find('.js-group-cols-wrap').length).toBe(1)
+
+    it 'renders the same appearance card set as a group', ->
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+      repeatCards = @$el.find('.appearance-card').map(-> $(@).data('card-slug')).get()
+      @survey2 = new (require('../../jsapp/xlform/src/_model')).Survey()
+      @survey2.rows.add(type: 'group', name: 'grp1', label: 'Group 1')
+      groupRow = @survey2.rows.at(0)
+      groupDetail = groupRow.get('appearance')
+      $el2 = $('<div/>')
+      $wrap2 = $('<div><div class="js-card-settings-appearance"></div></div>')
+      groupCtx = $.extend({}, @mixin, {
+        cid: 'cid_grp2'
+        $el: $el2
+        $: (sel) => $el2.find(sel)
+        model: groupDetail
+        listenTo: ->
+        Templates: @viewRowDetail.Templates
+        rowView: { cardSettingsWrap: $wrap2, model: groupRow }
+      })
+      groupCtx.html()
+      groupCtx.afterRender.call(groupCtx)
+      groupCards = $el2.find('.appearance-card').map(-> $(@).data('card-slug')).get()
+      expect(repeatCards).toEqual(groupCards)
