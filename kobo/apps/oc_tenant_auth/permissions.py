@@ -19,12 +19,8 @@ class AssetObjectPermission(AssetPermission):
     backends can restrict their view to publicly-shared assets at the
     object level.
 
-    OC customization: subdomain users can read and edit each other's library
-    items (question/block/template/collection). Surveys remain governed by the
-    standard object-level permission check.
+    OC customization: subdomain users can read and edit each other's assets.
     """
-
-    _LIBRARY_ASSET_TYPES = ('question', 'block', 'template', 'collection')
 
     def has_permission(self, request, view):
         self.validate_password(request)
@@ -35,11 +31,10 @@ class AssetObjectPermission(AssetPermission):
         return request.method in permissions.SAFE_METHODS
 
     def has_object_permission(self, request, view, obj):
-        # OC: all subdomain users may read and write each other's library items.
+        # OC: all subdomain users may read and write each other's assets.
         if (
             request.user
             and request.user.is_authenticated
-            and getattr(obj, 'asset_type', None) in self._LIBRARY_ASSET_TYPES
             and self._same_subdomain(request.user, obj)
         ):
             return True
@@ -56,17 +51,14 @@ class AssetObjectPermission(AssetPermission):
 class SubdomainAwareAssetSnapshotPermission(AssetSnapshotPermission):
     """
     OC customization: extends AssetSnapshotPermission to grant preview/detail
-    access to snapshots of library items (question/block/template/collection)
-    owned by users in the caller's Keycloak subdomain.
+    access to snapshots of assets owned by users in the caller's Keycloak
+    subdomain.
     """
-
-    _LIBRARY_ASSET_TYPES = ('question', 'block', 'template', 'collection')
 
     def has_object_permission(self, request, view, obj):
         if (
             request.user
             and request.user.is_authenticated
-            and getattr(obj.asset, 'asset_type', None) in self._LIBRARY_ASSET_TYPES
             and AssetObjectPermission._same_subdomain(request.user, obj.asset)
         ):
             return True
