@@ -57,7 +57,7 @@ import envStore from '#/envStore'
 import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
 import { logicBuilderClient } from '#/openclinica/logicBuilderClient'
-import { buildFieldContext, buildItemDefinition } from '#/openclinica/logicBuilderContext'
+import { buildFieldContext, buildItemDefinition, readItemName } from '#/openclinica/logicBuilderContext'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
 import { useBuilderInert } from '#/openclinica/useBuilderInert'
 import pageState from '#/pageState.store'
@@ -473,13 +473,9 @@ export default function EditableForm(props: EditableFormProps) {
       // Can't reset state during render.
       return null
     }
-    let itemName = ''
-    try {
-      itemName = request.row.getValue?.('name') || request.row.get?.('name')?.get?.('value') || ''
-    } catch (e) {
-      console.warn('Logic Builder: failed to read item name for the dialog', e)
-      itemName = ''
-    }
+    // Same reader the item definition uses, so the dialog header and the
+    // prompt's TARGET ITEM can never name different items (review Minor 2).
+    const itemName = readItemName(request.row)
     return (
       <AiGeneratorDialog
         open

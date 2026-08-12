@@ -1908,6 +1908,15 @@ LOGGING = {
             'handlers': ['console'],
             'propagate': False
         },
+        # OC fork (OC-28277): the Logic Builder AI endpoint (private
+        # oc-logic-builder-server package) emits one INFO line per generation
+        # request — its only per-request diagnostic. Without this entry the
+        # root logger's WARNING level drops it.
+        'oc_logic_builder_server': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     }
 }
 

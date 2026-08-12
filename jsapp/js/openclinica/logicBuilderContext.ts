@@ -114,6 +114,24 @@ function readRowString(row: any, key: string): string {
 }
 
 /**
+ * The scoped item's name — the one reader for it, shared by the AI Generator
+ * dialog's header and the item definition sent to the model, so the two can
+ * never disagree about which item is scoped. Unlike `readRowString` it falls
+ * back to the row's `name` detail model when `getValue` yields nothing: a row
+ * mid-edit can hold the name only there, and an empty `- name:` in the prompt
+ * would silently strip the target item's identity. Name-only on purpose —
+ * `type` and `label` hold different value shapes in their detail models.
+ */
+export function readItemName(row: any): string {
+  try {
+    return String(row.getValue?.('name') || row.get?.('name')?.get?.('value') || '')
+  } catch (e) {
+    console.warn('Logic Builder: failed to read the item name for AI context', e)
+    return ''
+  }
+}
+
+/**
  * The scoped item in full: identity, choice list, and the current expression of
  * every logic attribute — sent unconditionally, so the model can reason about
  * the logic already on the item (P1.2 AC2).
@@ -136,7 +154,7 @@ export function buildItemDefinition(row: any): ItemDefinition {
     }
   }
   return {
-    name: readRowString(row, 'name'),
+    name: readItemName(row),
     type: readRowString(row, 'type'),
     label: readRowString(row, 'label'),
     choices: readRowChoices(row),

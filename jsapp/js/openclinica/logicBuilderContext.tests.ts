@@ -1,5 +1,5 @@
 import chai from 'chai'
-import { buildFieldContext, buildItemDefinition } from './logicBuilderContext'
+import { buildFieldContext, buildItemDefinition, readItemName } from './logicBuilderContext'
 
 // Minimal Backbone/xlform fakes. A select row answers `_isSelectQuestion()` and
 // hands out its choice list via `getList()`, whose `options.models` are Backbone
@@ -115,6 +115,53 @@ describe('buildItemDefinition (P1.2)', () => {
       relevant: '',
       repeatCount: '',
     })
+    chai.expect(warnSpy.mock.calls.length).to.be.above(0)
+  })
+})
+
+describe('readItemName (P1.2)', () => {
+  let warnSpy: jest.SpyInstance
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    warnSpy.mockRestore()
+  })
+
+  it('reads the name off getValue', () => {
+    const row = fakeRow({ values: { name: 'BMI' } })
+    chai.expect(readItemName(row)).to.equal('BMI')
+    chai.expect(buildItemDefinition(row).name).to.equal('BMI')
+    chai.expect(warnSpy.mock.calls.length).to.equal(0)
+  })
+
+  it('falls back to the name detail model when getValue yields nothing', () => {
+    // The one reader the dialog header and the item definition now share:
+    // before they were unified only the header did this detail read, so a row
+    // in this state sent the model a TARGET ITEM with an empty `- name:`.
+    const row = fakeRow({ values: {}, columns: { name: 'PREGNANT' } })
+    chai.expect(readItemName(row)).to.equal('PREGNANT')
+    chai.expect(buildItemDefinition(row).name).to.equal('PREGNANT')
+    chai.expect(warnSpy.mock.calls.length).to.equal(0)
+  })
+
+  it("is '' when neither path yields a name", () => {
+    chai.expect(readItemName(fakeRow({}))).to.equal('')
+    // Row missing both readers entirely: the calls are optional, so no throw.
+    chai.expect(readItemName({})).to.equal('')
+    chai.expect(warnSpy.mock.calls.length).to.equal(0)
+  })
+
+  it("is '' and warns when the getValue read throws", () => {
+    // A throwing read aborts the whole expression, so the detail model is not
+    // consulted — the dialog header behaved this way before the unification.
+    const hostile = {
+      getValue: () => {
+        throw new Error('x')
+      },
+      get: () => ({ get: () => 'NOT_REACHED' }),
+    }
+    chai.expect(readItemName(hostile)).to.equal('')
     chai.expect(warnSpy.mock.calls.length).to.be.above(0)
   })
 })
