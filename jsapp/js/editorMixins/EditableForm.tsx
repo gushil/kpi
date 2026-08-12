@@ -1053,6 +1053,7 @@ export default function EditableForm(props: EditableFormProps) {
       pageState.showModal({
         type: MODAL_TYPES.FORM_LANGUAGES,
         asset: state.asset,
+        hasUnsavedChanges: needsSave(),
       })
     }
   }
