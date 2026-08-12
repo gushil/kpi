@@ -151,9 +151,13 @@ RUN uv pip sync "${TMP_DIR}/pip_dependencies.txt" 1>/dev/null
 
 # OC fork (OC-28277): install the PRIVATE oc-logic-builder-server package (the
 # AI generate-expression endpoint: prompt assembly + Anthropic call). Same
-# BuildKit secret as the npm stage; the token is read from the mount and never
-# lands in a layer. --no-deps is safe ONLY because the `uv pip sync` above has
-# already installed its one runtime dep, requests.
+# BuildKit secret as the npm stage, and the same throwaway-credential trick:
+# the token rides a netrc deleted inside this RUN, so it stays out of the URL,
+# out of argv, and out of the layer command `docker history` keeps — which
+# records the literal `$(cat …)`, never its value. github.com answers the
+# archive with a redirect to a self-authenticating codeload URL, so a netrc
+# entry for github.com alone is enough. --no-deps is safe ONLY because the
+# `uv pip sync` above has already installed its one runtime dep, requests.
 # The import check is load-bearing: a package that installs but cannot import is
 # a BOOT failure, not a missing feature. router_api_v2 calls find_spec on the
 # .django submodule, which imports the parent package, whose own chain reaches
@@ -161,8 +165,11 @@ RUN uv pip sync "${TMP_DIR}/pip_dependencies.txt" 1>/dev/null
 # every request. Fail the build here instead. Pinned by git sha, not dist version.
 ARG LOGIC_BUILDER_SERVER_REF=REPLACE_WITH_MERGED_SHA
 RUN --mount=type=secret,id=gh_token \
-    uv pip install --no-deps \
-      "oc-logic-builder-server @ https://x-access-token:$(cat /run/secrets/gh_token)@github.com/OpenClinica/logic-builder/archive/${LOGIC_BUILDER_SERVER_REF}.tar.gz#subdirectory=server" \
+    printf 'machine github.com\nlogin x-access-token\npassword %s\n' \
+      "$(cat /run/secrets/gh_token)" > /tmp/netrc \
+    && NETRC=/tmp/netrc uv pip install --no-deps \
+      "oc-logic-builder-server @ https://github.com/OpenClinica/logic-builder/archive/${LOGIC_BUILDER_SERVER_REF}.tar.gz#subdirectory=server" \
+    && rm -f /tmp/netrc \
     && python -c "import oc_logic_builder_server"
 
 RUN rm -rf ${VIRTUAL_ENV}/lib/python*/site-packages/rest_framework/static/rest_framework
