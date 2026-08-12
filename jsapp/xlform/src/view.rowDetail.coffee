@@ -1912,6 +1912,7 @@ module.exports = do ->
       stripped = currentVal.replace(/\bw\d+\b/g, '').replace(/\s+/g, ' ').trim()
       newVal = if stripped then "#{stripped} #{widthSlug}" else widthSlug
       @model.set('value', newVal)
+      @$select_width?.val(widthSlug)
 
     _refreshWidthPill: ($pill) ->
       groupCols = getParentGroupCols(@)
