@@ -1,5 +1,6 @@
 {expect} = require('../helper/fauxChai')
 $ = require('jquery')
+Backbone = require('backbone')
 
 # Provide translation stub (no Django runtime in tests)
 window.t ?= (str) -> str
@@ -926,12 +927,11 @@ do ->
       @mixin = @viewRowDetail.DetailViewMixins.appearance
       @$el = $('<div/>')
       @$cardSettingsWrap = $('<div><div class="js-card-settings-appearance"></div></div>')
-      @mixin_ctx = $.extend({}, @mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_grp_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
       })
@@ -989,12 +989,11 @@ do ->
       # _afterRenderWidth inserts the item-width section as a sibling right
       # before '.js-card-settings-advanced-toggle' (see OC-28234).
       @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>')
-      @mixin_ctx = $.extend({}, @mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_item_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
       })
@@ -1049,12 +1048,11 @@ do ->
       @$el = $('<div/>')
       @$testRoot = $('<div/>').appendTo('body')
       @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo(@$testRoot)
-      @mixin_ctx = $.extend({}, mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, mixin, {
         cid: 'cid_item_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
       })
@@ -1104,24 +1102,22 @@ do ->
 
       $elA = $('<div/>')
       $wrapA = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo($sibRoot)
-      ctxA = $.extend({}, mixin, {
+      ctxA = $.extend({}, Backbone.Events, mixin, {
         cid: 'cid_qA_appearance'
         $el: $elA
         $: (sel) -> $elA.find(sel)
         model: rowA.get('appearance')
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: $wrapA, model: rowA }
       })
 
       $elB = $('<div/>')
       $wrapB = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo($sibRoot)
-      ctxB = $.extend({}, mixin, {
+      ctxB = $.extend({}, Backbone.Events, mixin, {
         cid: 'cid_qB_appearance'
         $el: $elB
         $: (sel) -> $elB.find(sel)
         model: rowB.get('appearance')
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: $wrapB, model: rowB }
       })
@@ -1157,12 +1153,11 @@ do ->
       $root = $('<div/>').appendTo('body')
       $wrapX = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo($root)
       $elX = $('<div/>')
-      ctxX = $.extend({}, mixin, {
+      ctxX = $.extend({}, Backbone.Events, mixin, {
         cid: 'cid_qX_appearance'
         $el: $elX
         $: (sel) -> $elX.find(sel)
         model: rowX.get('appearance')
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: $wrapX, model: rowX }
       })
@@ -1173,12 +1168,11 @@ do ->
 
       $wrapY = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo($root)
       $elY = $('<div/>')
-      ctxY = $.extend({}, mixin, {
+      ctxY = $.extend({}, Backbone.Events, mixin, {
         cid: 'cid_qY_appearance'
         $el: $elY
         $: (sel) -> $elY.find(sel)
         model: rowY.get('appearance')
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: $wrapY, model: rowY }
       })
@@ -1323,12 +1317,11 @@ do ->
       @mixin = @viewRowDetail.DetailViewMixins.appearance
       @$el = $('<div/>')
       @$cardSettingsWrap = $('<div><div class="js-card-settings-appearance"></div></div>')
-      @mixin_ctx = $.extend({}, @mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_rep_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
       })
@@ -1350,12 +1343,11 @@ do ->
       groupDetail = groupRow.get('appearance')
       $el2 = $('<div/>')
       $wrap2 = $('<div><div class="js-card-settings-appearance"></div></div>')
-      groupCtx = $.extend({}, @mixin, {
+      groupCtx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_grp2'
         $el: $el2
         $: (sel) => $el2.find(sel)
         model: groupDetail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: $wrap2, model: groupRow }
       })
@@ -1388,12 +1380,11 @@ do ->
       mixin = viewRowDetail.DetailViewMixins.appearance
       $el = $('<div/>')
       $cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>')
-      mixin_ctx = $.extend({}, mixin, {
+      mixin_ctx = $.extend({}, Backbone.Events, mixin, {
         cid: 'cid_item_appearance'
         $el: $el
         $: (sel) -> $el.find(sel)
         model: detail
-        listenTo: ->
         Templates: viewRowDetail.Templates
         rowView: { cardSettingsWrap: $cardSettingsWrap, model: row }
       })
@@ -1481,12 +1472,11 @@ do ->
           <div class="js-card-settings-advanced-toggle"></div>
         </div>
       """)
-      @mixin_ctx = $.extend({}, @mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_q1_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
         rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
       })
