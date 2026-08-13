@@ -1,4 +1,3 @@
-from collections import defaultdict
 from django.db.models import Prefetch
 
 from kobo.apps.organizations.models import Organization
@@ -23,7 +22,7 @@ class AssetViewSetListMixin:
                 )
             )
         )
-        organizations_per_asset = defaultdict(dict)
+        organizations_per_asset = {}
         for asset in assets:
             try:
                 organizations_per_asset[asset.id] = asset.owner.organizations[0]

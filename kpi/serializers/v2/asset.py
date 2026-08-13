@@ -985,11 +985,13 @@ class AssetSerializer(serializers.HyperlinkedModelSerializer):
         except KeyError:
             # Fallback on context if it exists (i.e.: asset lists of an organization).
             # Otherwise, retrieve from the asset owner.
-            organization = self.context.get(
-                'organization', asset.owner.organization
-            )
+            organization = self.context.get('organization')
+            if organization is None:
+                organization = asset.owner.organization
 
-        if organization.get_user_role(request.user) == ORG_ADMIN_ROLE:
+        # `organization` is `None` for a removed org member/owner (see
+        # MemberViewSet.perform_destroy); skip the admin grant in that case.
+        if organization and organization.get_user_role(request.user) == ORG_ADMIN_ROLE:
             access_types.extend(['shared', 'org-admin'])
             access_types = list(set(access_types))
 
@@ -1007,9 +1009,9 @@ class AssetSerializer(serializers.HyperlinkedModelSerializer):
         except KeyError:
             # Fallback on context if it exists (i.e.: asset lists of an organization).
             # Otherwise, retrieve from the asset owner.
-            organization = self.context.get(
-                'organization', asset.owner.organization
-            )
+            organization = self.context.get('organization')
+            if organization is None:
+                organization = asset.owner.organization
 
         if (
             organization
