@@ -1756,6 +1756,20 @@ module.exports = do ->
       @_refreshWidthPill($pill)
       $pill.show()
 
+      # Re-register so each re-render replaces the old listener rather than stacking.
+      parent_group = @model_get_parent_group()
+      if parent_group?
+        parentAppearance = parent_group.get('appearance')
+        if parentAppearance?
+          if @_groupColsChangeHandler
+            parentAppearance.off 'change', @_groupColsChangeHandler
+          # Skip if settings panel was closed (cardSettingsWrap detached from DOM).
+          @_groupColsChangeHandler = =>
+            settingsWrap = @rowView?.cardSettingsWrap
+            return unless settingsWrap?.length and document.body.contains(settingsWrap[0])
+            @_afterRenderWidth()
+          parentAppearance.on 'change', @_groupColsChangeHandler
+
       # Card select handler
       selectWidth = (el) =>
         slug = $(el).data('width-slug')
