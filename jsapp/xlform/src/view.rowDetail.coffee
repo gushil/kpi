@@ -1756,6 +1756,22 @@ module.exports = do ->
       @_refreshWidthPill($pill)
       $pill.show()
 
+      # Unconditional teardown handles reparent and splitApart (orphan) cases.
+      if @_widthParentAppearance
+        @rowView.stopListening @_widthParentAppearance, 'change:value'
+        @_widthParentAppearance = null
+      parent_group = @model_get_parent_group()
+      if parent_group?
+        parentAppearance = parent_group.get('appearance')
+        if parentAppearance?
+          @_widthParentAppearance = parentAppearance
+          # rowView.stopListening() in _cleanupExpandedRender is the primary cleanup;
+          # DOM check is belt-and-braces for edge cases.
+          @rowView.listenTo parentAppearance, 'change:value', =>
+            settingsWrap = @rowView?.cardSettingsWrap
+            return unless settingsWrap?.length and document.body.contains(settingsWrap[0])
+            @_afterRenderWidth()
+
       # Card select handler
       selectWidth = (el) =>
         slug = $(el).data('width-slug')

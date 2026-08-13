@@ -1,5 +1,6 @@
 {expect} = require('../helper/fauxChai')
 $ = require('jquery')
+Backbone = require('backbone')
 
 # Provide translation stub (no Django runtime in tests)
 window.t ?= (str) -> str
@@ -926,14 +927,13 @@ do ->
       @mixin = @viewRowDetail.DetailViewMixins.appearance
       @$el = $('<div/>')
       @$cardSettingsWrap = $('<div><div class="js-card-settings-appearance"></div></div>')
-      @mixin_ctx = $.extend({}, @mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_grp_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       # html() must run first: it creates @$select_width, which afterRender()
       # (via _afterRenderCardGrid/_writeModelValue) depends on.
@@ -989,14 +989,13 @@ do ->
       # _afterRenderWidth inserts the item-width section as a sibling right
       # before '.js-card-settings-advanced-toggle' (see OC-28234).
       @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>')
-      @mixin_ctx = $.extend({}, @mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_item_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       @mixin_ctx.html()
     afterEach ->
@@ -1025,6 +1024,168 @@ do ->
       expect($paragraphCard.length).toBe(1)
       $paragraphCard.trigger('click')
       expect(@detail.get('value')).toBe('multiline w14')
+
+  ###############################################################
+  # OC-28463: item width picker must re-render when parent group
+  # column count changes while the item settings panel is open.
+  ###############################################################
+  describe 'view.rowDetail.DetailViewMixins: "appearance" (item) — syncs with parent group column change (OC-28463)', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      sessionStorage.setItem('kpi.editable-form.form-style', 'theme-grid')
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @survey = new $model.Survey(survey: [
+        {type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w4', __rows: [
+          {type: 'text', name: 'q1', label: 'Q1'}
+        ]}
+      ])
+      @group = @survey.rows.at(0)
+      @row = @group.rows.at(0)
+      @detail = @row.get('appearance')
+      @groupDetail = @group.get('appearance')
+      mixin = @viewRowDetail.DetailViewMixins.appearance
+      @$el = $('<div/>')
+      @$testRoot = $('<div/>').appendTo('body')
+      @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo(@$testRoot)
+      @mixin_ctx = $.extend({}, Backbone.Events, mixin, {
+        cid: 'cid_item_appearance'
+        $el: @$el
+        $: (sel) => @$el.find(sel)
+        model: @detail
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
+      })
+      @mixin_ctx.html()
+      @mixin_ctx.afterRender.call(@mixin_ctx)
+    afterEach ->
+      window.xlfHideWarnings = false
+      sessionStorage.removeItem('kpi.editable-form.form-style')
+      @$testRoot?.remove()
+
+    it 'item width picker rebuilds immediately when parent group column count changes', ->
+      $wrap = @$cardSettingsWrap.find('.js-item-width-wrap')
+      expect($wrap.find('.width-card').length).toBe(4)
+      expect($wrap.find('.item-width__context').text()).toContain('4')
+      @groupDetail.set 'value', 'w6'
+      $wrapNew = @$cardSettingsWrap.find('.js-item-width-wrap')
+      expect($wrapNew.find('.width-card').length).toBe(6)
+      expect($wrapNew.find('.item-width__context').text()).toContain('6')
+
+    it 'does not accumulate duplicate listeners across re-renders', ->
+      renderCount = 0
+      original = @mixin_ctx._afterRenderWidth.bind(@mixin_ctx)
+      @mixin_ctx._afterRenderWidth = ->
+        renderCount++
+        original.call(@)
+      # Re-attach so the spy is captured; reset counter, then fire group change.
+      @mixin_ctx._afterRenderWidth.call(@mixin_ctx)
+      renderCount = 0
+      @groupDetail.set 'value', 'w8'
+      expect(renderCount).toBe(1)
+
+    it 'sibling item width pickers both rebuild when parent group column count changes', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey2 = new $model.Survey(survey: [
+        {type: 'group', name: 'grp2', label: 'Group 2', appearance: 'w4', __rows: [
+          {type: 'text', name: 'qa', label: 'Q A'}
+          {type: 'text', name: 'qb', label: 'Q B'}
+        ]}
+      ])
+      group2   = survey2.rows.at(0)
+      rowA     = group2.rows.at(0)
+      rowB     = group2.rows.at(1)
+      grpDetail = group2.get('appearance')
+      mixin = @viewRowDetail.DetailViewMixins.appearance
+
+      $sibRoot = $('<div/>').appendTo('body')
+
+      $elA = $('<div/>')
+      $wrapA = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo($sibRoot)
+      ctxA = $.extend({}, Backbone.Events, mixin, {
+        cid: 'cid_qA_appearance'
+        $el: $elA
+        $: (sel) -> $elA.find(sel)
+        model: rowA.get('appearance')
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrapA, model: rowA })
+      })
+
+      $elB = $('<div/>')
+      $wrapB = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo($sibRoot)
+      ctxB = $.extend({}, Backbone.Events, mixin, {
+        cid: 'cid_qB_appearance'
+        $el: $elB
+        $: (sel) -> $elB.find(sel)
+        model: rowB.get('appearance')
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrapB, model: rowB })
+      })
+
+      ctxA.html()
+      ctxA.afterRender.call(ctxA)
+      ctxB.html()
+      ctxB.afterRender.call(ctxB)
+
+      expect($wrapA.find('.width-card').length).toBe(4)
+      expect($wrapB.find('.width-card').length).toBe(4)
+      grpDetail.set 'value', 'w6'
+      expect($wrapA.find('.width-card').length).toBe(6)
+      expect($wrapB.find('.width-card').length).toBe(6)
+
+      $sibRoot.remove()
+      return
+
+    it 'item whose settings panel was closed (detached wrap) does not update the detached DOM on group column change', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey3 = new $model.Survey(survey: [
+        {type: 'group', name: 'grp3', label: 'Group 3', appearance: 'w4', __rows: [
+          {type: 'text', name: 'qx', label: 'Q X'}
+          {type: 'text', name: 'qy', label: 'Q Y'}
+        ]}
+      ])
+      group3    = survey3.rows.at(0)
+      rowX      = group3.rows.at(0)
+      rowY      = group3.rows.at(1)
+      grpDetail3 = group3.get('appearance')
+      mixin = @viewRowDetail.DetailViewMixins.appearance
+
+      $root = $('<div/>').appendTo('body')
+      $wrapX = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo($root)
+      $elX = $('<div/>')
+      ctxX = $.extend({}, Backbone.Events, mixin, {
+        cid: 'cid_qX_appearance'
+        $el: $elX
+        $: (sel) -> $elX.find(sel)
+        model: rowX.get('appearance')
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrapX, model: rowX })
+      })
+      ctxX.html()
+      ctxX.afterRender.call(ctxX)
+      expect($wrapX.find('.width-card').length).toBe(4)
+      $wrapX.detach()  # simulate closing item X's settings panel
+
+      $wrapY = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo($root)
+      $elY = $('<div/>')
+      ctxY = $.extend({}, Backbone.Events, mixin, {
+        cid: 'cid_qY_appearance'
+        $el: $elY
+        $: (sel) -> $elY.find(sel)
+        model: rowY.get('appearance')
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrapY, model: rowY })
+      })
+      ctxY.html()
+      ctxY.afterRender.call(ctxY)
+      expect($wrapY.find('.width-card').length).toBe(4)
+
+      grpDetail3.set 'value', 'w8'
+      expect($wrapX.find('.width-card').length).toBe(4)  # detached — must not update
+      expect($wrapY.find('.width-card').length).toBe(8)  # live — must update
+
+      $root.remove()
+      return
 
   ###############################################################
   # view.rowDetail: DetailViewMixins.appearance — onOcFormStyleChange
@@ -1156,14 +1317,13 @@ do ->
       @mixin = @viewRowDetail.DetailViewMixins.appearance
       @$el = $('<div/>')
       @$cardSettingsWrap = $('<div><div class="js-card-settings-appearance"></div></div>')
-      @mixin_ctx = $.extend({}, @mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_rep_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       @mixin_ctx.html()
     afterEach ->
@@ -1183,14 +1343,13 @@ do ->
       groupDetail = groupRow.get('appearance')
       $el2 = $('<div/>')
       $wrap2 = $('<div><div class="js-card-settings-appearance"></div></div>')
-      groupCtx = $.extend({}, @mixin, {
+      groupCtx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_grp2'
         $el: $el2
         $: (sel) => $el2.find(sel)
         model: groupDetail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: $wrap2, model: groupRow }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrap2, model: groupRow })
       })
       groupCtx.html()
       groupCtx.afterRender.call(groupCtx)
@@ -1221,14 +1380,13 @@ do ->
       mixin = viewRowDetail.DetailViewMixins.appearance
       $el = $('<div/>')
       $cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>')
-      mixin_ctx = $.extend({}, mixin, {
+      mixin_ctx = $.extend({}, Backbone.Events, mixin, {
         cid: 'cid_item_appearance'
         $el: $el
         $: (sel) -> $el.find(sel)
         model: detail
-        listenTo: ->
         Templates: viewRowDetail.Templates
-        rowView: { cardSettingsWrap: $cardSettingsWrap, model: row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $cardSettingsWrap, model: row })
       })
       mixin_ctx.html()
       { mixin_ctx, $el, $cardSettingsWrap, detail }
@@ -1314,14 +1472,13 @@ do ->
           <div class="js-card-settings-advanced-toggle"></div>
         </div>
       """)
-      @mixin_ctx = $.extend({}, @mixin, {
+      @mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
         cid: 'cid_q1_appearance'
         $el: @$el
         $: (sel) => @$el.find(sel)
         model: @detail
-        listenTo: ->
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       @mixin_ctx.html()
     afterEach ->
