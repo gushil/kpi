@@ -9,7 +9,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from kobo.apps.kobo_auth.shortcuts import User
-from kobo.apps.organizations.models import Organization
+from kobo.apps.organizations.models import OrganizationUser
 from kpi.constants import (
     ASSET_TYPE_BLOCK,
     ASSET_TYPE_COLLECTION,
@@ -317,7 +317,7 @@ class CollectionsTests(BaseTestCase):
         shared_collection.assign_perm(self.someuser, PERM_VIEW_ASSET)
 
         # Simulate an active member removed from their organization
-        Organization.objects.filter(organization_users__user=another_user).delete()
+        OrganizationUser.objects.filter(user=another_user).delete()
         assert another_user.organizations_organization.count() == 0
 
         access_types = self._get_access_types_per_collection()
@@ -340,7 +340,7 @@ class CollectionsTests(BaseTestCase):
         )
         shared_collection.assign_perm(self.someuser, PERM_VIEW_ASSET)
 
-        Organization.objects.filter(organization_users__user=another_user).delete()
+        OrganizationUser.objects.filter(user=another_user).delete()
         another_user.extra_details.date_removed = timezone.now()
         another_user.extra_details.save(update_fields=['date_removed'])
 

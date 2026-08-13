@@ -980,9 +980,9 @@ class AssetSerializer(serializers.HyperlinkedModelSerializer):
         if request.user.is_superuser:
             access_types.append('superuser')
 
-        try:
+        if 'organizations_per_asset' in self.context:
             organization = self.context['organizations_per_asset'].get(asset.id)
-        except KeyError:
+        else:
             # Fallback on context if it exists (i.e.: asset lists of an organization).
             # Otherwise, retrieve from the asset owner.
             organization = self.context.get('organization')
@@ -1004,9 +1004,9 @@ class AssetSerializer(serializers.HyperlinkedModelSerializer):
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_owner_label(self, asset):
-        try:
+        if 'organizations_per_asset' in self.context:
             organization = self.context['organizations_per_asset'].get(asset.id)
-        except KeyError:
+        else:
             # Fallback on context if it exists (i.e.: asset lists of an organization).
             # Otherwise, retrieve from the asset owner.
             organization = self.context.get('organization')
