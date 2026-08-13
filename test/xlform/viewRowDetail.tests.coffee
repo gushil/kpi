@@ -933,7 +933,7 @@ do ->
         $: (sel) => @$el.find(sel)
         model: @detail
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       # html() must run first: it creates @$select_width, which afterRender()
       # (via _afterRenderCardGrid/_writeModelValue) depends on.
@@ -995,7 +995,7 @@ do ->
         $: (sel) => @$el.find(sel)
         model: @detail
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       @mixin_ctx.html()
     afterEach ->
@@ -1054,7 +1054,7 @@ do ->
         $: (sel) => @$el.find(sel)
         model: @detail
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       @mixin_ctx.html()
       @mixin_ctx.afterRender.call(@mixin_ctx)
@@ -1108,7 +1108,7 @@ do ->
         $: (sel) -> $elA.find(sel)
         model: rowA.get('appearance')
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: $wrapA, model: rowA }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrapA, model: rowA })
       })
 
       $elB = $('<div/>')
@@ -1119,7 +1119,7 @@ do ->
         $: (sel) -> $elB.find(sel)
         model: rowB.get('appearance')
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: $wrapB, model: rowB }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrapB, model: rowB })
       })
 
       ctxA.html()
@@ -1159,7 +1159,7 @@ do ->
         $: (sel) -> $elX.find(sel)
         model: rowX.get('appearance')
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: $wrapX, model: rowX }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrapX, model: rowX })
       })
       ctxX.html()
       ctxX.afterRender.call(ctxX)
@@ -1174,7 +1174,7 @@ do ->
         $: (sel) -> $elY.find(sel)
         model: rowY.get('appearance')
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: $wrapY, model: rowY }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrapY, model: rowY })
       })
       ctxY.html()
       ctxY.afterRender.call(ctxY)
@@ -1323,7 +1323,7 @@ do ->
         $: (sel) => @$el.find(sel)
         model: @detail
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       @mixin_ctx.html()
     afterEach ->
@@ -1349,7 +1349,7 @@ do ->
         $: (sel) => $el2.find(sel)
         model: groupDetail
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: $wrap2, model: groupRow }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $wrap2, model: groupRow })
       })
       groupCtx.html()
       groupCtx.afterRender.call(groupCtx)
@@ -1386,7 +1386,7 @@ do ->
         $: (sel) -> $el.find(sel)
         model: detail
         Templates: viewRowDetail.Templates
-        rowView: { cardSettingsWrap: $cardSettingsWrap, model: row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $cardSettingsWrap, model: row })
       })
       mixin_ctx.html()
       { mixin_ctx, $el, $cardSettingsWrap, detail }
@@ -1478,7 +1478,7 @@ do ->
         $: (sel) => @$el.find(sel)
         model: @detail
         Templates: @viewRowDetail.Templates
-        rowView: { cardSettingsWrap: @$cardSettingsWrap, model: @row }
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: @row })
       })
       @mixin_ctx.html()
     afterEach ->

@@ -1756,14 +1756,18 @@ module.exports = do ->
       @_refreshWidthPill($pill)
       $pill.show()
 
-      # Re-register so each re-render replaces the old listener rather than stacking.
+      # Unconditional teardown handles reparent and splitApart (orphan) cases.
+      if @_widthParentAppearance
+        @rowView.stopListening @_widthParentAppearance, 'change:value'
+        @_widthParentAppearance = null
       parent_group = @model_get_parent_group()
       if parent_group?
         parentAppearance = parent_group.get('appearance')
         if parentAppearance?
-          @stopListening parentAppearance, 'change:value'
-          # Skip if settings panel was closed (cardSettingsWrap detached from DOM).
-          @listenTo parentAppearance, 'change:value', =>
+          @_widthParentAppearance = parentAppearance
+          # rowView.stopListening() in _cleanupExpandedRender is the primary cleanup;
+          # DOM check is belt-and-braces for edge cases.
+          @rowView.listenTo parentAppearance, 'change:value', =>
             settingsWrap = @rowView?.cardSettingsWrap
             return unless settingsWrap?.length and document.body.contains(settingsWrap[0])
             @_afterRenderWidth()
