@@ -149,6 +149,29 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 COPY ./dependencies/pip/requirements.txt "${TMP_DIR}/pip_dependencies.txt"
 RUN uv pip sync "${TMP_DIR}/pip_dependencies.txt" 1>/dev/null
 
+# OC fork (OC-28277): install the PRIVATE oc-logic-builder-server package (the
+# AI generate-expression endpoint: prompt assembly + Anthropic call). Same
+# BuildKit secret as the npm stage, and the same throwaway-credential trick:
+# the token rides a netrc deleted inside this RUN, so it stays out of the URL,
+# out of argv, and out of the layer command `docker history` keeps — which
+# records the literal `$(cat …)`, never its value. github.com answers the
+# archive with a redirect to a self-authenticating codeload URL, so a netrc
+# entry for github.com alone is enough. --no-deps is safe ONLY because the
+# `uv pip sync` above has already installed its one runtime dep, requests.
+# The import check is load-bearing: a package that installs but cannot import is
+# a BOOT failure, not a missing feature. router_api_v2 calls find_spec on the
+# .django submodule, which imports the parent package, whose own chain reaches
+# `import requests` — and that raise happens at URLconf import time, killing
+# every request. Fail the build here instead. Pinned by git sha, not dist version.
+ARG LOGIC_BUILDER_SERVER_REF=531b7217d87fe9b57ce1fd4eeefa48fb0971fd61
+RUN --mount=type=secret,id=gh_token \
+    printf 'machine github.com\nlogin x-access-token\npassword %s\n' \
+      "$(cat /run/secrets/gh_token)" > /tmp/netrc \
+    && NETRC=/tmp/netrc uv pip install --no-deps \
+      "oc-logic-builder-server @ https://github.com/OpenClinica/logic-builder/archive/${LOGIC_BUILDER_SERVER_REF}.tar.gz#subdirectory=server" \
+    && rm -f /tmp/netrc \
+    && python -c "import oc_logic_builder_server"
+
 RUN rm -rf ${VIRTUAL_ENV}/lib/python*/site-packages/rest_framework/static/rest_framework
 
 #####################################
@@ -245,6 +268,15 @@ COPY . "${KPI_SRC_DIR}"
 # Copy virtualenv from 'pip-dependencies'.
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 COPY --from=pip-dependencies "$VIRTUAL_ENV" "$VIRTUAL_ENV"
+
+# OC fork (OC-28277): carry the sync marker over too. docker/entrypoint.sh
+# re-runs `uv pip sync` at startup whenever this file differs from
+# requirements.txt, and an ABSENT marker counts as differing — which would
+# uninstall oc-logic-builder-server (deliberately not in requirements.txt) on
+# every container start and silently 404 the AI endpoint. Both copies come from
+# the same build context, so they match and the startup sync is skipped, which
+# is what upstream's marker was for.
+COPY --from=pip-dependencies "${TMP_DIR}/pip_dependencies.txt" "${TMP_DIR}/pip_dependencies.txt"
 
 # Copy static production build from 'webpack-build-prod'.
 COPY --from=webpack-build-prod --parents \

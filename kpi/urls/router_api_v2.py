@@ -1,3 +1,5 @@
+import importlib.util
+
 from django.urls import include, path
 from rest_framework.renderers import JSONRenderer
 from rest_framework_extensions.routers import ExtendedDefaultRouter
@@ -261,6 +263,22 @@ kobo_scim_pattern = [
     ),
 ]
 
+# OC fork (OC-28277): the AI generate-expression endpoint lives in the PRIVATE
+# oc-logic-builder-server package. find_spec (not try/import) so a real import
+# error inside an installed package still surfaces loudly; absent on public CI,
+# where this path simply 404s.
+if (
+    importlib.util.find_spec('oc_logic_builder_server') is not None
+    and importlib.util.find_spec('oc_logic_builder_server.django') is not None
+):
+    oc_ai_patterns = [path('ai/', include('oc_logic_builder_server.django.urls'))]
+else:
+    oc_ai_patterns = []
+
 urls_patterns = (
-    router_api_v2.urls + enketo_url_aliases + supplement_url_pattern + kobo_scim_pattern
+    router_api_v2.urls
+    + enketo_url_aliases
+    + supplement_url_pattern
+    + kobo_scim_pattern
+    + oc_ai_patterns
 )
