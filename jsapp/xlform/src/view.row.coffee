@@ -562,6 +562,10 @@ module.exports = do ->
       # ocFormStyleChange listener and _appearanceDV are properly removed.
       @toggleSettings(false) if @_settingsExpanded
       @model.splitApart()
+      # Notify any open item settings panel that its parent group may have
+      # changed, so the Item width context line refreshes without the user
+      # closing and reopening it (OC-28433).
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
       @model._parent._parent.trigger('remove', @model)
       @surveyView.survey.trigger('change')
       @$el.detach()

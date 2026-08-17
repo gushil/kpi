@@ -863,6 +863,10 @@ module.exports = do ->
       @activateGroupButton(false)
       if rows.length > 0
         @survey._addGroup(__rows: rows)
+        # Notify any open item settings panel that its parent group may have
+        # changed, so the Item width context line refreshes without the user
+        # closing and reopening it (OC-28433).
+        document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
         @reset()
         return true
       else

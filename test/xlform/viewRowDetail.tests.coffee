@@ -1026,6 +1026,201 @@ do ->
       expect(@detail.get('value')).toBe('multiline w14')
 
   ###############################################################
+  # OC-28433: Item width context line names the form (not "No
+  # parent group") for ungrouped items, and uses correct singular/
+  # plural "column"/"columns" wording everywhere it appears.
+  ###############################################################
+  describe 'view.rowDetail.DetailViewMixins: "appearance" (item) — Item width context line (OC-28433)', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      sessionStorage.setItem('kpi.editable-form.form-style', 'theme-grid')
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+      @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>')
+    afterEach ->
+      window.xlfHideWarnings = false
+      sessionStorage.removeItem('kpi.editable-form.form-style')
+
+    it 'ungrouped item names the form and its column count, not "No parent group"', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      detail = row.get('appearance')
+      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: detail
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      contextText = @$cardSettingsWrap.find('.item-width__context').text()
+      expect(contextText).toBe('Form has 4 columns')
+      expect(contextText.indexOf('No parent group')).toBe(-1)
+
+    it 'ungrouped item still renders the 4-card fraction picker (treated as w4)', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      detail = row.get('appearance')
+      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: detail
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      $wrap = @$cardSettingsWrap.find('.js-item-width-wrap')
+      expect($wrap.find('.width-card').length).toBe(4)
+      expect($wrap.find('.width-card__code').map(-> $(@).text()).get()).toEqual(['w4', 'w3', 'w2', 'w1'])
+
+    it 'grouped item in a 1-column group reads "1 column" (singular) on the context line', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey(survey: [
+        {type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w1', __rows: [
+          {type: 'text', name: 'q1', label: 'Q1'}
+        ]}
+      ])
+      group = survey.rows.at(0)
+      row = group.rows.at(0)
+      detail = row.get('appearance')
+      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: detail
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      contextText = @$cardSettingsWrap.find('.item-width__context').text()
+      expect(contextText).toBe('Parent group (grp1) has 1 column')
+
+    it 'grouped item in a 1-column group reads "1 column" (singular) on the span note', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey(survey: [
+        {type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w1', __rows: [
+          {type: 'text', name: 'q1', label: 'Q1'}
+        ]}
+      ])
+      group = survey.rows.at(0)
+      row = group.rows.at(0)
+      detail = row.get('appearance')
+      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: detail
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      spanNoteText = @$cardSettingsWrap.find('.item-width__span-note').text()
+      expect(spanNoteText).toBe('This group has 1 column, so widths are shown as columns.')
+
+    it 'context line refreshes when the item is grouped while its settings panel is open', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      detail = row.get('appearance')
+      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: detail
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+
+      # Mirrors view.surveyApp.coffee's groupSelectedRows(): reparent the row
+      # into a brand-new group, then fire the same DOM event the real UI fires.
+      survey._addGroup(__rows: [row])
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+
+      contextText = @$cardSettingsWrap.find('.item-width__context').text()
+      expect(contextText.indexOf('Form has')).toBe(-1)
+      expect(contextText.indexOf('Parent group (')).toBe(0)
+
+    it 'context line refreshes when the item is ungrouped while its settings panel is open', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey(survey: [
+        {type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w4', __rows: [
+          {type: 'text', name: 'q1', label: 'Q1'}
+        ]}
+      ])
+      group = survey.rows.at(0)
+      row = group.rows.at(0)
+      detail = row.get('appearance')
+      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: detail
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Parent group (grp1) has 4 columns')
+
+      # Mirrors view.row.coffee's _deleteGroup(): unwrap the group, then fire
+      # the same DOM event the real UI fires.
+      group.splitApart()
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+
+    it 'context line refreshes on grouping for a legacy-path type not in isCardGridType (e.g. image)', ->
+      # "image" reaches _afterRenderWidth via _afterRenderLegacy, NOT the
+      # card-grid branch of afterRender — the listener must be registered
+      # from inside _afterRenderWidth itself, or types like this never get it.
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'image', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      detail = row.get('appearance')
+      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: detail
+        Templates: @viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      expect(mixin_ctx.isCardGridType()).toBe(false)
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+
+      survey._addGroup(__rows: [row])
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+
+      contextText = @$cardSettingsWrap.find('.item-width__context').text()
+      expect(contextText.indexOf('Form has')).toBe(-1)
+      expect(contextText.indexOf('Parent group (')).toBe(0)
+
+  ###############################################################
   # OC-28463: item width picker must re-render when parent group
   # column count changes while the item settings panel is open.
   ###############################################################
