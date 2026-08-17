@@ -1501,7 +1501,7 @@ export default function EditableForm(props: EditableFormProps) {
               size='m'
               onClick={toggleAsideLayoutSettings}
               tooltip={hasMetadataAndDetails() ? t('Change form layout and settings') : t('Change form layout')}
-              tooltipPosition='left'
+              tooltipPosition='right'
               startIcon={state.asideLayoutSettingsVisible ? 'close' : 'settings'}
               label={hasMetadataAndDetails() ? t('Layout & Settings') : t('Layout')}
             />
