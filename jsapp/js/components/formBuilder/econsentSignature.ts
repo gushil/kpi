@@ -38,11 +38,17 @@ function getHashQueryParam(name: string): string | null {
   return new URLSearchParams(hash.slice(queryIndex)).get(name)
 }
 
-/**
- * Read study eConsent module status from the URL query parameter `econsent`.
- */
+let _lastKnownEconsent: string | null = getHashQueryParam('econsent')
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('hashchange', () => {
+    const v = getHashQueryParam('econsent')
+    if (v) _lastKnownEconsent = v
+  })
+}
+
 export function getStudyEConsentModuleStatus(): string | null {
-  return getHashQueryParam('econsent')
+  return getHashQueryParam('econsent') ?? _lastKnownEconsent
 }
 
 /**
