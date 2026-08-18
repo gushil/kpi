@@ -1042,23 +1042,31 @@ do ->
       window.xlfHideWarnings = false
       sessionStorage.removeItem('kpi.editable-form.form-style')
 
+    # Builds and expand-renders an appearance mixin for `row`, wired up exactly
+    # like the real RowView/DetailView pairing, against the shared
+    # @$cardSettingsWrap. Takes mixin/viewRowDetail/$cardSettingsWrap as
+    # explicit params (rather than reading `@`) so it has no dependency on the
+    # caller's `this` binding.
+    renderAppearanceForRow = (mixin, viewRowDetail, $cardSettingsWrap, row) ->
+      mixin_ctx = $.extend({}, Backbone.Events, mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: row.get('appearance')
+        Templates: viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      mixin_ctx
+
     it 'ungrouped item names the form and its column count, not "No parent group"', ->
       $model = require('../../jsapp/xlform/src/_model')
       survey = new $model.Survey()
       survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
       row = survey.rows.at(0)
-      detail = row.get('appearance')
-      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
-        cid: 'cid_item_appearance'
-        $el: $('<div/>')
-        $: (sel) -> @$el.find(sel)
-        model: detail
-        Templates: @viewRowDetail.Templates
-        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
-      })
-      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
-      mixin_ctx.html()
-      mixin_ctx.afterRender.call(mixin_ctx)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
       contextText = @$cardSettingsWrap.find('.item-width__context').text()
       expect(contextText).toBe('Form has 4 columns')
       expect(contextText.indexOf('No parent group')).toBe(-1)
@@ -1068,18 +1076,7 @@ do ->
       survey = new $model.Survey()
       survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
       row = survey.rows.at(0)
-      detail = row.get('appearance')
-      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
-        cid: 'cid_item_appearance'
-        $el: $('<div/>')
-        $: (sel) -> @$el.find(sel)
-        model: detail
-        Templates: @viewRowDetail.Templates
-        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
-      })
-      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
-      mixin_ctx.html()
-      mixin_ctx.afterRender.call(mixin_ctx)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
       $wrap = @$cardSettingsWrap.find('.js-item-width-wrap')
       expect($wrap.find('.width-card').length).toBe(4)
       expect($wrap.find('.width-card__code').map(-> $(@).text()).get()).toEqual(['w4', 'w3', 'w2', 'w1'])
@@ -1093,18 +1090,7 @@ do ->
       ])
       group = survey.rows.at(0)
       row = group.rows.at(0)
-      detail = row.get('appearance')
-      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
-        cid: 'cid_item_appearance'
-        $el: $('<div/>')
-        $: (sel) -> @$el.find(sel)
-        model: detail
-        Templates: @viewRowDetail.Templates
-        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
-      })
-      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
-      mixin_ctx.html()
-      mixin_ctx.afterRender.call(mixin_ctx)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
       contextText = @$cardSettingsWrap.find('.item-width__context').text()
       expect(contextText).toBe('Parent group (grp1) has 1 column')
 
@@ -1117,18 +1103,7 @@ do ->
       ])
       group = survey.rows.at(0)
       row = group.rows.at(0)
-      detail = row.get('appearance')
-      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
-        cid: 'cid_item_appearance'
-        $el: $('<div/>')
-        $: (sel) -> @$el.find(sel)
-        model: detail
-        Templates: @viewRowDetail.Templates
-        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
-      })
-      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
-      mixin_ctx.html()
-      mixin_ctx.afterRender.call(mixin_ctx)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
       spanNoteText = @$cardSettingsWrap.find('.item-width__span-note').text()
       expect(spanNoteText).toBe('This group has 1 column, so widths are shown as columns.')
 
@@ -1137,18 +1112,7 @@ do ->
       survey = new $model.Survey()
       survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
       row = survey.rows.at(0)
-      detail = row.get('appearance')
-      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
-        cid: 'cid_item_appearance'
-        $el: $('<div/>')
-        $: (sel) -> @$el.find(sel)
-        model: detail
-        Templates: @viewRowDetail.Templates
-        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
-      })
-      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
-      mixin_ctx.html()
-      mixin_ctx.afterRender.call(mixin_ctx)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
       expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
 
       # Mirrors view.surveyApp.coffee's groupSelectedRows(): reparent the row
@@ -1169,18 +1133,7 @@ do ->
       ])
       group = survey.rows.at(0)
       row = group.rows.at(0)
-      detail = row.get('appearance')
-      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
-        cid: 'cid_item_appearance'
-        $el: $('<div/>')
-        $: (sel) -> @$el.find(sel)
-        model: detail
-        Templates: @viewRowDetail.Templates
-        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
-      })
-      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
-      mixin_ctx.html()
-      mixin_ctx.afterRender.call(mixin_ctx)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
       expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Parent group (grp1) has 4 columns')
 
       # Mirrors view.row.coffee's _deleteGroup(): unwrap the group, then fire
@@ -1198,18 +1151,7 @@ do ->
       survey = new $model.Survey()
       survey.rows.add(type: 'image', name: 'q1', label: 'Q1')
       row = survey.rows.at(0)
-      detail = row.get('appearance')
-      mixin_ctx = $.extend({}, Backbone.Events, @mixin, {
-        cid: 'cid_item_appearance'
-        $el: $('<div/>')
-        $: (sel) -> @$el.find(sel)
-        model: detail
-        Templates: @viewRowDetail.Templates
-        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
-      })
-      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
-      mixin_ctx.html()
-      mixin_ctx.afterRender.call(mixin_ctx)
+      mixin_ctx = renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
       expect(mixin_ctx.isCardGridType()).toBe(false)
       expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
 

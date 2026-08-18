@@ -1364,7 +1364,11 @@ module.exports = do ->
     # types like "image" that fail isCardGridType() and would wrongly bail
     # out here if that check were still present.
     onOcRowStructureChange: ->
-      return unless @model?._parent?
+      # @model is the appearance detail, whose own _parent is the row itself
+      # (stable, not nulled on detach) — checking @model?._parent? would never
+      # catch a deleted row. row.detach() nulls the ROW's _parent instead
+      # (model.row.coffee), so check that via @rowView.model.
+      return unless @rowView?.model?._parent?
       return unless @is_form_style_theme_grid()
       @_afterRenderWidth()
 
