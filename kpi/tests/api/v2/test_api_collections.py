@@ -3,11 +3,13 @@ import re
 
 from django.contrib.auth.models import AnonymousUser
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext as t
 from rest_framework import status
 from rest_framework.response import Response
 
 from kobo.apps.kobo_auth.shortcuts import User
+from kobo.apps.organizations.models import OrganizationUser
 from kpi.constants import (
     ASSET_TYPE_BLOCK,
     ASSET_TYPE_COLLECTION,
@@ -300,6 +302,106 @@ class CollectionsTests(BaseTestCase):
             expected_collection = expected[collection.get('name')]
             assert expected_collection['status'] == collection['status']
             assert expected_collection['access_types'] == collection['access_types']
+
+    def test_collection_access_types_when_owner_has_no_organization(self):
+        """
+        An active user removed from their organization (e.g. via
+        `MemberViewSet.perform_destroy`) must still list collections fine.
+        """
+        another_user = User.objects.get(username='anotheruser')
+        shared_collection = Asset.objects.create(
+            asset_type=ASSET_TYPE_COLLECTION,
+            name='shared collection',
+            owner=another_user,
+        )
+        shared_collection.assign_perm(self.someuser, PERM_VIEW_ASSET)
+
+        # Simulate an active member removed from their organization
+        OrganizationUser.objects.filter(user=another_user).delete()
+        assert another_user.organizations_organization.count() == 0
+
+        access_types = self._get_access_types_per_collection()
+        assert access_types['shared collection'] == ['shared']
+        assert access_types['test collection'] == ['owned']
+
+        # No organization is created as a side effect of listing collections
+        assert another_user.organizations_organization.count() == 0
+
+    def test_collection_access_types_when_owner_is_removed(self):
+        """
+        The list endpoint never touches the lazy `organization` property, so
+        this only differs from the test above in how the owner became org-less.
+        """
+        another_user = User.objects.get(username='anotheruser')
+        shared_collection = Asset.objects.create(
+            asset_type=ASSET_TYPE_COLLECTION,
+            name='shared collection',
+            owner=another_user,
+        )
+        shared_collection.assign_perm(self.someuser, PERM_VIEW_ASSET)
+
+        OrganizationUser.objects.filter(user=another_user).delete()
+        another_user.extra_details.date_removed = timezone.now()
+        another_user.extra_details.save(update_fields=['date_removed'])
+
+        access_types = self._get_access_types_per_collection()
+        assert access_types['shared collection'] == ['shared']
+        assert access_types['test collection'] == ['owned']
+        assert another_user.organizations_organization.count() == 0
+
+    def test_collection_access_types_when_user_is_organization_admin(self):
+        another_user = User.objects.get(username='anotheruser')
+        shared_collection = Asset.objects.create(
+            asset_type=ASSET_TYPE_COLLECTION,
+            name='shared collection',
+            owner=another_user,
+        )
+        shared_collection.assign_perm(self.someuser, PERM_VIEW_ASSET)
+
+        # Make `someuser` an admin of the organization owning the collection
+        organization = another_user.organization
+        organization.mmo_override = True
+        organization.save(update_fields=['mmo_override'])
+        organization.add_user(self.someuser, is_admin=True)
+
+        access_types = self._get_access_types_per_collection()
+        assert sorted(access_types['shared collection']) == ['org-admin', 'shared']
+
+    def test_collection_detail_access_types_when_owner_is_removed(self):
+        """
+        Detail has no context shortcut, so it hits the lazy `organization`
+        property directly; only a removed owner makes it return `None`.
+        """
+        another_user = User.objects.get(username='anotheruser')
+        shared_collection = Asset.objects.create(
+            asset_type=ASSET_TYPE_COLLECTION,
+            name='shared collection',
+            owner=another_user,
+        )
+        shared_collection.assign_perm(self.someuser, PERM_VIEW_ASSET)
+        OrganizationUser.objects.filter(user=another_user).delete()
+        another_user.extra_details.date_removed = timezone.now()
+        another_user.extra_details.save(update_fields=['date_removed'])
+
+        detail_url = reverse(
+            self._get_endpoint('asset-detail'),
+            kwargs={'uid_asset': shared_collection.uid},
+        )
+        response = self.client.get(detail_url)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['access_types'] == ['shared']
+        assert response.data['owner_label'] == another_user.username
+        assert another_user.organizations_organization.count() == 0
+
+    def _get_access_types_per_collection(self) -> dict:
+        list_url = reverse(self._get_endpoint('asset-list'))
+        response = self.client.get(f'{list_url}?q=asset_type:collection')
+        assert response.status_code == status.HTTP_200_OK
+
+        return {
+            collection['name']: collection['access_types']
+            for collection in response.data['results']
+        }
 
     def test_collection_subscribe(self):
         public_collection = Asset.objects.create(
