@@ -38,15 +38,24 @@ function getHashQueryParam(name: string): string | null {
   return new URLSearchParams(hash.slice(queryIndex)).get(name)
 }
 
-let _lastKnownEconsent: string | null = getHashQueryParam('econsent')
+let _lastKnownEconsent: string | null = null
 
 if (typeof window !== 'undefined') {
+  _lastKnownEconsent = getHashQueryParam('econsent')
   window.addEventListener('hashchange', () => {
     const v = getHashQueryParam('econsent')
     if (v) _lastKnownEconsent = v
   })
 }
 
+/**
+ * Returns the eConsent module status, reading the URL hash first and falling
+ * back to the last known value captured at page load or on a prior hashchange.
+ * The fallback is intentional: after React Router navigates back to the library
+ * route (stripping `?econsent` from the URL), template edit links must still
+ * carry `?econsent` so the eConsent signature item remains available in the
+ * form builder.
+ */
 export function getStudyEConsentModuleStatus(): string | null {
   return getHashQueryParam('econsent') ?? _lastKnownEconsent
 }
