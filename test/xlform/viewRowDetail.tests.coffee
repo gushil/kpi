@@ -1037,10 +1037,15 @@ do ->
       @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
       $model = require('../../jsapp/xlform/src/_model')
       @mixin = @viewRowDetail.DetailViewMixins.appearance
-      @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>')
+      # Appended to the document — onOcRowStructureChange now requires the
+      # settings wrap to be in the document (matches how a genuinely open
+      # panel looks), same as the OC-28463 listener below.
+      @$testRoot = $('<div/>').appendTo('body')
+      @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo(@$testRoot)
     afterEach ->
       window.xlfHideWarnings = false
       sessionStorage.removeItem('kpi.editable-form.form-style')
+      @$testRoot?.remove()
 
     # Builds and expand-renders an appearance mixin for `row`, wired up exactly
     # like the real RowView/DetailView pairing, against the shared
@@ -1161,6 +1166,46 @@ do ->
       contextText = @$cardSettingsWrap.find('.item-width__context').text()
       expect(contextText.indexOf('Form has')).toBe(-1)
       expect(contextText.indexOf('Parent group (')).toBe(0)
+
+    it 'tears down the ocRowStructureChange listener on remove() for a legacy-path type (e.g. image)', ->
+      # Uses the real DetailView class (not the synthetic mixin_ctx harness)
+      # so remove() is the actual DetailView.prototype.remove — the fix is
+      # rowView._appearanceDV getting set from inside _afterRenderWidth,
+      # which is what makes _cleanupExpandedRender's "if @_appearanceDV then
+      # @_appearanceDV.remove()" reach legacy-path types at all.
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'image', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      detail = row.get('appearance')
+      rowView = $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      dv = new @viewRowDetail.DetailView({ model: detail, rowView: rowView })
+      dv.render()
+      expect(dv.isCardGridType()).toBe(false)
+      expect(rowView._appearanceDV).toBe(dv)
+
+      renderCount = 0
+      original = dv._afterRenderWidth.bind(dv)
+      dv._afterRenderWidth = -> renderCount++; original()
+
+      dv.remove()
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+      expect(renderCount).toBe(0)
+
+    it 'item whose settings panel was closed (detached wrap) does not update on structural change', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+      @$cardSettingsWrap.detach()  # simulate closing the item's settings panel
+
+      survey._addGroup(__rows: [row])
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+
+      # detached — must not update
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
 
   ###############################################################
   # OC-28463: item width picker must re-render when parent group

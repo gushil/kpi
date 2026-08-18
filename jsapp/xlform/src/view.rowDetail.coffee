@@ -1369,6 +1369,14 @@ module.exports = do ->
       # catch a deleted row. row.detach() nulls the ROW's _parent instead
       # (model.row.coffee), so check that via @rowView.model.
       return unless @rowView?.model?._parent?
+      # Skip panels whose wrap is no longer in the document — the same guard
+      # the parentAppearance listener uses in _afterRenderWidth. Safe now
+      # that groupSelectedRows dispatches only after its own reset() has put
+      # the row back in the document (view.surveyApp.coffee); a dispatch
+      # racing ahead of that would make this indistinguishable from a truly
+      # closed panel and wrongly suppress the refresh.
+      settingsWrap = @rowView?.cardSettingsWrap
+      return unless settingsWrap?.length and document.body.contains(settingsWrap[0])
       return unless @is_form_style_theme_grid()
       @_afterRenderWidth()
 
@@ -1800,7 +1808,11 @@ module.exports = do ->
       # reaches _afterRenderWidth, including legacy-path types like "image" that
       # aren't in isCardGridType's list and never run the card-grid branch of
       # afterRender. Unconditional teardown mirrors the parentAppearance listener
-      # above — avoids stacking listeners across repeated calls.
+      # above, avoiding stacked listeners across repeated calls.
+      # The back-ref below is what makes teardown reachable: _cleanupExpandedRender
+      # only calls remove() via rowView._appearanceDV, and afterRender sets that
+      # for isCardGridType() rows only, so legacy types would leak this listener.
+      @rowView._appearanceDV = @
       if @_onOcRowStructureChangeBound
         document.removeEventListener('ocRowStructureChange', @_onOcRowStructureChangeBound)
       @_onOcRowStructureChangeBound = => @onOcRowStructureChange()
