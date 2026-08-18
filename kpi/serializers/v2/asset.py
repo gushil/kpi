@@ -980,14 +980,7 @@ class AssetSerializer(serializers.HyperlinkedModelSerializer):
         if request.user.is_superuser:
             access_types.append('superuser')
 
-        if 'organizations_per_asset' in self.context:
-            organization = self.context['organizations_per_asset'].get(asset.id)
-        else:
-            # Fallback on context if it exists (i.e.: asset lists of an organization).
-            # Otherwise, retrieve from the asset owner.
-            organization = self.context.get('organization')
-            if organization is None:
-                organization = asset.owner.organization
+        organization = self._resolve_organization(asset)
 
         # `organization` is `None` for a removed org member/owner (see
         # MemberViewSet.perform_destroy); skip the admin grant in that case.
@@ -1002,16 +995,22 @@ class AssetSerializer(serializers.HyperlinkedModelSerializer):
 
         return access_types
 
+    def _resolve_organization(self, asset):
+        """
+        Shared by get_access_types/get_owner_label. May be `None` for an
+        owner with no organization (e.g. a removed org member/owner).
+        """
+        if 'organizations_per_asset' in self.context:
+            return self.context['organizations_per_asset'].get(asset.id)
+
+        organization = self.context.get('organization')
+        if organization is None:
+            organization = asset.owner.organization
+        return organization
+
     @extend_schema_field(OpenApiTypes.STR)
     def get_owner_label(self, asset):
-        if 'organizations_per_asset' in self.context:
-            organization = self.context['organizations_per_asset'].get(asset.id)
-        else:
-            # Fallback on context if it exists (i.e.: asset lists of an organization).
-            # Otherwise, retrieve from the asset owner.
-            organization = self.context.get('organization')
-            if organization is None:
-                organization = asset.owner.organization
+        organization = self._resolve_organization(asset)
 
         if (
             organization

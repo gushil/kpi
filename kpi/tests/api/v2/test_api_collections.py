@@ -367,6 +367,29 @@ class CollectionsTests(BaseTestCase):
         access_types = self._get_access_types_per_collection()
         assert sorted(access_types['shared collection']) == ['org-admin', 'shared']
 
+    def test_collection_detail_access_types_when_owner_has_no_organization(self):
+        """
+        Unlike the list/org-scoped endpoints, asset-detail has no
+        `organizations_per_asset`/`organization` in context.
+        """
+        another_user = User.objects.get(username='anotheruser')
+        shared_collection = Asset.objects.create(
+            asset_type=ASSET_TYPE_COLLECTION,
+            name='shared collection',
+            owner=another_user,
+        )
+        shared_collection.assign_perm(self.someuser, PERM_VIEW_ASSET)
+        OrganizationUser.objects.filter(user=another_user).delete()
+
+        detail_url = reverse(
+            self._get_endpoint('asset-detail'),
+            kwargs={'uid_asset': shared_collection.uid},
+        )
+        response = self.client.get(detail_url)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['access_types'] == ['shared']
+        assert response.data['owner_label'] == another_user.username
+
     def _get_access_types_per_collection(self) -> dict:
         list_url = reverse(self._get_endpoint('asset-list'))
         response = self.client.get(f'{list_url}?q=asset_type:collection')
