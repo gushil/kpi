@@ -329,8 +329,8 @@ class CollectionsTests(BaseTestCase):
 
     def test_collection_access_types_when_owner_is_removed(self):
         """
-        A removed owner's `organization` property returns `None` instead of
-        lazily creating one, so no organization is available for access checks.
+        The list endpoint never touches the lazy `organization` property, so
+        this only differs from the test above in how the owner became org-less.
         """
         another_user = User.objects.get(username='anotheruser')
         shared_collection = Asset.objects.create(
@@ -367,10 +367,10 @@ class CollectionsTests(BaseTestCase):
         access_types = self._get_access_types_per_collection()
         assert sorted(access_types['shared collection']) == ['org-admin', 'shared']
 
-    def test_collection_detail_access_types_when_owner_has_no_organization(self):
+    def test_collection_detail_access_types_when_owner_is_removed(self):
         """
-        Unlike the list/org-scoped endpoints, asset-detail has no
-        `organizations_per_asset`/`organization` in context.
+        Detail has no context shortcut, so it hits the lazy `organization`
+        property directly; only a removed owner makes it return `None`.
         """
         another_user = User.objects.get(username='anotheruser')
         shared_collection = Asset.objects.create(
@@ -380,6 +380,8 @@ class CollectionsTests(BaseTestCase):
         )
         shared_collection.assign_perm(self.someuser, PERM_VIEW_ASSET)
         OrganizationUser.objects.filter(user=another_user).delete()
+        another_user.extra_details.date_removed = timezone.now()
+        another_user.extra_details.save(update_fields=['date_removed'])
 
         detail_url = reverse(
             self._get_endpoint('asset-detail'),
@@ -389,6 +391,7 @@ class CollectionsTests(BaseTestCase):
         assert response.status_code == status.HTTP_200_OK
         assert response.data['access_types'] == ['shared']
         assert response.data['owner_label'] == another_user.username
+        assert another_user.organizations_organization.count() == 0
 
     def _get_access_types_per_collection(self) -> dict:
         list_url = reverse(self._get_endpoint('asset-list'))

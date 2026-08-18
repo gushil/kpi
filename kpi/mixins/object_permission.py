@@ -555,7 +555,11 @@ class ObjectPermissionMixin:
         project_views_perms = get_project_view_user_permissions_for_asset(self, user)
 
         other_perms = []
-        if self.owner and self.owner.organization.is_admin_only(user):
+        if (
+            self.owner
+            and self.owner.organization
+            and self.owner.organization.is_admin_only(user)
+        ):
             # Admins do not receive explicit permission assignments.
             other_perms = list(self.get_org_admin_inherited_perms(self))
 
@@ -619,6 +623,7 @@ class ObjectPermissionMixin:
 
             if (
                 self.owner
+                and self.owner.organization
                 and self.owner.organization.is_admin_only(user_obj)
                 and codename in org_admin_perms
             ):
