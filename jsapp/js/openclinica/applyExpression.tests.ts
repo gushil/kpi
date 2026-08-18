@@ -322,3 +322,37 @@ describe('readCurrentExpression (P1.3 AC2)', () => {
     chai.expect(readCurrentExpression(makeRow({ detail: numDetail }).row, 'repeat_count')).to.equal('7')
   })
 })
+
+describe('P1.3 AC guards — pass-through fidelity, no provenance, round-trip', () => {
+  it('AC3: writes the applied expression byte-identical for a non-stripping attribute', () => {
+    // repeat_count is neither newline-stripping nor facade-backed, so the
+    // string must land in RowDetail exactly as the dialog sent it.
+    const { row, detail } = makeRow()
+    const expr = "concat('a', \"b\")  + ${W}"
+    const outcome = applyExpressionToRow(row, 'repeat_count', expr)
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
+    chai.expect(detail.set.mock.calls).to.deep.equal([['value', expr]])
+  })
+
+  it('AC5: apply writes only the value key — no provenance mark on detail or row', () => {
+    const detail = { set: jest.fn(), getValue: jest.fn() }
+    const row = {
+      get: jest.fn(() => detail),
+      getSurvey: jest.fn(() => ({ trigger: jest.fn() })),
+      set: jest.fn(),
+    }
+    applyExpressionToRow(row, 'default', '1 + 1')
+    chai.expect(row.set.mock.calls.length).to.equal(0)
+    chai.expect(detail.set.mock.calls.map((c: any[]) => c[0])).to.deep.equal(['value'])
+  })
+
+  it('AC6: an applied facade expression round-trips byte-for-byte through the raw read', () => {
+    const { row, rawValue } = makeFacadeRow({ raw: '', serialize: (raw: string) => raw })
+    const expr = "${HEIGHT} > 0 and ${WEIGHT} > 0"
+    const outcome = applyExpressionToRow(row, 'constraint', expr)
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
+    chai.expect(rawValue()).to.equal(expr)
+    // The same raw value is what the confirmation reader reports next time.
+    chai.expect(readCurrentExpression(row, 'constraint')).to.equal(expr)
+  })
+})
