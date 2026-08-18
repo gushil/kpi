@@ -282,6 +282,10 @@ class AssetImportTaskTest(BaseTestCase):
         self.assertEqual(detail_response.data['status'], 'complete')
 
     def test_import_xls_with_default_language_not_in_translations(self):
+        """
+        OC-28445: plain `label` now gets suffixed to match `default_language`,
+        so the mismatch error no longer fires for this asset.
+        """
         asset = Asset.objects.get(pk=2)
         xlsx_io = asset.to_xlsx_io(
             append={'settings': {'default_language': 'English (en)'}}
@@ -296,10 +300,8 @@ class AssetImportTaskTest(BaseTestCase):
         # Task should complete right away due to `CELERY_TASK_ALWAYS_EAGER`
         detail_response = self.client.get(response.data['url'])
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(detail_response.data['status'], 'error')
-        self.assertTrue(
-            detail_response.data['messages']['error'].startswith(
-                '`English (en)` is specified as the default language, '
-                'but only these translations are present in the form:'
-            )
-        )
+        self.assertEqual(detail_response.data['status'], 'complete')
+        created_details = detail_response.data['messages']['created'][0]
+        created_asset = Asset.objects.get(uid=created_details['uid'])
+        self.assertEqual(created_asset.content['translations'][0], 'English (en)')
+        self.assertIn('English', created_asset.content['translations'])

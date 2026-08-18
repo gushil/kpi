@@ -375,6 +375,98 @@ class AssetContentTests(AssetsTestCase):
         )
         assert q1['label'] == ['Modified question', 'Question modifiée']
 
+    def test_first_upload_single_language_form_names_label_like_hint(self):
+        """
+        OC-28445: `label` must be suffixed like `hint` on first upload, or
+        Form Designer sees a mixed unnamed/named language and refuses to load.
+        """
+        content = {
+            'survey': [
+                {
+                    'name': 'q1',
+                    'type': 'text',
+                    'label': 'Question 1',
+                    'hint': 'Some hint',
+                },
+            ],
+            'choices': [],
+            'settings': {'default_language': 'English (en)'},
+        }
+
+        asset = Asset.objects.create(
+            owner=self.user, asset_type='survey', content=content
+        )
+
+        self.assertEqual(asset.content['translations'], ['English (en)'])
+        self.assertNotIn(None, asset.content['translations'])
+        q1 = next(
+            r for r in asset.content['survey'] if r.get('name') == 'q1'
+        )
+        self.assertEqual(q1['label'], ['Question 1'])
+        self.assertEqual(q1['hint'], ['Some hint'])
+
+    def test_first_upload_single_language_form_names_image_like_label(self):
+        """
+        OC-28445: a plain `image` column is translatable too (formpack treats
+        media columns the same as label/hint), so it must be suffixed too.
+        """
+        content = {
+            'survey': [
+                {
+                    'name': 'q1',
+                    'type': 'text',
+                    'label': 'Question 1',
+                    'image': 'photo.png',
+                },
+            ],
+            'choices': [],
+            'settings': {'default_language': 'English (en)'},
+        }
+
+        asset = Asset.objects.create(
+            owner=self.user, asset_type='survey', content=content
+        )
+
+        self.assertEqual(asset.content['translations'], ['English (en)'])
+        self.assertNotIn(None, asset.content['translations'])
+        q1 = next(
+            r for r in asset.content['survey'] if r.get('name') == 'q1'
+        )
+        self.assertEqual(q1['label'], ['Question 1'])
+        self.assertEqual(q1['image'], ['photo.png'])
+
+    def test_first_upload_single_language_form_names_all_media_columns(self):
+        """
+        OC-28445: every formpack media column (audio/video/big-image), not
+        just image, must be suffixed too or the same mismatch reproduces.
+        """
+        content = {
+            'survey': [
+                {
+                    'name': 'q1',
+                    'type': 'text',
+                    'label': 'Question 1',
+                    'audio': 'a.mp3',
+                    'video': 'v.mp4',
+                    'big-image': 'big.png',
+                },
+            ],
+            'choices': [],
+            'settings': {'default_language': 'English (en)'},
+        }
+
+        asset = Asset.objects.create(
+            owner=self.user, asset_type='survey', content=content
+        )
+
+        self.assertEqual(asset.content['translations'], ['English (en)'])
+        q1 = next(
+            r for r in asset.content['survey'] if r.get('name') == 'q1'
+        )
+        self.assertEqual(q1['audio'], ['a.mp3'])
+        self.assertEqual(q1['video'], ['v.mp4'])
+        self.assertEqual(q1['media::big-image'], ['big.png'])
+
     def test_flatten_empty_relevant(self):
         content = self._wrap_field('relevant', [])
         a1 = Asset.objects.create(content=content, asset_type='survey')
