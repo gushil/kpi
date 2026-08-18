@@ -114,6 +114,19 @@ export function applyExpressionToRow(row: any, attribute: string, expression: st
   }
 }
 
+/**
+ * The panel editor's current expression for (row, attribute), read RAW from
+ * the RowDetail (`detail.get('value')`) — never `getValue()`, whose facade
+ * reserialization for relevant/constraint silently drops clauses it can't
+ * resolve. Bound into the AI Generator dialog's `getCurrentExpression` prop
+ * (P1.3 AC2): called at Apply-click time to decide whether the inline
+ * overwrite confirmation fires. Missing row/detail/value reads as '' — an
+ * empty editor, which applies without confirmation.
+ */
+export function readCurrentExpression(row: any, attribute: string): string {
+  return String(row?.get?.(attribute)?.get?.('value') ?? '')
+}
+
 // Per-attribute expression input inside a settings drawer. Scoped to a `root`
 // (the row's own `.card__settings`) by the caller so a second open drawer — or
 // a group + child row rendering the same class — can't be hit (round-5 #2).

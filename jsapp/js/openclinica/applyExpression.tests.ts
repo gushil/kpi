@@ -1,5 +1,5 @@
 import chai from 'chai'
-import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from './applyExpression'
+import { applyExpressionToRow, focusGenerateButton, focusPanelInput, readCurrentExpression } from './applyExpression'
 
 // Minimal Backbone-ish fakes: a row hands out a RowDetail via get(attribute)
 // and its survey via getSurvey(); the detail exposes set()/getValue().
@@ -280,5 +280,45 @@ describe('focusGenerateButton (P1.1 AC6, dismiss)', () => {
   it('returns false and warns when no matching Generate button exists', () => {
     chai.expect(focusGenerateButton('relevant')).to.equal(false)
     chai.expect(warnSpy.mock.calls.length).to.equal(1)
+  })
+})
+
+describe('readCurrentExpression (P1.3 AC2)', () => {
+  it('returns the raw stored value for the attribute', () => {
+    const detail = {
+      set: jest.fn(),
+      get: jest.fn((k: string) => (k === 'value' ? '${OLD} + 1' : undefined)),
+      getValue: jest.fn(() => 'reformatted'),
+    }
+    const { row } = makeRow({ detail })
+    chai.expect(readCurrentExpression(row, 'calculation')).to.equal('${OLD} + 1')
+    chai.expect(detail.getValue.mock.calls.length).to.equal(0)
+  })
+
+  it('returns the RAW value for facade attributes — never the lossy getValue() serialization', () => {
+    const { row, detail } = makeFacadeRow({
+      raw: "${A} = '1' and ${GONE} = '2'",
+      serialize: () => "${A} = '1'",
+    })
+    chai.expect(readCurrentExpression(row, 'relevant')).to.equal("${A} = '1' and ${GONE} = '2'")
+    chai.expect(detail.getValue.mock.calls.length).to.equal(0)
+  })
+
+  it('returns empty string when the row has no RowDetail for the attribute', () => {
+    const { row } = makeRow({ detail: undefined })
+    chai.expect(readCurrentExpression(row, 'calculation')).to.equal('')
+  })
+
+  it('returns empty string for a null row and for a detail without get()', () => {
+    chai.expect(readCurrentExpression(null, 'calculation')).to.equal('')
+    const { row } = makeRow({ detail: { set: jest.fn(), getValue: jest.fn() } })
+    chai.expect(readCurrentExpression(row, 'calculation')).to.equal('')
+  })
+
+  it('returns empty string when the stored value is null, and coerces non-strings', () => {
+    const nullDetail = { set: jest.fn(), get: jest.fn(() => null), getValue: jest.fn() }
+    chai.expect(readCurrentExpression(makeRow({ detail: nullDetail }).row, 'default')).to.equal('')
+    const numDetail = { set: jest.fn(), get: jest.fn(() => 7), getValue: jest.fn() }
+    chai.expect(readCurrentExpression(makeRow({ detail: numDetail }).row, 'repeat_count')).to.equal('7')
   })
 })
