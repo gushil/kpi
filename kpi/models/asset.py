@@ -15,6 +15,7 @@ from django.utils.translation import gettext_lazy as t
 from taggit.managers import TaggableManager, _TaggableManager
 from taggit.utils import require_instance_manager
 
+from formpack.constants import MEDIA_COLUMN_NAMES
 from formpack.utils.flatten_content import flatten_content
 from formpack.utils.json_hash import json_hash
 from formpack.utils.kobo_locking import strip_kobo_locking_profile
@@ -1506,18 +1507,14 @@ class Asset(
         if not content.get('translations') and existing_translations:
             content['translations'] = existing_translations
 
-        # Suffix plain hint and label strings to the default language
+        # Suffix every translatable column (formpack treats label/hint/media
+        # alike) so none are left unnamed, mixing named and unnamed languages.
         default_lang = settings_data.get('default_language')
         if default_lang:
-            for row in content.get('survey', []):
-                if 'hint' in row and isinstance(row['hint'], str):
-                    row[f'hint::{default_lang}'] = row.pop('hint')
-            # Only suffix plain labels for multilingual forms. On single-language
-            # forms, plain `label` is the expected format for an unnamed translation.
-            if len(existing_translations) > 1:
-                for row in content.get('survey', []) + content.get('choices', []):
-                    if 'label' in row and isinstance(row['label'], str):
-                        row[f'label::{default_lang}'] = row.pop('label')
+            for row in content.get('survey', []) + content.get('choices', []):
+                for col in ('label', 'hint') + MEDIA_COLUMN_NAMES:
+                    if col in row and isinstance(row[col], str):
+                        row[f'{col}::{default_lang}'] = row.pop(col)
 
 
 class UserAssetSubscription(models.Model):
