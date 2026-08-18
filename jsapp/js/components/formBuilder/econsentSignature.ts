@@ -38,35 +38,53 @@ function getHashQueryParam(name: string): string | null {
   return new URLSearchParams(hash.slice(queryIndex)).get(name)
 }
 
-let _lastKnownEconsent: string | null = null
+const ECONSENT_KEY = 'oc.fd.econsent'
+const EVENT_TYPE_KEY = 'oc.fd.eventType'
 
+// At document load the URL is authoritative: Wekan always builds Library and
+// Edit URLs with ?econsent when the module is on. A load without the param means
+// the module is off for this context, so clear any value a previous document in
+// this tab may have stored. Nothing after load may clear these values, because
+// every param-less URL after load is a stripped one — React Router drops the
+// hash query on any navigate(path) call that carries no query.
 if (typeof window !== 'undefined') {
-  _lastKnownEconsent = getHashQueryParam('econsent')
-  window.addEventListener('hashchange', () => {
-    const v = getHashQueryParam('econsent')
-    if (v) _lastKnownEconsent = v
-  })
+  const econsent = getHashQueryParam('econsent')
+  if (econsent === null) {
+    sessionStorage.removeItem(ECONSENT_KEY)
+    sessionStorage.removeItem(EVENT_TYPE_KEY)
+  } else {
+    sessionStorage.setItem(ECONSENT_KEY, econsent)
+    sessionStorage.setItem(EVENT_TYPE_KEY, getHashQueryParam('event_type') ?? '')
+  }
 }
 
 /**
  * Returns the eConsent module status, reading the URL hash first and falling
- * back to the last known value captured at page load or on a prior hashchange.
- * The fallback is intentional: after React Router navigates back to the library
- * route (stripping `?econsent` from the URL), template edit links must still
- * carry `?econsent` so the eConsent signature item remains available in the
- * form builder.
+ * back to the value stored in sessionStorage at document load.
+ * The fallback is intentional: React Router drops ?econsent on any navigate()
+ * call that carries no query, so after returning from the editor to the library
+ * the URL is always param-less. sessionStorage survives that navigation and is
+ * cleared on the next document load only when Wekan opens the page without
+ * ?econsent (meaning the module is off for this context).
  */
 export function getStudyEConsentModuleStatus(): string | null {
-  return getHashQueryParam('econsent') ?? _lastKnownEconsent
+  return getHashQueryParam('econsent') ?? sessionStorage.getItem(ECONSENT_KEY)
 }
 
 /**
  * Read the event type for the current form context from the URL query parameter
- * `event_type`. Returns null when the parameter is absent (e.g. Library editing),
- * or an empty string when the parameter is present but has no value.
+ * `event_type`, falling back to the value stored at document load alongside the
+ * eConsent status. Returns null when the parameter was absent at load (e.g.
+ * Library editing) or when the URL is stripped after navigation. An empty string
+ * stored at load means the param was absent, which is mapped back to null so
+ * the library case remains permitted.
  */
 export function getFormEventType(): FormEventType | null {
-  return getHashQueryParam('event_type')
+  const live = getHashQueryParam('event_type')
+  if (live !== null) return live
+  const stored = sessionStorage.getItem(EVENT_TYPE_KEY)
+  // '' was stored when event_type was absent at load → treat as no event context
+  return stored || null
 }
 
 /**
