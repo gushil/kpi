@@ -377,8 +377,8 @@ class AssetContentTests(AssetsTestCase):
 
     def test_first_upload_single_language_form_names_label_like_hint(self):
         """
-        OC-28445: `label` must be suffixed like `hint` on first upload, or FD
-        sees a mixed unnamed/named language and refuses to load the form.
+        OC-28445: `label` must be suffixed like `hint` on first upload, or
+        Form Designer sees a mixed unnamed/named language and refuses to load.
         """
         content = {
             'survey': [

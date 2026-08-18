@@ -1512,7 +1512,7 @@ class Asset(
         default_lang = settings_data.get('default_language')
         if default_lang:
             for row in content.get('survey', []) + content.get('choices', []):
-                for col in ('label', 'hint') + MEDIA_COLUMN_NAMES:
+                for col in ('label', 'hint', *MEDIA_COLUMN_NAMES):
                     if col in row and isinstance(row[col], str):
                         row[f'{col}::{default_lang}'] = row.pop(col)
 
