@@ -455,7 +455,9 @@ class AssetSnapshotViewSet(OpenRosaViewSetMixin, AuditLoggedNoUpdateModelViewSet
             # pointing at the XML detail endpoint instead of using Enketo's
             # preview API (which posts a server_url back). This avoids the
             # `requests.post`/`enketo_flush_cached_preview` round-trip.
-            preview_url = '{}/{}?form={}&lang=en'.format(
+            # OC-28411: no longer forcing English - preview should follow
+            # the form's own configured primary/default language.
+            preview_url = '{}/{}?form={}'.format(
                 settings.ENKETO_URL,
                 settings.ENKETO_PREVIEW_ENDPOINT,
                 reverse(
