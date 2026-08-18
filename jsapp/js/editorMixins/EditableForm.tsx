@@ -54,7 +54,7 @@ import {
   update_states,
 } from '#/constants'
 import envStore from '#/envStore'
-import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
+import { applyExpressionToRow, focusGenerateButton, focusPanelInput, readCurrentExpression } from '#/openclinica/applyExpression'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
 import { logicBuilderClient } from '#/openclinica/logicBuilderClient'
 import { buildFieldContext, buildItemDefinition, readItemName } from '#/openclinica/logicBuilderContext'
@@ -491,6 +491,9 @@ export default function EditableForm(props: EditableFormProps) {
         // would make the scroll container unhittable and break AC2's
         // "scrollable but inert".
         onApply={applyGeneratedExpression}
+        // P1.3 AC2: live raw read of the panel editor at Apply-click time —
+        // drives the dialog's inline overwrite confirmation.
+        getCurrentExpression={() => readCurrentExpression(request.row, request.attribute)}
         onClose={closeGenerateDialog}
       />
     )
