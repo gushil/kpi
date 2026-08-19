@@ -18,6 +18,7 @@ from kpi.mixins import (
     XlsExportableMixin,
     OCFormUtilsMixin,
 )
+from kpi.mixins.oc_form_utils import OC_UNTRANSLATED_MEDIA_COLUMNS
 from kpi.utils.hash import calculate_hash
 from kpi.utils.log import logging
 from kpi.utils.models import DjangoModelABCMetaclass
@@ -189,39 +190,44 @@ class AssetSnapshot(
         return super().save(*args, **kwargs)
 
     def _adjust_content_media_column_before_generate_xml(self, content):
+        """
+        Rename OC's untranslated media columns to the `media::<type>` name
+        formpack and pyxform expect, and name the form's first language on them.
+        Without a language, formpack reads the column as untranslated and appends
+        the unnamed language, so translations outnumber the entries in every
+        `label` list and XForm generation fails (OC-28513).
 
-        media_columns = {"audio": "media::audio", "image": "media::image", "video": 'media::video'}
+        No suffix in two cases: the first language is itself unnamed, so there is
+        nothing to add; or formpack already expanded the column into a
+        per-language list (base name in `content['translated']`, or a list
+        value), where pinning it to one language would collapse the list.
 
-        def _adjust_media_columns(survey, non_dc_cols):
-            for survey_col_idx in range(len(survey)):
-                survey_col = survey[survey_col_idx]
-                survey_col_keys = list(survey_col.keys())
-                for survey_col_key in survey_col_keys:
-                    if survey_col_key in non_dc_cols:
-                        survey_col["{}".format(media_columns[survey_col_key])] = survey_col[survey_col_key]
-                        del survey_col[survey_col_key]
+        Survey sheet only, matching the hide step in `OCFormUtilsMixin`. Choices
+        media is never hidden, so it arrives already renamed.
+        """
+        translations = content.get('translations') or []
+        first_language = translations[0] if translations else None
+        suffix = f'::{first_language}' if first_language else ''
+        translated = content.get('translated') or []
 
-        survey = content.get('survey', [])
-
-        survey_col_key_list = []
-        for survey_col_idx in range(len(survey)):
-            survey_col = survey[survey_col_idx]
-            survey_col_key_list = survey_col_key_list + list(survey_col.keys())
-
-        for media_column_key in media_columns.keys():
-            non_dc_col = media_column_key
-            non_dc_cols = [s for s in survey_col_key_list if s.startswith(non_dc_col)]
-
-            if len(non_dc_cols) > 0:
-                _adjust_media_columns(survey, non_dc_cols)
+        for row in content.get('survey', []):
+            for column in list(row.keys()):
+                base_column = column.split('::')[0]
+                if (
+                    base_column in OC_UNTRANSLATED_MEDIA_COLUMNS
+                    and not column.startswith('media::')
+                ):
+                    already_translated = (
+                        base_column in translated
+                        or isinstance(row[column], list)
+                    )
+                    new_suffix = '' if already_translated else suffix
+                    row[f'media::{base_column}{new_suffix}'] = row.pop(column)
 
         if 'translations' in content:
-            translated = content.get('translated', [])
-            non_dc_media_columns = ['audio', 'image', 'video']
-            for translated_idx in range(len(translated)):
-                for non_dc_media_column in non_dc_media_columns:
-                    if non_dc_media_column == translated[translated_idx]:
-                        translated[translated_idx] = u"{}".format(media_columns[non_dc_media_column])
+            for index, column in enumerate(translated):
+                if column in OC_UNTRANSLATED_MEDIA_COLUMNS:
+                    translated[index] = f'media::{column}'
 
     def _prepare_for_xml_pyxform_generation(self, content, id_string):
         if 'settings' in content:

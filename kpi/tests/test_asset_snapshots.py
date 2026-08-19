@@ -146,3 +146,103 @@ class AssetSnapshotHousekeeping(AssetSnapshotsTestCase):
         assert AssetSnapshot.objects.filter(
             pk=asset_2_newer_snapshot.id
         ).exists()
+
+
+class MediaColumnLanguageTestCase(TestCase):
+    """
+    OC-28513: a media column that OC keeps untranslated must be given the
+    form's first language before XForm generation. Without it, formpack reads
+    the column as untranslated, appends the unnamed language to
+    `translations`, and every `label` list is then one entry short.
+    """
+
+    fixtures = ['test_data']
+
+    def setUp(self):
+        self.user = User.objects.get(username='someuser')
+
+    def _source(self, first_language, media_column='image'):
+        label_column = (
+            'label' if first_language is None else f'label::{first_language}'
+        )
+        return {
+            'survey': [
+                {
+                    'type': 'text',
+                    'name': 'q1',
+                    '$kuid': 'k1',
+                    label_column: 'Question 1',
+                },
+                {
+                    'type': 'text',
+                    'name': 'q2',
+                    '$kuid': 'k2',
+                    label_column: 'Question 2',
+                    media_column: 'photo.png',
+                },
+            ],
+            'choices': [],
+            'settings': {
+                'id_string': 'media_language',
+                'form_title': 'Media language',
+            },
+        }
+
+    def _snapshot(self, source):
+        return AssetSnapshot.objects.create(owner=self.user, source=source)
+
+    def test_named_first_language_keeps_image_and_generates_xml(self):
+        snapshot = self._snapshot(self._source('English (en)'))
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertIn('photo.png', snapshot.xml)
+
+    def test_unnamed_first_language_still_generates_xml(self):
+        snapshot = self._snapshot(self._source(None))
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertIn('photo.png', snapshot.xml)
+
+    def test_audio_and_video_columns_get_the_first_language_too(self):
+        for media_column in ('audio', 'video'):
+            with self.subTest(media_column=media_column):
+                snapshot = self._snapshot(
+                    self._source('English (en)', media_column=media_column)
+                )
+                self.assertEqual(snapshot.details['status'], 'success')
+                self.assertIn('photo.png', snapshot.xml)
+
+    def test_already_expanded_media_column_keeps_both_languages(self):
+        """
+        A media column formpack has already expanded into a per-language
+        list (its base name is in `translated`) must not be suffixed with
+        the first language: that would tell formpack the whole list is one
+        filename for that language, stringifying both into a single value.
+        """
+        source = {
+            'survey': [
+                {
+                    'type': 'text',
+                    'name': 'q1',
+                    '$kuid': 'k1',
+                    'label': ['Question 1', 'Question 1 (fr)'],
+                },
+                {
+                    'type': 'text',
+                    'name': 'q2',
+                    '$kuid': 'k2',
+                    'label': ['Question 2', 'Question 2 (fr)'],
+                    'image': ['photo.png', 'photo_fr.png'],
+                },
+            ],
+            'choices': [],
+            'translated': ['label', 'image'],
+            'translations': ['English (en)', 'French (fr)'],
+            'settings': {
+                'id_string': 'media_language',
+                'form_title': 'Media language',
+            },
+        }
+        snapshot = self._snapshot(source)
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertIn('photo.png', snapshot.xml)
+        self.assertIn('photo_fr.png', snapshot.xml)
+        self.assertNotIn('photo.pngphoto_fr.png', snapshot.xml)

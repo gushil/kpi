@@ -1,3 +1,10 @@
+# Media columns OC hides behind an `oc_` prefix across standardization, so formpack
+# never expands them. OC-13108 needs the export to be `image` or `image::<language>`,
+# not `media::image`, which mixes a named and an unnamed language and then blocks
+# Form Designer from reopening the form.
+OC_UNTRANSLATED_MEDIA_COLUMNS = ('audio', 'image', 'video')
+
+
 class OCFormUtilsMixin:
 
     def _adjust_content_custom_column(self, content):
