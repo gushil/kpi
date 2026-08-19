@@ -1,3 +1,4 @@
+import { ECONSENT_SIGNATURE_EXTERNAL_VALUE } from '#/components/formBuilder/econsentSignature'
 import {
   applyFreshPrimaryLanguage,
   mergeFreshTranslations,
@@ -604,7 +605,7 @@ describe('surveyToValidJson - discard unsupported eConsent signature settings (O
   })
 
   it('strips item group, appearance, required, readonly, default, calculation and trigger from a "signature" row', () => {
-    const result = toValidSurvey([unsupportedRow('signature')])
+    const result = toValidSurvey([unsupportedRow(ECONSENT_SIGNATURE_EXTERNAL_VALUE)])
     const row = result.survey[0]
     expect(row).to.not.have.property('bind::oc:itemgroup')
     expect(row).to.not.have.property('appearance')
@@ -643,14 +644,14 @@ describe('surveyToValidJson - discard unsupported eConsent signature settings (O
         label: 'I consent',
         hint: 'Please confirm',
         relevant: '${some_question} = 1',
-        'bind::oc:external': 'signature',
+        'bind::oc:external': ECONSENT_SIGNATURE_EXTERNAL_VALUE,
       },
     ])
     const row = result.survey[0]
     expect(row.label).to.equal('I consent')
     expect(row.hint).to.equal('Please confirm')
     expect(row.relevant).to.equal('${some_question} = 1')
-    expect(row['bind::oc:external']).to.equal('signature')
+    expect(row['bind::oc:external']).to.equal(ECONSENT_SIGNATURE_EXTERNAL_VALUE)
   })
 
   it('leaves a non-eConsent row (no bind::oc:external) completely untouched', () => {
@@ -678,14 +679,16 @@ describe('surveyToValidJson - discard unsupported eConsent signature settings (O
   })
 
   it("doesn't add a field a signature row never had in the first place", () => {
-    const result = toValidSurvey([{ type: 'select_multiple', name: 'q1', 'bind::oc:external': 'signature' }])
+    const result = toValidSurvey([
+      { type: 'select_multiple', name: 'q1', 'bind::oc:external': ECONSENT_SIGNATURE_EXTERNAL_VALUE },
+    ])
     expect(result.survey[0]).to.not.have.property('appearance')
   })
 
   it('only strips fields on the matching signature row, leaving other rows in the same survey untouched', () => {
     const result = toValidSurvey([
       { type: 'text', name: 'q1', 'bind::oc:external': 'contactdata', 'bind::oc:itemgroup': 'group1' },
-      unsupportedRow('signature'),
+      unsupportedRow(ECONSENT_SIGNATURE_EXTERNAL_VALUE),
     ])
     expect(result.survey[0]['bind::oc:itemgroup']).to.equal('group1')
     expect(result.survey[1]).to.not.have.property('bind::oc:itemgroup')
