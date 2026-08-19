@@ -1355,3 +1355,47 @@ class TestAssetDataCollectors(TestCase):
         patched_set_links.assert_any_call(self.dc0.token)
         patched_set_links.assert_any_call(self.dc1.token)
         assert len(patched_set_links.call_args) == 2
+
+
+class LeakedOcMediaColumnTestCase(TestCase):
+    """
+    OC-28513: content stored with the internal `oc_<media>::<language>` name
+    must be restored to the bare media name on its next save, so the leaked
+    column stops reaching the downloaded template and the XForm.
+    """
+
+    fixtures = ['test_data']
+
+    def setUp(self):
+        self.user = User.objects.get(username='someuser')
+
+    def test_leaked_oc_image_column_is_restored_on_save(self):
+        asset = Asset.objects.create(
+            owner=self.user,
+            asset_type='survey',
+            content={
+                'survey': [
+                    {
+                        'name': 'q1',
+                        'type': 'text',
+                        'label': ['Question 1'],
+                        'oc_image::English (en)': 'photo.png',
+                        '$kuid': 'k1',
+                    },
+                ],
+                'choices': [],
+                'translations': ['English (en)'],
+                'translated': ['label'],
+                'settings': {
+                    'default_language': 'English (en)',
+                    'id_string': 'leaked',
+                },
+                'schema': '1',
+            },
+        )
+
+        q1 = next(r for r in asset.content['survey'] if r.get('name') == 'q1')
+        self.assertEqual(
+            [key for key in q1 if 'image' in key], ['image']
+        )
+        self.assertEqual(q1['image'], 'photo.png')
