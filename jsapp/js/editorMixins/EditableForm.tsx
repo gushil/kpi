@@ -54,7 +54,12 @@ import {
   update_states,
 } from '#/constants'
 import envStore from '#/envStore'
-import { applyExpressionToRow, focusGenerateButton, focusPanelInput, readCurrentExpression } from '#/openclinica/applyExpression'
+import {
+  applyExpressionToRow,
+  focusGenerateButton,
+  focusPanelInput,
+  readCurrentExpression,
+} from '#/openclinica/applyExpression'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
 import { logicBuilderClient } from '#/openclinica/logicBuilderClient'
 import { buildFieldContext, buildItemDefinition, readItemName } from '#/openclinica/logicBuilderContext'
@@ -413,11 +418,7 @@ export default function EditableForm(props: EditableFormProps) {
       // applyExpressionToRow already reverted the write, so nothing was
       // persisted (round-5 #5, PR#273 deferred). Return false so the dialog
       // stays open for the user to adjust the prompt and retry.
-      console.warn(
-        'Logic Builder: refused a lossy apply and reverted',
-        outcome,
-        request.attribute,
-      )
+      console.warn('Logic Builder: refused a lossy apply and reverted', outcome, request.attribute)
       if (outcome.unresolved.length > 0) {
         const names = outcome.unresolved.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
         alertify.error(
@@ -427,7 +428,9 @@ export default function EditableForm(props: EditableFormProps) {
         )
       } else {
         alertify.error(
-          t("The generated expression couldn't be represented by this panel's builder, so it was not applied. Nothing was changed."),
+          t(
+            "The generated expression couldn't be represented by this panel's builder, so it was not applied. Nothing was changed.",
+          ),
         )
       }
       return false

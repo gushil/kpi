@@ -74,8 +74,8 @@ describe('applyExpressionToRow (P1.3)', () => {
 
   it('joins newline-separated tokens with a space, never concatenating them (PR#273 deferred)', () => {
     const { row, detail } = makeRow()
-    applyExpressionToRow(row, 'calculation', "${A} = 1\nand ${B} = 2")
-    chai.expect(detail.set.mock.calls).to.deep.equal([['value', "${A} = 1 and ${B} = 2"]])
+    applyExpressionToRow(row, 'calculation', '${A} = 1\nand ${B} = 2')
+    chai.expect(detail.set.mock.calls).to.deep.equal([['value', '${A} = 1 and ${B} = 2']])
   })
 
   it('keeps newlines for relevant (manual entry keeps them there too)', () => {
@@ -184,7 +184,9 @@ describe('applyExpressionToRow (P1.3)', () => {
   it('rejects and reverts a ref-less wipeout — facade serializes a non-empty intent to empty (PR#273 deferred)', () => {
     const { row, detail, rawValue } = makeFacadeRow({ raw: "${OLD} = '1'", serialize: () => '' })
     const outcome = applyExpressionToRow(row, 'constraint', '. >= 0 and . <= 200')
-    chai.expect(outcome).to.deep.equal({ status: 'rejected', intended: '. >= 0 and . <= 200', stored: '', unresolved: [] })
+    chai
+      .expect(outcome)
+      .to.deep.equal({ status: 'rejected', intended: '. >= 0 and . <= 200', stored: '', unresolved: [] })
     chai.expect(rawValue()).to.equal("${OLD} = '1'")
   })
 
@@ -374,7 +376,7 @@ describe('P1.3 AC guards — pass-through fidelity, no provenance, round-trip', 
     // repeat_count is neither newline-stripping nor facade-backed, so the
     // string must land in RowDetail exactly as the dialog sent it.
     const { row, detail } = makeRow()
-    const expr = "concat('a', \"b\")  + ${W}"
+    const expr = 'concat(\'a\', "b")  + ${W}'
     const outcome = applyExpressionToRow(row, 'repeat_count', expr)
     chai.expect(outcome).to.deep.equal({ status: 'applied' })
     chai.expect(detail.set.mock.calls).to.deep.equal([['value', expr]])
@@ -394,7 +396,7 @@ describe('P1.3 AC guards — pass-through fidelity, no provenance, round-trip', 
 
   it('AC6: an applied facade expression round-trips byte-for-byte through the raw read', () => {
     const { row, rawValue } = makeFacadeRow({ raw: '', serialize: (raw: string) => raw })
-    const expr = "${HEIGHT} > 0 and ${WEIGHT} > 0"
+    const expr = '${HEIGHT} > 0 and ${WEIGHT} > 0'
     const outcome = applyExpressionToRow(row, 'constraint', expr)
     chai.expect(outcome).to.deep.equal({ status: 'applied' })
     chai.expect(rawValue()).to.equal(expr)
