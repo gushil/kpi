@@ -1026,6 +1026,188 @@ do ->
       expect(@detail.get('value')).toBe('multiline w14')
 
   ###############################################################
+  # OC-28433: Item width context line names the form (not "No
+  # parent group") for ungrouped items, and uses correct singular/
+  # plural "column"/"columns" wording everywhere it appears.
+  ###############################################################
+  describe 'view.rowDetail.DetailViewMixins: "appearance" (item) — Item width context line (OC-28433)', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      sessionStorage.setItem('kpi.editable-form.form-style', 'theme-grid')
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @mixin = @viewRowDetail.DetailViewMixins.appearance
+      # Appended to the document — onOcRowStructureChange now requires the
+      # settings wrap to be in the document (matches how a genuinely open
+      # panel looks), same as the OC-28463 listener below.
+      @$testRoot = $('<div/>').appendTo('body')
+      @$cardSettingsWrap = $('<div><div class="js-card-settings-advanced-toggle"></div></div>').appendTo(@$testRoot)
+    afterEach ->
+      window.xlfHideWarnings = false
+      sessionStorage.removeItem('kpi.editable-form.form-style')
+      @$testRoot?.remove()
+
+    # Builds and expand-renders an appearance mixin for `row`, wired up exactly
+    # like the real RowView/DetailView pairing, against the shared
+    # @$cardSettingsWrap. Takes mixin/viewRowDetail/$cardSettingsWrap as
+    # explicit params (rather than reading `@`) so it has no dependency on the
+    # caller's `this` binding.
+    renderAppearanceForRow = (mixin, viewRowDetail, $cardSettingsWrap, row) ->
+      mixin_ctx = $.extend({}, Backbone.Events, mixin, {
+        cid: 'cid_item_appearance'
+        $el: $('<div/>')
+        $: (sel) -> @$el.find(sel)
+        model: row.get('appearance')
+        Templates: viewRowDetail.Templates
+        rowView: $.extend({}, Backbone.Events, { cardSettingsWrap: $cardSettingsWrap, model: row })
+      })
+      mixin_ctx.$ = (sel) -> mixin_ctx.$el.find(sel)
+      mixin_ctx.html()
+      mixin_ctx.afterRender.call(mixin_ctx)
+      mixin_ctx
+
+    it 'ungrouped item names the form and its column count, not "No parent group"', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      contextText = @$cardSettingsWrap.find('.item-width__context').text()
+      expect(contextText).toBe('Form has 4 columns')
+      expect(contextText.indexOf('No parent group')).toBe(-1)
+
+    it 'ungrouped item still renders the 4-card fraction picker (treated as w4)', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      $wrap = @$cardSettingsWrap.find('.js-item-width-wrap')
+      expect($wrap.find('.width-card').length).toBe(4)
+      expect($wrap.find('.width-card__code').map(-> $(@).text()).get()).toEqual(['w4', 'w3', 'w2', 'w1'])
+
+    it 'grouped item in a 1-column group reads "1 column" (singular) on the context line', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey(survey: [
+        {type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w1', __rows: [
+          {type: 'text', name: 'q1', label: 'Q1'}
+        ]}
+      ])
+      group = survey.rows.at(0)
+      row = group.rows.at(0)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      contextText = @$cardSettingsWrap.find('.item-width__context').text()
+      expect(contextText).toBe('Parent group (grp1) has 1 column')
+
+    it 'grouped item in a 1-column group reads "1 column" (singular) on the span note', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey(survey: [
+        {type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w1', __rows: [
+          {type: 'text', name: 'q1', label: 'Q1'}
+        ]}
+      ])
+      group = survey.rows.at(0)
+      row = group.rows.at(0)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      spanNoteText = @$cardSettingsWrap.find('.item-width__span-note').text()
+      expect(spanNoteText).toBe('This group has 1 column, so widths are shown as columns.')
+
+    it 'context line refreshes when the item is grouped while its settings panel is open', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+
+      # Mirrors view.surveyApp.coffee's groupSelectedRows(): reparent the row
+      # into a brand-new group, then fire the same DOM event the real UI fires.
+      survey._addGroup(__rows: [row])
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+
+      contextText = @$cardSettingsWrap.find('.item-width__context').text()
+      expect(contextText.indexOf('Form has')).toBe(-1)
+      expect(contextText.indexOf('Parent group (')).toBe(0)
+
+    it 'context line refreshes when the item is ungrouped while its settings panel is open', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey(survey: [
+        {type: 'group', name: 'grp1', label: 'Group 1', appearance: 'w4', __rows: [
+          {type: 'text', name: 'q1', label: 'Q1'}
+        ]}
+      ])
+      group = survey.rows.at(0)
+      row = group.rows.at(0)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Parent group (grp1) has 4 columns')
+
+      # Mirrors view.row.coffee's _deleteGroup(): unwrap the group, then fire
+      # the same DOM event the real UI fires.
+      group.splitApart()
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+
+    it 'context line refreshes on grouping for a legacy-path type not in isCardGridType (e.g. image)', ->
+      # "image" reaches _afterRenderWidth via _afterRenderLegacy, NOT the
+      # card-grid branch of afterRender — the listener must be registered
+      # from inside _afterRenderWidth itself, or types like this never get it.
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'image', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      mixin_ctx = renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      expect(mixin_ctx.isCardGridType()).toBe(false)
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+
+      survey._addGroup(__rows: [row])
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+
+      contextText = @$cardSettingsWrap.find('.item-width__context').text()
+      expect(contextText.indexOf('Form has')).toBe(-1)
+      expect(contextText.indexOf('Parent group (')).toBe(0)
+
+    it 'tears down the ocRowStructureChange listener on remove() for a legacy-path type (e.g. image)', ->
+      # Uses the real DetailView class (not the synthetic mixin_ctx harness)
+      # so remove() is the actual DetailView.prototype.remove — the fix is
+      # rowView._appearanceDV getting set from inside _afterRenderWidth,
+      # which is what makes _cleanupExpandedRender's "if @_appearanceDV then
+      # @_appearanceDV.remove()" reach legacy-path types at all.
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'image', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      detail = row.get('appearance')
+      rowView = $.extend({}, Backbone.Events, { cardSettingsWrap: @$cardSettingsWrap, model: row })
+      dv = new @viewRowDetail.DetailView({ model: detail, rowView: rowView })
+      dv.render()
+      expect(dv.isCardGridType()).toBe(false)
+      expect(rowView._appearanceDV).toBe(dv)
+
+      renderCount = 0
+      original = dv._afterRenderWidth.bind(dv)
+      dv._afterRenderWidth = -> renderCount++; original()
+
+      dv.remove()
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+      expect(renderCount).toBe(0)
+
+    it 'item whose settings panel was closed (detached wrap) does not update on structural change', ->
+      $model = require('../../jsapp/xlform/src/_model')
+      survey = new $model.Survey()
+      survey.rows.add(type: 'text', name: 'q1', label: 'Q1')
+      row = survey.rows.at(0)
+      renderAppearanceForRow(@mixin, @viewRowDetail, @$cardSettingsWrap, row)
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+      @$cardSettingsWrap.detach()  # simulate closing the item's settings panel
+
+      survey._addGroup(__rows: [row])
+      document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+
+      # detached — must not update
+      expect(@$cardSettingsWrap.find('.item-width__context').text()).toBe('Form has 4 columns')
+
+  ###############################################################
   # OC-28463: item width picker must re-render when parent group
   # column count changes while the item settings panel is open.
   ###############################################################

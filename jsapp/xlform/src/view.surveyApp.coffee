@@ -864,6 +864,20 @@ module.exports = do ->
       if rows.length > 0
         @survey._addGroup(__rows: rows)
         @reset()
+        # Notify any open item settings panel that its parent group may have
+        # changed, so the Item width context line refreshes without the user
+        # closing and reopening it (OC-28433). @reset() defers the actual
+        # re-attach via its own setTimeout(0) (it debounces reset() calls
+        # internally), so chaining onto its returned promise risks silent
+        # loss if some other reset() call cancels this one's pending timeout
+        # first. Scheduling our own setTimeout(0) instead relies only on
+        # same-delay timers firing in scheduling order: @reset() above has
+        # already scheduled its timeout, so ours is guaranteed to run after
+        # the row is back in the document, not on the promise it returns.
+        setTimeout(
+          -> document.dispatchEvent(new CustomEvent('ocRowStructureChange'))
+          0
+        )
         return true
       else
         return false

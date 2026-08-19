@@ -215,6 +215,8 @@ module.exports = do ->
     remove: ->
       if @_onOcFormStyleChangeBound
         document.removeEventListener('ocFormStyleChange', @_onOcFormStyleChangeBound)
+      if @_onOcRowStructureChangeBound
+        document.removeEventListener('ocRowStructureChange', @_onOcRowStructureChangeBound)
       Backbone.off(null, null, @)
       super
 
@@ -1348,6 +1350,36 @@ module.exports = do ->
         else
           @rowView.cardSettingsWrap.find('.js-item-width-wrap').remove()
 
+    # Re-render the Item width context line when this item's structural parent
+    # changes — grouped or ungrouped — while its settings panel is open. Unlike
+    # a parent group's column-count *value* (OC-28463, a Backbone attribute we
+    # can listenTo), which group is the parent is a plain row._parent pointer
+    # with no change event of its own, so callers dispatch this DOM event
+    # (document.dispatchEvent(new CustomEvent('ocRowStructureChange'))) after
+    # any operation that reparents a row — see groupSelectedRows (view.surveyApp)
+    # and _deleteGroup (view.row).
+    # No isCardGridType()/questionType guard here: this listener is only ever
+    # registered from inside _afterRenderWidth (see below), which itself is
+    # only ever called for non-group/repeat item rows — including legacy-path
+    # types like "image" that fail isCardGridType() and would wrongly bail
+    # out here if that check were still present.
+    onOcRowStructureChange: ->
+      # @model is the appearance detail, whose own _parent is the row itself
+      # (stable, not nulled on detach) — checking @model?._parent? would never
+      # catch a deleted row. row.detach() nulls the ROW's _parent instead
+      # (model.row.coffee), so check that via @rowView.model.
+      return unless @rowView?.model?._parent?
+      # Skip panels whose wrap is no longer in the document — the same guard
+      # the parentAppearance listener uses in _afterRenderWidth. Safe now
+      # that groupSelectedRows dispatches only after its own reset() has put
+      # the row back in the document (view.surveyApp.coffee); a dispatch
+      # racing ahead of that would make this indistinguishable from a truly
+      # closed panel and wrongly suppress the refresh.
+      settingsWrap = @rowView?.cardSettingsWrap
+      return unless settingsWrap?.length and document.body.contains(settingsWrap[0])
+      return unless @is_form_style_theme_grid()
+      @_afterRenderWidth()
+
     # -------------------------------------------------------------------------
     # Card grid path (select_one / select_multiple)
     # -------------------------------------------------------------------------
@@ -1669,11 +1701,11 @@ module.exports = do ->
       currentW  = getWidthTokenFromModelValue(modelValue)
 
       # Context line text
+      col_word = if groupCols is 1 then t('column') else t('columns')
       if groupName?
-        col_word = if groupCols is 1 then t('column') else t('columns')
         contextText = "#{t('Parent group')} (#{groupName}) #{t('has')} #{groupCols} #{col_word}"
       else
-        contextText = t('No parent group')
+        contextText = "#{t('Form has')} #{groupCols} #{col_word}"
 
       # Build card definitions
       if groupCols is 4
@@ -1717,7 +1749,7 @@ module.exports = do ->
 
       if groupCols isnt 4
         $body.append($('<div/>', { class: 'item-width__span-note' }).text(
-          "#{t('This group has')} #{groupCols} #{t('columns, so widths are shown as columns.')}"
+          "#{t('This group has')} #{groupCols} #{col_word}#{t(', so widths are shown as columns.')}"
         ))
 
       $grid = $('<div/>', { class: 'item-width__grid' })
@@ -1771,6 +1803,20 @@ module.exports = do ->
             settingsWrap = @rowView?.cardSettingsWrap
             return unless settingsWrap?.length and document.body.contains(settingsWrap[0])
             @_afterRenderWidth()
+
+      # Re-register here (not in afterRender) so this fires for every type that
+      # reaches _afterRenderWidth, including legacy-path types like "image" that
+      # aren't in isCardGridType's list and never run the card-grid branch of
+      # afterRender. Unconditional teardown mirrors the parentAppearance listener
+      # above, avoiding stacked listeners across repeated calls.
+      # The back-ref below is what makes teardown reachable: _cleanupExpandedRender
+      # only calls remove() via rowView._appearanceDV, and afterRender sets that
+      # for isCardGridType() rows only, so legacy types would leak this listener.
+      @rowView._appearanceDV = @
+      if @_onOcRowStructureChangeBound
+        document.removeEventListener('ocRowStructureChange', @_onOcRowStructureChangeBound)
+      @_onOcRowStructureChangeBound = => @onOcRowStructureChange()
+      document.addEventListener('ocRowStructureChange', @_onOcRowStructureChangeBound)
 
       # Card select handler
       selectWidth = (el) =>
