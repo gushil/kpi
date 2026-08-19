@@ -114,17 +114,49 @@ export function applyExpressionToRow(row: any, attribute: string, expression: st
   }
 }
 
+// Attributes whose stored value can be a state sentinel rather than an
+// expression: the Required toggle persists '' | true | false | 'true' |
+// 'false' for its simple states (mirrors view.mandatorySetting.coffee's own
+// hasExpression test). Only a real expression — or the XLSForm 'yes' the
+// bridge writes for Always — should trigger the overwrite confirmation.
+const REQUIRED_EMPTY_SENTINELS = new Set(['', 'true', 'false'])
+
 /**
- * The panel editor's current expression for (row, attribute), read RAW from
- * the RowDetail (`detail.get('value')`) — never `getValue()`, whose facade
- * reserialization for relevant/constraint silently drops clauses it can't
- * resolve. Bound into the AI Generator dialog's `getCurrentExpression` prop
- * (P1.3 AC2): called at Apply-click time to decide whether the inline
- * overwrite confirmation fires. Missing row/detail/value reads as '' — an
- * empty editor, which applies without confirmation.
+ * The panel editor's current expression for (row, attribute): reads RAW from
+ * the RowDetail (`detail.get('value')`) when possible, prefers raw over the
+ * lossy `getValue()` facade reserialization. Bound into the AI Generator
+ * dialog's `getCurrentExpression` prop (P1.3 AC2): called at Apply-click time
+ * to decide whether the inline overwrite confirmation fires.
+ *
+ * Strategy: raw wins when non-empty — the XForm directly edited by the user.
+ * For facade-backed attributes (relevant/constraint), the raw value is only
+ * the facade's construction-time SEED; conditions built in the Skip Logic
+ * panel update facade state but never call `model.set('value')`, so empty raw
+ * means "unknown", not "empty". When raw is empty, consult the live
+ * serialization to detect panel-built content. For Required, empty sentinels
+ * ('', 'true', 'false', and boolean true/false) signal pristine or toggled
+ * simple states that should not trigger confirmation.
  */
 export function readCurrentExpression(row: any, attribute: string): string {
-  return String(row?.get?.(attribute)?.get?.('value') ?? '')
+  const detail = row?.get?.(attribute)
+  const raw = String(detail?.get?.('value') ?? '')
+  if (attribute === 'required' && REQUIRED_EMPTY_SENTINELS.has(raw.trim())) {
+    return ''
+  }
+  if (raw.trim() !== '') {
+    return raw
+  }
+  // relevant/constraint: the raw value is only the facade's SEED — conditions
+  // built in the panel update facade state, never model.set('value')
+  // (view.rowDetail.coffee), so an empty raw is "unknown", not "empty".
+  // Consult the live serialization purely for the emptiness decision; raw
+  // wins whenever it has content, so the lossy reserialization is never
+  // reported as the current expression. A throw propagates to the dialog's
+  // fail-safe (assume non-empty, confirm).
+  if (FACADE_ATTRIBUTES.has(attribute)) {
+    return String(detail?.getValue?.() ?? '')
+  }
+  return raw
 }
 
 // Per-attribute expression input inside a settings drawer. Scoped to a `root`

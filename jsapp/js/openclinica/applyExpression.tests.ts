@@ -295,7 +295,7 @@ describe('readCurrentExpression (P1.3 AC2)', () => {
     chai.expect(detail.getValue.mock.calls.length).to.equal(0)
   })
 
-  it('returns the RAW value for facade attributes — never the lossy getValue() serialization', () => {
+  it('prefers RAW for facade attributes when non-empty — never the lossy getValue() serialization', () => {
     const { row, detail } = makeFacadeRow({
       raw: "${A} = '1' and ${GONE} = '2'",
       serialize: () => "${A} = '1'",
@@ -320,6 +320,33 @@ describe('readCurrentExpression (P1.3 AC2)', () => {
     chai.expect(readCurrentExpression(makeRow({ detail: nullDetail }).row, 'default')).to.equal('')
     const numDetail = { set: jest.fn(), get: jest.fn(() => 7), getValue: jest.fn() }
     chai.expect(readCurrentExpression(makeRow({ detail: numDetail }).row, 'repeat_count')).to.equal('7')
+  })
+
+  it('falls back to the facade serialization ONLY to detect panel-built content when raw is empty', () => {
+    const { row, detail } = makeFacadeRow({ raw: '', serialize: () => "${A} = '1'" })
+    chai.expect(readCurrentExpression(row, 'relevant')).to.equal("${A} = '1'")
+    chai.expect(detail.getValue.mock.calls.length).to.equal(1)
+  })
+
+  it('does not consult the facade for non-facade attributes with empty raw', () => {
+    const detail = { set: jest.fn(), get: jest.fn(() => ''), getValue: jest.fn(() => 'SHOULD NOT BE READ') }
+    const { row } = makeRow({ detail })
+    chai.expect(readCurrentExpression(row, 'calculation')).to.equal('')
+    chai.expect(detail.getValue.mock.calls.length).to.equal(0)
+  })
+
+  it('normalizes the Required state sentinels to empty — pristine/toggled panels never confirm', () => {
+    for (const sentinel of ['', 'false', 'true', false, true]) {
+      const detail = { set: jest.fn(), get: jest.fn(() => sentinel), getValue: jest.fn() }
+      chai.expect(readCurrentExpression(makeRow({ detail }).row, 'required')).to.equal('')
+    }
+  })
+
+  it("keeps 'yes' (Always) and real expressions non-empty for required — those DO confirm", () => {
+    const yes = { set: jest.fn(), get: jest.fn(() => 'yes'), getValue: jest.fn() }
+    chai.expect(readCurrentExpression(makeRow({ detail: yes }).row, 'required')).to.equal('yes')
+    const expr = { set: jest.fn(), get: jest.fn(() => '${AGE} > 18'), getValue: jest.fn() }
+    chai.expect(readCurrentExpression(makeRow({ detail: expr }).row, 'required')).to.equal('${AGE} > 18')
   })
 })
 
