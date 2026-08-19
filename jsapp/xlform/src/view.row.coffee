@@ -27,7 +27,6 @@ econsentSignature = require('../../js/components/formBuilder/econsentSignature')
 # TODO: port this and others from alertify.dialog to new modal system
 # https://github.com/kobotoolbox/kpi/issues/3977
 multiConfirm = require('#/alertify').multiConfirm
-alertify = require('alertifyjs')
 constants = require('#/constants')
 notify = require('#/utils').notify
 arrayMiddleOut = require('#/oc/utils').processArrayMiddleOut
@@ -515,22 +514,7 @@ module.exports = do ->
     deleteGroup: (evt) ->
       evt.preventDefault()
       skipConfirm = $(evt.currentTarget).hasClass('js-force-delete-group')
-      if !skipConfirm
-        dialog = alertify.dialog('confirm')
-        opts =
-          title: t('Delete group')
-          message: t('Are you sure you want to split apart this group?')
-          labels:
-            ok: t('Yes')
-            cancel: t('No')
-          onok: =>
-            @_deleteGroup()
-            return
-          oncancel: =>
-            dialog.destroy()
-            return
-        dialog.set(opts).show()
-      else
+      if skipConfirm
         @_deleteGroup()
         return
 
