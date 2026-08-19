@@ -383,7 +383,10 @@ class TestAssetSnapshotDetail(AssetSnapshotBase):
         xml_response = self.client.get(snapshot_url)
         self.assertContains(xml_response, 'Global message in English')
 
-    def test_preview_forces_english_language(self):
+    def test_preview_does_not_force_english_language(self):
+        # OC-28411: the preview redirect must not append a `lang=en`
+        # override - this only verifies the param is absent, not that
+        # the form's configured language is actually applied downstream.
         self.client.login(username='someuser', password='someuser')
         url = reverse(self._get_endpoint('assetsnapshot-list'))
         data = {'source': self.form_source}
@@ -398,7 +401,7 @@ class TestAssetSnapshotDetail(AssetSnapshotBase):
         )
         preview_response = self.client.get(preview_url)
         self.assertEqual(preview_response.status_code, status.HTTP_302_FOUND)
-        self.assertIn('lang=en', preview_response.url)
+        self.assertNotIn('lang=en', preview_response.url)
 
     def test_preview_with_overridden_form_disclaimer(self):
         self.client.login(username='someuser', password='someuser')
