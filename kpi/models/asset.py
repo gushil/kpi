@@ -61,6 +61,7 @@ from kpi.mixins import (
     StandardizeSearchableFieldMixin,
     XlsExportableMixin,
 )
+from kpi.mixins.oc_form_utils import OC_UNTRANSLATED_MEDIA_COLUMNS
 from kpi.models.abstract_models import AbstractTimeStampedModel
 from kpi.models.asset_file import AssetFile
 from kpi.models.asset_snapshot import AssetSnapshot
@@ -1507,12 +1508,26 @@ class Asset(
         if not content.get('translations') and existing_translations:
             content['translations'] = existing_translations
 
-        # Suffix every translatable column (formpack treats label/hint/media
-        # alike) so none are left unnamed, mixing named and unnamed languages.
+        # Name every translatable column so none is left unnamed, mixing named
+        # and unnamed languages in one form (OC-28445). The media columns OC
+        # hides behind an `oc_` prefix are left alone: they are kept out of
+        # `content['translated']` on purpose, and naming them here only leaks
+        # the internal `oc_<media>::<language>` name into stored content, the
+        # downloaded template and the XForm (OC-28513). They are given the
+        # form's first language later, at XForm generation.
         default_lang = settings_data.get('default_language')
         if default_lang:
+            translatable_columns = (
+                'label',
+                'hint',
+                *(
+                    column
+                    for column in MEDIA_COLUMN_NAMES
+                    if column not in OC_UNTRANSLATED_MEDIA_COLUMNS
+                ),
+            )
             for row in content.get('survey', []) + content.get('choices', []):
-                for col in ('label', 'hint', *MEDIA_COLUMN_NAMES):
+                for col in translatable_columns:
                     if col in row and isinstance(row[col], str):
                         row[f'{col}::{default_lang}'] = row.pop(col)
 

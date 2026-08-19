@@ -405,10 +405,12 @@ class AssetContentTests(AssetsTestCase):
         self.assertEqual(q1['label'], ['Question 1'])
         self.assertEqual(q1['hint'], ['Some hint'])
 
-    def test_first_upload_single_language_form_names_image_like_label(self):
+    def test_first_upload_keeps_oc_media_columns_untranslated(self):
         """
-        OC-28445: a plain `image` column is translatable too (formpack treats
-        media columns the same as label/hint), so it must be suffixed too.
+        OC-28513: `audio`, `image` and `video` are kept out of formpack's
+        translation machinery on purpose, so naming the default language must
+        leave them alone. Naming them leaks the internal
+        `oc_<media>::<language>` name and drops the media from the XForm.
         """
         content = {
             'survey': [
@@ -416,7 +418,9 @@ class AssetContentTests(AssetsTestCase):
                     'name': 'q1',
                     'type': 'text',
                     'label': 'Question 1',
+                    'audio': 'a.mp3',
                     'image': 'photo.png',
+                    'video': 'v.mp4',
                 },
             ],
             'choices': [],
@@ -429,43 +433,68 @@ class AssetContentTests(AssetsTestCase):
 
         self.assertEqual(asset.content['translations'], ['English (en)'])
         self.assertNotIn(None, asset.content['translations'])
+        self.assertNotIn('audio', asset.content['translated'])
+        self.assertNotIn('image', asset.content['translated'])
+        self.assertNotIn('video', asset.content['translated'])
         q1 = next(
             r for r in asset.content['survey'] if r.get('name') == 'q1'
         )
         self.assertEqual(q1['label'], ['Question 1'])
-        self.assertEqual(q1['image'], ['photo.png'])
+        self.assertEqual(q1['audio'], 'a.mp3')
+        self.assertEqual(q1['image'], 'photo.png')
+        self.assertEqual(q1['video'], 'v.mp4')
 
-    def test_first_upload_single_language_form_names_all_media_columns(self):
+    def test_naming_primary_language_keeps_media_and_preview(self):
         """
-        OC-28445: every formpack media column (audio/video/big-image), not
-        just image, must be suffixed too or the same mismatch reproduces.
+        OC-28513: upload a form with one unnamed language and an `image`
+        value, then name English as the primary language. The column must keep
+        its name and the XForm must keep the image.
         """
-        content = {
-            'survey': [
-                {
-                    'name': 'q1',
-                    'type': 'text',
-                    'label': 'Question 1',
-                    'audio': 'a.mp3',
-                    'video': 'v.mp4',
-                    'big-image': 'big.png',
-                },
-            ],
-            'choices': [],
-            'settings': {'default_language': 'English (en)'},
-        }
-
         asset = Asset.objects.create(
-            owner=self.user, asset_type='survey', content=content
+            owner=self.user,
+            asset_type='survey',
+            content={
+                'survey': [
+                    {
+                        'name': 'q1',
+                        'type': 'text',
+                        'label': 'Question 1',
+                        'image': 'photo.png',
+                    },
+                ],
+                'choices': [],
+                'settings': {},
+            },
         )
+        self.assertEqual(asset.content['translations'], [None])
 
-        self.assertEqual(asset.content['translations'], ['English (en)'])
+        # What the Manage Languages modal sends when the first, unnamed
+        # language is given a name.
+        content = deepcopy(asset.content)
+        content['translations'][0] = 'English (en)'
+        content['settings']['default_language'] = 'English (en)'
+        asset.content = content
+        asset.save()
+        asset.refresh_from_db()
+
         q1 = next(
             r for r in asset.content['survey'] if r.get('name') == 'q1'
         )
-        self.assertEqual(q1['audio'], ['a.mp3'])
-        self.assertEqual(q1['video'], ['v.mp4'])
-        self.assertEqual(q1['media::big-image'], ['big.png'])
+        self.assertEqual([key for key in q1 if 'image' in key], ['image'])
+        self.assertEqual(q1['image'], 'photo.png')
+
+        snapshot = asset.snapshot(regenerate=True)
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertIn('photo.png', snapshot.xml)
+
+        workbook = openpyxl.load_workbook(asset.to_xlsx_io(versioned=False))
+        header = [
+            cell
+            for cell in next(workbook['survey'].iter_rows(values_only=True))
+            if cell
+        ]
+        self.assertIn('image', header)
+        self.assertNotIn('oc_image::English (en)', header)
 
     def test_flatten_empty_relevant(self):
         content = self._wrap_field('relevant', [])
