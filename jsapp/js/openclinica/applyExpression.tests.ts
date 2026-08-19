@@ -62,14 +62,20 @@ describe('applyExpressionToRow (P1.3)', () => {
     const { row, detail, survey } = makeRow()
     const outcome = applyExpressionToRow(row, 'calculation', '${A}\n + \r\n${B}')
     chai.expect(outcome).to.deep.equal({ status: 'applied' })
-    chai.expect(detail.set.mock.calls).to.deep.equal([['value', '${A} + ${B}']])
+    chai.expect(detail.set.mock.calls).to.deep.equal([['value', '${A}  +  ${B}']])
     chai.expect(survey.trigger.mock.calls).to.deep.equal([['change']])
   })
 
   it('strips newlines for required too — its panel input is single-line (round-5 #7)', () => {
     const { row, detail } = makeRow()
     applyExpressionToRow(row, 'required', '${A} = 1\nand ${B} = 2')
-    chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1and ${B} = 2')
+    chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1 and ${B} = 2')
+  })
+
+  it('joins newline-separated tokens with a space, never concatenating them (PR#273 deferred)', () => {
+    const { row, detail } = makeRow()
+    applyExpressionToRow(row, 'calculation', "${A} = 1\nand ${B} = 2")
+    chai.expect(detail.set.mock.calls).to.deep.equal([['value', "${A} = 1 and ${B} = 2"]])
   })
 
   it('keeps newlines for relevant (manual entry keeps them there too)', () => {
@@ -173,6 +179,19 @@ describe('applyExpressionToRow (P1.3)', () => {
     })
     const outcome = applyExpressionToRow(row, 'default', 'today()')
     chai.expect(outcome).to.deep.equal({ status: 'error', reason: 'write-failed' })
+  })
+
+  it('rejects and reverts a ref-less wipeout — facade serializes a non-empty intent to empty (PR#273 deferred)', () => {
+    const { row, detail, rawValue } = makeFacadeRow({ raw: "${OLD} = '1'", serialize: () => '' })
+    const outcome = applyExpressionToRow(row, 'constraint', '. >= 0 and . <= 200')
+    chai.expect(outcome).to.deep.equal({ status: 'rejected', intended: '. >= 0 and . <= 200', stored: '', unresolved: [] })
+    chai.expect(rawValue()).to.equal("${OLD} = '1'")
+  })
+
+  it('clearing to empty is not treated as a wipeout', () => {
+    const { row } = makeFacadeRow({ raw: "${OLD} = '1'", serialize: (raw: string) => raw })
+    const outcome = applyExpressionToRow(row, 'relevant', '')
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
   })
 })
 

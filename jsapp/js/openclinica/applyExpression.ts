@@ -13,6 +13,8 @@ import { columnToTab } from './logicBuilderTabs'
 // suppressed), so an applied AI result is normalized to match: Calculation and
 // Default (PR#273 round-1 #3) plus Required, whose panel input is single-line —
 // a multi-line value would write fine but become uneditable there (round-5 #7).
+// Newlines are replaced with a space (not stripped) to keep adjacent tokens
+// separated and prevent syntax errors like `${A}=1and${B}=2` (PR#273 deferred).
 const NEWLINE_STRIPPING_ATTRIBUTES = new Set(['calculation', 'default', 'required'])
 
 // Facade-backed attributes: RowDetail.getValue() for these returns
@@ -84,7 +86,7 @@ export function applyExpressionToRow(row: any, attribute: string, expression: st
     return { status: 'error', reason: 'detached-row' }
   }
   try {
-    const value = NEWLINE_STRIPPING_ATTRIBUTES.has(attribute) ? expression.replace(/\r?\n/g, '') : expression
+    const value = NEWLINE_STRIPPING_ATTRIBUTES.has(attribute) ? expression.replace(/\r?\n/g, ' ') : expression
     if (FACADE_ATTRIBUTES.has(attribute)) {
       // Capture the RAW stored value so a lossy write reverts to exactly what
       // was there. getValue() is the facade's reserialization, which itself
@@ -97,7 +99,12 @@ export function applyExpressionToRow(row: any, attribute: string, expression: st
       survey.trigger?.('change')
       const stored = String(detail.getValue?.() ?? '')
       const unresolved = droppedFieldRefs(value, stored)
-      if (unresolved.length > 0) {
+      // The ref-diff can't see a clause with no ${field} reference (e.g. the
+      // XPath-dot constraint `. >= 0 and . <= 200`) that the facade drops
+      // wholesale — an empty serialization of a non-empty intent is the same
+      // silent-data-loss case via a different trigger (PR#273 deferred item).
+      const wipedOut = stored.trim() === '' && value.trim() !== ''
+      if (unresolved.length > 0 || wipedOut) {
         // Revert: never persist a silently-reduced expression.
         detail.set('value', previous)
         survey.trigger?.('change')
