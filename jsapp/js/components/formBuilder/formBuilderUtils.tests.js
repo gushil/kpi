@@ -1,9 +1,11 @@
+import { ECONSENT_SIGNATURE_EXTERNAL_VALUE } from '#/components/formBuilder/econsentSignature'
 import {
   applyFreshPrimaryLanguage,
   mergeFreshTranslations,
   nullifyTranslations,
   readParameters,
   resolveCurrentPrimaryLanguage,
+  surveyToValidJson,
   unnullifyTranslations,
   writeParameters,
 } from '#/components/formBuilder/formBuilderUtils'
@@ -575,6 +577,121 @@ describe('resolveCurrentPrimaryLanguage', () => {
     const result = resolveCurrentPrimaryLanguage(undefined, undefined)
     expect(result.primaryLangName).to.equal(null)
     expect(result.translatedProps).to.deep.equal([])
+  })
+})
+
+describe('surveyToValidJson - discard unsupported eConsent signature settings (OC-27875)', () => {
+  // `survey.toFlatJSON()` is called twice by `surveyToValidJson`; return a
+  // fresh shallow copy of each row every call so the two calls can't leak
+  // mutations into one another (matching the real Backbone model, which
+  // recomputes its flat representation from scratch each time).
+  const fakeSurvey = (rows) => ({
+    toFlatJSON: () => ({ survey: rows.map((row) => ({ ...row })), settings: [{}] }),
+  })
+
+  const toValidSurvey = (rows) => JSON.parse(surveyToValidJson(fakeSurvey(rows)))
+
+  const unsupportedRow = (externalValue) => ({
+    type: 'select_multiple',
+    name: 'q1',
+    'bind::oc:external': externalValue,
+    'bind::oc:itemgroup': 'group1',
+    appearance: 'multiline',
+    required: 'yes',
+    readonly: 'yes',
+    default: 'today()',
+    calculation: 'today()+3',
+    trigger: '${other_question}',
+  })
+
+  it('strips item group, appearance, required, readonly, default, calculation and trigger from a "signature" row', () => {
+    const result = toValidSurvey([unsupportedRow(ECONSENT_SIGNATURE_EXTERNAL_VALUE)])
+    const row = result.survey[0]
+    expect(row).to.not.have.property('bind::oc:itemgroup')
+    expect(row).to.not.have.property('appearance')
+    expect(row).to.not.have.property('required')
+    expect(row).to.not.have.property('readonly')
+    expect(row).to.not.have.property('default')
+    expect(row).to.not.have.property('calculation')
+    expect(row).to.not.have.property('trigger')
+  })
+  ;['clinicaldata', 'contactdata', 'identifier'].forEach((externalValue) => {
+    it(`leaves a "${externalValue}" row untouched (out of scope for OC-27875)`, () => {
+      const result = toValidSurvey([unsupportedRow(externalValue)])
+      const row = result.survey[0]
+      expect(row['bind::oc:itemgroup']).to.equal('group1')
+      expect(row.appearance).to.equal('multiline')
+      expect(row.required).to.equal('yes')
+      expect(row.readonly).to.equal('yes')
+      expect(row.default).to.equal('today()')
+      expect(row.calculation).to.equal('today()+3')
+      expect(row.trigger).to.equal('${other_question}')
+    })
+  })
+
+  it('leaves a row with an unrecognized bind::oc:external value untouched', () => {
+    const result = toValidSurvey([unsupportedRow('some_future_value')])
+    const row = result.survey[0]
+    expect(row['bind::oc:itemgroup']).to.equal('group1')
+    expect(row.appearance).to.equal('multiline')
+  })
+
+  it('preserves supported settings on a signature row untouched (AC4)', () => {
+    const result = toValidSurvey([
+      {
+        type: 'select_multiple',
+        name: 'q1',
+        label: 'I consent',
+        hint: 'Please confirm',
+        relevant: '${some_question} = 1',
+        'bind::oc:external': ECONSENT_SIGNATURE_EXTERNAL_VALUE,
+      },
+    ])
+    const row = result.survey[0]
+    expect(row.label).to.equal('I consent')
+    expect(row.hint).to.equal('Please confirm')
+    expect(row.relevant).to.equal('${some_question} = 1')
+    expect(row['bind::oc:external']).to.equal(ECONSENT_SIGNATURE_EXTERNAL_VALUE)
+  })
+
+  it('leaves a non-eConsent row (no bind::oc:external) completely untouched', () => {
+    const result = toValidSurvey([
+      {
+        type: 'text',
+        name: 'q1',
+        'bind::oc:itemgroup': 'group1',
+        appearance: 'multiline',
+        required: 'yes',
+        readonly: 'yes',
+        default: 'today()',
+        calculation: 'today()+3',
+        trigger: '${other_question}',
+      },
+    ])
+    const row = result.survey[0]
+    expect(row['bind::oc:itemgroup']).to.equal('group1')
+    expect(row.appearance).to.equal('multiline')
+    expect(row.required).to.equal('yes')
+    expect(row.readonly).to.equal('yes')
+    expect(row.default).to.equal('today()')
+    expect(row.calculation).to.equal('today()+3')
+    expect(row.trigger).to.equal('${other_question}')
+  })
+
+  it("doesn't add a field a signature row never had in the first place", () => {
+    const result = toValidSurvey([
+      { type: 'select_multiple', name: 'q1', 'bind::oc:external': ECONSENT_SIGNATURE_EXTERNAL_VALUE },
+    ])
+    expect(result.survey[0]).to.not.have.property('appearance')
+  })
+
+  it('only strips fields on the matching signature row, leaving other rows in the same survey untouched', () => {
+    const result = toValidSurvey([
+      { type: 'text', name: 'q1', 'bind::oc:external': 'contactdata', 'bind::oc:itemgroup': 'group1' },
+      unsupportedRow(ECONSENT_SIGNATURE_EXTERNAL_VALUE),
+    ])
+    expect(result.survey[0]['bind::oc:itemgroup']).to.equal('group1')
+    expect(result.survey[1]).to.not.have.property('bind::oc:itemgroup')
   })
 })
 

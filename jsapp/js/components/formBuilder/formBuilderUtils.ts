@@ -1,4 +1,5 @@
 import clonedeep from 'lodash.clonedeep'
+import { ECONSENT_SIGNATURE_EXTERNAL_VALUE } from '#/components/formBuilder/econsentSignature'
 import { ASSET_TYPES, type AssetTypeName, GroupTypeBeginName, GroupTypeEndName } from '#/constants'
 import type { AssetContent } from '#/dataInterface'
 import type { KoboMatrixPlainData } from '#/formbuild/containers/KoboMatrix'
@@ -18,6 +19,38 @@ export function getFormBuilderAssetType(assetType?: AssetTypeName, desiredAssetT
   return null
 }
 
+// OC-27875: these XLSForm row settings are not supported on eConsent
+// signature items. Form Designer's row settings drawer already clears
+// `bind::oc:itemgroup` for signature rows as a render side effect
+// (view.row.coffee), but that never runs for a row whose drawer was never
+// opened - e.g. one loaded from an import - so a stale value round-trips
+// through save/reopen untouched unless stripped here too. Scoped to
+// `signature` only, per product decision - contactdata/identifier/clinicaldata
+// rows are out of scope for this ticket.
+const UNSUPPORTED_ECONSENT_SIGNATURE_FIELDS = [
+  'bind::oc:itemgroup',
+  'appearance',
+  'required',
+  'readonly',
+  'default',
+  'calculation',
+  'trigger',
+]
+
+// Discards `UNSUPPORTED_ECONSENT_SIGNATURE_FIELDS` from any row using
+// `bind::oc:external = "signature"`, so the saved/previewed form definition
+// only retains settings eConsent signature items actually support.
+function discardUnsupportedEConsentSignatureSettings(flatSurvey: FlatSurvey): FlatSurvey {
+  flatSurvey.survey.forEach((row) => {
+    if (row['bind::oc:external'] === ECONSENT_SIGNATURE_EXTERNAL_VALUE) {
+      UNSUPPORTED_ECONSENT_SIGNATURE_FIELDS.forEach((field) => {
+        delete row[field]
+      })
+    }
+  })
+  return flatSurvey
+}
+
 export function surveyToValidJson(survey: Survey) {
   // HACK: This is done as a fix for https://github.com/kobotoolbox/kpi/pull/735
   // I'm not entirely sure what this is about but definitely BAD CODE™!
@@ -26,7 +59,7 @@ export function surveyToValidJson(survey: Survey) {
   // to "survey.toFlatJSON()"
   survey.toFlatJSON()
   // returning the result of the second call to "toFlatJSON()"
-  return JSON.stringify(survey.toFlatJSON())
+  return JSON.stringify(discardUnsupportedEConsentSignatureSettings(survey.toFlatJSON()))
 }
 
 /**
