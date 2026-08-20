@@ -41,6 +41,18 @@ function getHashQueryParam(name: string): string | null {
 const ECONSENT_KEY = 'oc.fd.econsent'
 const EVENT_TYPE_KEY = 'oc.fd.eventType'
 
+// Resolve sessionStorage once. Returns null when Web Storage is unavailable
+// (e.g. blocked third-party context, opaque origin, or Safari ITP).
+function getSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
+const storage = getSessionStorage()
+
 // At document load the URL is authoritative: Wekan always builds Library and
 // Edit URLs with ?econsent when the module is on. A load without the param means
 // the module is off for this context, so clear any value a previous document in
@@ -50,11 +62,11 @@ const EVENT_TYPE_KEY = 'oc.fd.eventType'
 if (typeof window !== 'undefined') {
   const econsent = getHashQueryParam('econsent')
   if (econsent === null) {
-    sessionStorage.removeItem(ECONSENT_KEY)
-    sessionStorage.removeItem(EVENT_TYPE_KEY)
+    storage?.removeItem(ECONSENT_KEY)
+    storage?.removeItem(EVENT_TYPE_KEY)
   } else {
-    sessionStorage.setItem(ECONSENT_KEY, econsent)
-    sessionStorage.setItem(EVENT_TYPE_KEY, getHashQueryParam('event_type') ?? '')
+    storage?.setItem(ECONSENT_KEY, econsent)
+    storage?.setItem(EVENT_TYPE_KEY, getHashQueryParam('event_type') ?? '')
   }
 }
 
@@ -68,7 +80,7 @@ if (typeof window !== 'undefined') {
  * ?econsent (meaning the module is off for this context).
  */
 export function getStudyEConsentModuleStatus(): string | null {
-  return getHashQueryParam('econsent') ?? sessionStorage.getItem(ECONSENT_KEY)
+  return getHashQueryParam('econsent') ?? storage?.getItem(ECONSENT_KEY) ?? null
 }
 
 /**
@@ -82,7 +94,7 @@ export function getStudyEConsentModuleStatus(): string | null {
 export function getFormEventType(): FormEventType | null {
   const live = getHashQueryParam('event_type')
   if (live !== null) return live
-  const stored = sessionStorage.getItem(EVENT_TYPE_KEY)
+  const stored = storage?.getItem(EVENT_TYPE_KEY)
   // '' was stored when event_type was absent at load → treat as no event context
   return stored || null
 }
