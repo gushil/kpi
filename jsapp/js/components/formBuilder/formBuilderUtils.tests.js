@@ -597,4 +597,38 @@ describe('applyFreshPrimaryLanguage', () => {
     expect(result.primaryLangName).to.equal(null)
     expect(result.surveyDataJSON).to.equal(surveyDataJSON)
   })
+
+  it('3. overwrites a stale default_language with the fresh primary language', () => {
+    const surveyDataJSON = JSON.stringify({
+      settings: [{ default_language: 'English' }],
+      survey: [{ name: 'q1', label: 'Hello' }],
+    })
+    const result = applyFreshPrimaryLanguage(
+      surveyDataJSON,
+      { translations: ['English (en)'], translated: ['label'] },
+      { translations_0: 'English', translated: ['label'] },
+    )
+    const survey = JSON.parse(result.surveyDataJSON)
+    expect(survey.settings[0].default_language).to.equal('English (en)')
+    expect(survey.survey[0]['label::English (en)']).to.equal('Hello')
+  })
+
+  it('4. still fills an empty default_language', () => {
+    const surveyDataJSON = JSON.stringify({ settings: [{}], survey: [{ name: 'q1', label: 'Hello' }] })
+    const result = applyFreshPrimaryLanguage(
+      surveyDataJSON,
+      { translations: ['English (en)'], translated: ['label'] },
+      undefined,
+    )
+    expect(JSON.parse(result.surveyDataJSON).settings[0].default_language).to.equal('English (en)')
+  })
+
+  it('5. leaves default_language alone when no primary language is found', () => {
+    const surveyDataJSON = JSON.stringify({
+      settings: [{ default_language: 'English' }],
+      survey: [{ name: 'q1', label: 'Hello' }],
+    })
+    const result = applyFreshPrimaryLanguage(surveyDataJSON, undefined, undefined)
+    expect(result.surveyDataJSON).to.equal(surveyDataJSON)
+  })
 })

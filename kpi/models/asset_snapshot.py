@@ -148,45 +148,71 @@ class AssetSnapshot(
         _note = self.details.pop('note', None)
         _source = copy.deepcopy(self.source)
 
-        self._adjust_content_media_column_before_standardize(_source)
-        self._standardize(_source)
-        self._adjust_content_media_column(_source)
-        self._revert_custom_column(_source)
+        try:
+            self._adjust_content_media_column_before_standardize(_source)
+            self._standardize(_source)
+            self._adjust_content_media_column(_source)
+            self._revert_custom_column(_source)
 
-        self._make_default_translation_first(_source)
-        self._strip_empty_rows(_source)
-        self._autoname(_source)
-        self._remove_empty_expressions(_source)
-        # TODO: move these inside `generate_xml_from_source()`?
-        _settings = _source.get('settings', {})
-        form_title = _settings.get('form_title')
-        id_string = _settings.get('id_string')
-        root_node_name = _settings.get('name')
-        self.xml, self.details = self.generate_xml_from_source(
-            _source,
-            include_note=_note,
-            root_node_name=root_node_name,
-            form_title=form_title,
-            id_string=id_string,
-        )
-        if self.submission_uuid:
-            _xml = self.xml
-            rootUuid = add_uuid_prefix(self.submission_uuid)
-            # this code would fit best within "generate_xml_from_source" method, where
-            # additional XForm attributes are passed to formpack / pyxform at generation,
-            # but the equivalent change can be done with string replacement
-            after_instanceid = '<rootUuid/>'
-            before_modelclose = (
-                f'<bind calculate="\'{rootUuid}\'" '
-                f'nodeset="/{id_string}/meta/rootUuid" '
-                'required="true()" type="string"/>'
+            self._make_default_translation_first(_source)
+            self._strip_empty_rows(_source)
+            self._autoname(_source)
+            self._remove_empty_expressions(_source)
+        except ValueError as err:
+            # `_prioritize_translation()` raises when `settings.default_language`
+            # names no present translation (OC-28515). Bad client content, so report
+            # it like `generate_xml_from_source()` does: a 400, not a 500.
+            logging.error(
+                'Failed to prepare source for xform generation',
+                extra={
+                    'src': self.source,
+                    'uid': self.uid,
+                    '_msg': str(err),
+                    'traceback': traceback.format_exc(),
+                },
             )
+            self.xml = ''
+            self.details = {
+                'status': 'failure',
+                'error_type': type(err).__name__,
+                'error': str(err),
+                'warnings': [],
+            }
+        else:
+            # TODO: move these inside `generate_xml_from_source()`?
+            _settings = _source.get('settings', {})
+            form_title = _settings.get('form_title')
+            id_string = _settings.get('id_string')
+            root_node_name = _settings.get('name')
+            self.xml, self.details = self.generate_xml_from_source(
+                _source,
+                include_note=_note,
+                root_node_name=root_node_name,
+                form_title=form_title,
+                id_string=id_string,
+            )
+            if self.submission_uuid:
+                _xml = self.xml
+                rootUuid = add_uuid_prefix(self.submission_uuid)
+                # this code would fit best within "generate_xml_from_source" method,
+                # where additional XForm attributes are passed to formpack / pyxform at
+                # generation, but the equivalent change can be done with string
+                # replacement
+                after_instanceid = '<rootUuid/>'
+                before_modelclose = (
+                    f'<bind calculate="\'{rootUuid}\'" '
+                    f'nodeset="/{id_string}/meta/rootUuid" '
+                    'required="true()" type="string"/>'
+                )
 
-            _xml = _xml.replace('<instanceID/>', f'<instanceID/>\n{after_instanceid}')
-            _xml = _xml.replace('</model>', f'{before_modelclose}\n</model>')
-            self.xml = _xml
+                _xml = _xml.replace(
+                    '<instanceID/>', f'<instanceID/>\n{after_instanceid}'
+                )
+                _xml = _xml.replace('</model>', f'{before_modelclose}\n</model>')
+                self.xml = _xml
 
-        self.source = _source
+            self.source = _source
+
         return super().save(*args, **kwargs)
 
     def _adjust_content_media_column_before_generate_xml(self, content):
