@@ -191,7 +191,15 @@ export function applyFreshPrimaryLanguage(
     translations_0: primaryLangName,
     translated: translatedProps,
   })
-  return { surveyDataJSON: updatedSurveyDataJSON, primaryLangName }
+
+  // The label keys were just written with `primaryLangName`, so `default_language` must
+  // name it too. The model's value is stale after an in-session rename, and
+  // `unnullifyTranslations()` only fills it when empty, so pyxform rejects it (OC-28515).
+  const surveyData: FlatSurvey = JSON.parse(updatedSurveyDataJSON)
+  if (surveyData.settings?.[0]) {
+    surveyData.settings[0].default_language = primaryLangName
+  }
+  return { surveyDataJSON: JSON.stringify(surveyData), primaryLangName }
 }
 
 /**
