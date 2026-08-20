@@ -80,6 +80,24 @@ class CreateAssetSnapshots(AssetSnapshotsTestCase):
         # pyxform 1.x uses <value> instead of <name> for choice elements
         assert snap.xml.count('<value>ABC</value>') == 2
 
+    def test_mismatched_default_language_is_reported_not_raised(self):
+        content = {
+            'survey': [
+                {
+                    'type': 'text',
+                    'name': 'q1',
+                    'label::English (en)': 'Cheese?',
+                },
+            ],
+            'settings': {'default_language': 'English', 'id_string': 'oc28515'},
+        }
+        snapshot = AssetSnapshot.objects.create(source=content)
+        self.assertEqual(snapshot.xml, '')
+        self.assertEqual(snapshot.details['status'], 'failure')
+        self.assertEqual(snapshot.details['error_type'], 'ValueError')
+        self.assertIn('default language', snapshot.details['error'])
+        self.assertIn('English (en)', snapshot.details['error'])
+
     def test_asset_snapshot_regenerate(self):
         content = {
             'settings': [{'id_string': 'no_title_asset'}],

@@ -52,6 +52,25 @@ class TestAssetSnapshotList(AssetSnapshotBase):
     def test_create_asset_snapshot_from_source(self):
         self._create_asset_snapshot_from_source()
 
+    def test_mismatched_default_language_returns_400(self):
+        self.client.login(username='someuser', password='someuser')
+        url = reverse(self._get_endpoint('assetsnapshot-list'))
+        source = {
+            'survey': [
+                {
+                    'type': 'text',
+                    'name': 'q1',
+                    'label::English (en)': 'Cheese?',
+                },
+            ],
+            'settings': {'default_language': 'English', 'id_string': 'oc28515'},
+        }
+        response = self.client.post(url, {'source': source}, format='json')
+        self.assertEqual(
+            response.status_code, status.HTTP_400_BAD_REQUEST, msg=response.data
+        )
+        self.assertIn('default language', str(response.data['error']))
+
     def test_owner_can_access_snapshot_from_source(self):
         creation_response = self._create_asset_snapshot_from_source()
         snapshot_uid = creation_response.data['uid']
