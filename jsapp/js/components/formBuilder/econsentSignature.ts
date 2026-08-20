@@ -38,20 +38,65 @@ function getHashQueryParam(name: string): string | null {
   return new URLSearchParams(hash.slice(queryIndex)).get(name)
 }
 
+const ECONSENT_KEY = 'oc.fd.econsent'
+const EVENT_TYPE_KEY = 'oc.fd.eventType'
+
+// Resolve sessionStorage once. Returns null when Web Storage is unavailable
+// (e.g. blocked third-party context, opaque origin, or Safari ITP).
+function getSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
+const storage = getSessionStorage()
+
+// At document load the URL is authoritative: Wekan always builds Library and
+// Edit URLs with ?econsent when the module is on. A load without the param means
+// the module is off for this context, so clear any value a previous document in
+// this tab may have stored. Nothing after load may clear these values, because
+// every param-less URL after load is a stripped one — React Router drops the
+// hash query on any navigate(path) call that carries no query.
+if (typeof window !== 'undefined') {
+  const econsent = getHashQueryParam('econsent')
+  if (econsent === null) {
+    storage?.removeItem(ECONSENT_KEY)
+    storage?.removeItem(EVENT_TYPE_KEY)
+  } else {
+    storage?.setItem(ECONSENT_KEY, econsent)
+    storage?.setItem(EVENT_TYPE_KEY, getHashQueryParam('event_type') ?? '')
+  }
+}
+
 /**
- * Read study eConsent module status from the URL query parameter `econsent`.
+ * Returns the eConsent module status, reading the URL hash first and falling
+ * back to the value stored in sessionStorage at document load.
+ * The fallback is intentional: React Router drops ?econsent on any navigate()
+ * call that carries no query, so after returning from the editor to the library
+ * the URL is always param-less. sessionStorage survives that navigation and is
+ * cleared on the next document load only when Wekan opens the page without
+ * ?econsent (meaning the module is off for this context).
  */
 export function getStudyEConsentModuleStatus(): string | null {
-  return getHashQueryParam('econsent')
+  return getHashQueryParam('econsent') ?? storage?.getItem(ECONSENT_KEY) ?? null
 }
 
 /**
  * Read the event type for the current form context from the URL query parameter
- * `event_type`. Returns null when the parameter is absent (e.g. Library editing),
- * or an empty string when the parameter is present but has no value.
+ * `event_type`, falling back to the value stored at document load alongside the
+ * eConsent status. Returns null when the parameter was absent at load (e.g.
+ * Library editing) or when the URL is stripped after navigation. An empty string
+ * stored at load means the param was absent, which is mapped back to null so
+ * the library case remains permitted.
  */
 export function getFormEventType(): FormEventType | null {
-  return getHashQueryParam('event_type')
+  const live = getHashQueryParam('event_type')
+  if (live !== null) return live
+  const stored = storage?.getItem(EVENT_TYPE_KEY)
+  // '' was stored when event_type was absent at load → treat as no event context
+  return stored || null
 }
 
 /**
