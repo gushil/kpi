@@ -1,5 +1,5 @@
 import chai from 'chai'
-import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from './applyExpression'
+import { applyExpressionToRow, focusGenerateButton, focusPanelInput, readCurrentExpression } from './applyExpression'
 
 // Minimal Backbone-ish fakes: a row hands out a RowDetail via get(attribute)
 // and its survey via getSurvey(); the detail exposes set()/getValue().
@@ -62,14 +62,20 @@ describe('applyExpressionToRow (P1.3)', () => {
     const { row, detail, survey } = makeRow()
     const outcome = applyExpressionToRow(row, 'calculation', '${A}\n + \r\n${B}')
     chai.expect(outcome).to.deep.equal({ status: 'applied' })
-    chai.expect(detail.set.mock.calls).to.deep.equal([['value', '${A} + ${B}']])
+    chai.expect(detail.set.mock.calls).to.deep.equal([['value', '${A}  +  ${B}']])
     chai.expect(survey.trigger.mock.calls).to.deep.equal([['change']])
   })
 
   it('strips newlines for required too — its panel input is single-line (round-5 #7)', () => {
     const { row, detail } = makeRow()
     applyExpressionToRow(row, 'required', '${A} = 1\nand ${B} = 2')
-    chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1and ${B} = 2')
+    chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1 and ${B} = 2')
+  })
+
+  it('joins newline-separated tokens with a space, never concatenating them (PR#273 deferred)', () => {
+    const { row, detail } = makeRow()
+    applyExpressionToRow(row, 'calculation', '${A} = 1\nand ${B} = 2')
+    chai.expect(detail.set.mock.calls).to.deep.equal([['value', '${A} = 1 and ${B} = 2']])
   })
 
   it('keeps newlines for relevant (manual entry keeps them there too)', () => {
@@ -173,6 +179,21 @@ describe('applyExpressionToRow (P1.3)', () => {
     })
     const outcome = applyExpressionToRow(row, 'default', 'today()')
     chai.expect(outcome).to.deep.equal({ status: 'error', reason: 'write-failed' })
+  })
+
+  it('rejects and reverts a ref-less wipeout — facade serializes a non-empty intent to empty (PR#273 deferred)', () => {
+    const { row, detail, rawValue } = makeFacadeRow({ raw: "${OLD} = '1'", serialize: () => '' })
+    const outcome = applyExpressionToRow(row, 'constraint', '. >= 0 and . <= 200')
+    chai
+      .expect(outcome)
+      .to.deep.equal({ status: 'rejected', intended: '. >= 0 and . <= 200', stored: '', unresolved: [] })
+    chai.expect(rawValue()).to.equal("${OLD} = '1'")
+  })
+
+  it('clearing to empty is not treated as a wipeout', () => {
+    const { row } = makeFacadeRow({ raw: "${OLD} = '1'", serialize: (raw: string) => raw })
+    const outcome = applyExpressionToRow(row, 'relevant', '')
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
   })
 })
 
@@ -280,5 +301,106 @@ describe('focusGenerateButton (P1.1 AC6, dismiss)', () => {
   it('returns false and warns when no matching Generate button exists', () => {
     chai.expect(focusGenerateButton('relevant')).to.equal(false)
     chai.expect(warnSpy.mock.calls.length).to.equal(1)
+  })
+})
+
+describe('readCurrentExpression (P1.3 AC2)', () => {
+  it('returns the raw stored value for the attribute', () => {
+    const detail = {
+      set: jest.fn(),
+      get: jest.fn((k: string) => (k === 'value' ? '${OLD} + 1' : undefined)),
+      getValue: jest.fn(() => 'reformatted'),
+    }
+    const { row } = makeRow({ detail })
+    chai.expect(readCurrentExpression(row, 'calculation')).to.equal('${OLD} + 1')
+    chai.expect(detail.getValue.mock.calls.length).to.equal(0)
+  })
+
+  it('prefers RAW for facade attributes when non-empty — never the lossy getValue() serialization', () => {
+    const { row, detail } = makeFacadeRow({
+      raw: "${A} = '1' and ${GONE} = '2'",
+      serialize: () => "${A} = '1'",
+    })
+    chai.expect(readCurrentExpression(row, 'relevant')).to.equal("${A} = '1' and ${GONE} = '2'")
+    chai.expect(detail.getValue.mock.calls.length).to.equal(0)
+  })
+
+  it('returns empty string when the row has no RowDetail for the attribute', () => {
+    const { row } = makeRow({ detail: undefined })
+    chai.expect(readCurrentExpression(row, 'calculation')).to.equal('')
+  })
+
+  it('returns empty string for a null row and for a detail without get()', () => {
+    chai.expect(readCurrentExpression(null, 'calculation')).to.equal('')
+    const { row } = makeRow({ detail: { set: jest.fn(), getValue: jest.fn() } })
+    chai.expect(readCurrentExpression(row, 'calculation')).to.equal('')
+  })
+
+  it('returns empty string when the stored value is null, and coerces non-strings', () => {
+    const nullDetail = { set: jest.fn(), get: jest.fn(() => null), getValue: jest.fn() }
+    chai.expect(readCurrentExpression(makeRow({ detail: nullDetail }).row, 'default')).to.equal('')
+    const numDetail = { set: jest.fn(), get: jest.fn(() => 7), getValue: jest.fn() }
+    chai.expect(readCurrentExpression(makeRow({ detail: numDetail }).row, 'repeat_count')).to.equal('7')
+  })
+
+  it('falls back to the facade serialization ONLY to detect panel-built content when raw is empty', () => {
+    const { row, detail } = makeFacadeRow({ raw: '', serialize: () => "${A} = '1'" })
+    chai.expect(readCurrentExpression(row, 'relevant')).to.equal("${A} = '1'")
+    chai.expect(detail.getValue.mock.calls.length).to.equal(1)
+  })
+
+  it('does not consult the facade for non-facade attributes with empty raw', () => {
+    const detail = { set: jest.fn(), get: jest.fn(() => ''), getValue: jest.fn(() => 'SHOULD NOT BE READ') }
+    const { row } = makeRow({ detail })
+    chai.expect(readCurrentExpression(row, 'calculation')).to.equal('')
+    chai.expect(detail.getValue.mock.calls.length).to.equal(0)
+  })
+
+  it('normalizes the Required state sentinels to empty — pristine/toggled panels never confirm', () => {
+    for (const sentinel of ['', 'false', 'true', false, true]) {
+      const detail = { set: jest.fn(), get: jest.fn(() => sentinel), getValue: jest.fn() }
+      chai.expect(readCurrentExpression(makeRow({ detail }).row, 'required')).to.equal('')
+    }
+  })
+
+  it("keeps 'yes' (Always) and real expressions non-empty for required — those DO confirm", () => {
+    const yes = { set: jest.fn(), get: jest.fn(() => 'yes'), getValue: jest.fn() }
+    chai.expect(readCurrentExpression(makeRow({ detail: yes }).row, 'required')).to.equal('yes')
+    const expr = { set: jest.fn(), get: jest.fn(() => '${AGE} > 18'), getValue: jest.fn() }
+    chai.expect(readCurrentExpression(makeRow({ detail: expr }).row, 'required')).to.equal('${AGE} > 18')
+  })
+})
+
+describe('P1.3 AC guards — pass-through fidelity, no provenance, round-trip', () => {
+  it('AC3: writes the applied expression byte-identical for a non-stripping attribute', () => {
+    // repeat_count is neither newline-stripping nor facade-backed, so the
+    // string must land in RowDetail exactly as the dialog sent it.
+    const { row, detail } = makeRow()
+    const expr = 'concat(\'a\', "b")  + ${W}'
+    const outcome = applyExpressionToRow(row, 'repeat_count', expr)
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
+    chai.expect(detail.set.mock.calls).to.deep.equal([['value', expr]])
+  })
+
+  it('AC5: apply writes only the value key — no provenance mark on detail or row', () => {
+    const detail = { set: jest.fn(), getValue: jest.fn() }
+    const row = {
+      get: jest.fn(() => detail),
+      getSurvey: jest.fn(() => ({ trigger: jest.fn() })),
+      set: jest.fn(),
+    }
+    applyExpressionToRow(row, 'default', '1 + 1')
+    chai.expect(row.set.mock.calls.length).to.equal(0)
+    chai.expect(detail.set.mock.calls.map((c: any[]) => c[0])).to.deep.equal(['value'])
+  })
+
+  it('AC6: an applied facade expression round-trips byte-for-byte through the raw read', () => {
+    const { row, rawValue } = makeFacadeRow({ raw: '', serialize: (raw: string) => raw })
+    const expr = '${HEIGHT} > 0 and ${WEIGHT} > 0'
+    const outcome = applyExpressionToRow(row, 'constraint', expr)
+    chai.expect(outcome).to.deep.equal({ status: 'applied' })
+    chai.expect(rawValue()).to.equal(expr)
+    // The same raw value is what the confirmation reader reports next time.
+    chai.expect(readCurrentExpression(row, 'constraint')).to.equal(expr)
   })
 })

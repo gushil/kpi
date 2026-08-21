@@ -100,6 +100,8 @@ export interface AiGeneratorDialogProps {
   readonly inertRoot?: RefObject<HTMLElement> | HTMLElement | null
   readonly container?: HTMLElement | null
   readonly onApply: (expression: string) => boolean | Promise<boolean>
+  // P1.3 AC2 — live editor read driving the inline overwrite confirmation.
+  readonly getCurrentExpression: () => string
   readonly onClose: () => void
 }
 

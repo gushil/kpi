@@ -54,7 +54,12 @@ import {
   update_states,
 } from '#/constants'
 import envStore from '#/envStore'
-import { applyExpressionToRow, focusGenerateButton, focusPanelInput } from '#/openclinica/applyExpression'
+import {
+  applyExpressionToRow,
+  focusGenerateButton,
+  focusPanelInput,
+  readCurrentExpression,
+} from '#/openclinica/applyExpression'
 import { unmountAll } from '#/openclinica/generateButtonBridge'
 import { logicBuilderClient } from '#/openclinica/logicBuilderClient'
 import { buildFieldContext, buildItemDefinition, readItemName } from '#/openclinica/logicBuilderContext'
@@ -409,22 +414,25 @@ export default function EditableForm(props: EditableFormProps) {
       return true
     }
     if (outcome.status === 'rejected') {
-      // The skip-logic facade could not represent every clause and dropped the
-      // references it can't resolve; applyExpressionToRow already reverted the
-      // write, so nothing was persisted (round-5 #5). Report which references
-      // were unresolved; return false so the dialog stays open for the user to
-      // adjust the prompt and retry without retyping (round-6).
-      const names = outcome.unresolved.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
-      console.warn(
-        'Logic Builder: refused a lossy apply and reverted; unresolved references',
-        outcome.unresolved,
-        request.attribute,
-      )
-      alertify.error(
-        t(
-          'The generated expression references ##refs## which do not exist on this form, so it was not applied. Nothing was changed.',
-        ).replace('##refs##', names),
-      )
+      // The facade could not represent the expression and dropped content;
+      // applyExpressionToRow already reverted the write, so nothing was
+      // persisted (round-5 #5, PR#273 deferred). Return false so the dialog
+      // stays open for the user to adjust the prompt and retry.
+      console.warn('Logic Builder: refused a lossy apply and reverted', outcome, request.attribute)
+      if (outcome.unresolved.length > 0) {
+        const names = outcome.unresolved.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
+        alertify.error(
+          t(
+            'The generated expression references ##refs## which do not exist on this form, so it was not applied. Nothing was changed.',
+          ).replace('##refs##', names),
+        )
+      } else {
+        alertify.error(
+          t(
+            "The generated expression couldn't be represented by this panel's builder, so it was not applied. Nothing was changed.",
+          ),
+        )
+      }
       return false
     }
     // status === 'error': missing RowDetail, detached row, or a throw mid-write.
@@ -491,6 +499,9 @@ export default function EditableForm(props: EditableFormProps) {
         // would make the scroll container unhittable and break AC2's
         // "scrollable but inert".
         onApply={applyGeneratedExpression}
+        // P1.3 AC2: live raw read of the panel editor at Apply-click time —
+        // drives the dialog's inline overwrite confirmation.
+        getCurrentExpression={() => readCurrentExpression(request.row, request.attribute)}
         onClose={closeGenerateDialog}
       />
     )
