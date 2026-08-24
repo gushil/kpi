@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core'
-import { render, fireEvent } from '@testing-library/react'
+import { fireEvent, render } from '@testing-library/react'
 import chai from 'chai'
 import React from 'react'
 import type { Asset } from '#/api/models/asset'
@@ -22,7 +22,7 @@ function renderCard(props: { onAdd?: (uid: string) => void; asset?: Asset } = {}
   return render(
     <MantineProvider>
       <AssetNavigatorCard asset={asset} className='test-card' isExpanded={false} onAdd={onAdd} />
-    </MantineProvider>
+    </MantineProvider>,
   )
 }
 
