@@ -21,7 +21,11 @@ declare global {
 
 const SORTABLE_ITEM_CLASS_NAME = 'asset-navigator-sortable-item'
 
-export default function AssetNavigator() {
+interface AssetNavigatorProps {
+  onAdd: (uid: string) => void
+}
+
+export default function AssetNavigator(props: AssetNavigatorProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch] = useDebouncedValue(searchQuery, 500)
   // OpenClinica fork: library aside panel defaults to expanded (was assetNavExpanded default).
@@ -129,6 +133,7 @@ export default function AssetNavigator() {
               asset={asset}
               isExpanded={isExpanded}
               className={SORTABLE_ITEM_CLASS_NAME}
+              onAdd={props.onAdd}
             />
           ))}
         </Stack>

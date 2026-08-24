@@ -1592,7 +1592,16 @@ export default function EditableForm(props: EditableFormProps) {
             </bem.FormBuilderAside__row>
 
             <bem.FormBuilderAside__row>
-              <AssetNavigator />
+              <AssetNavigator
+                onAdd={(uid: string) => {
+                  if (app?.ngScope) {
+                    app.ngScope.handleItem({
+                      position: app.survey.rows.length,
+                      itemUid: uid,
+                    })
+                  }
+                }}
+              />
             </bem.FormBuilderAside__row>
           </bem.FormBuilderAside__content>
         )}
