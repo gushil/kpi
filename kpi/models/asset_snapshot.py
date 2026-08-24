@@ -228,15 +228,16 @@ class AssetSnapshot(
         per-language list (base name in `content['translated']`, or a list
         value), where pinning it to one language would collapse the list.
 
-        Survey sheet only, matching the hide step in `OCFormUtilsMixin`. Choices
-        media is never hidden, so it arrives already renamed.
+        Survey and choices sheets. `OCFormUtilsMixin._adjust_content_media_column()`
+        already restored both sheets to their bare name earlier in `save()`
+        (OC-28513), so they arrive here as `audio`/`image`/`video`, not `oc_*`.
         """
         translations = content.get('translations') or []
         first_language = translations[0] if translations else None
         suffix = f'::{first_language}' if first_language else ''
         translated = content.get('translated') or []
 
-        for row in content.get('survey', []):
+        for row in content.get('survey', []) + content.get('choices', []):
             for column in list(row.keys()):
                 base_column = column.split('::')[0]
                 if (
