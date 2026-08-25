@@ -35,7 +35,7 @@ class OCFormUtilsMixin:
         XForm (OC-28513). Matching the suffixed form also repairs content
         already stored with the leaked name.
         """
-        for row in content.get('survey', []):
+        for row in content.get('survey', []) + content.get('choices', []):
             for column in list(row.keys()):
                 base_column = column.split('::')[0]
                 if not base_column.startswith('oc_'):
@@ -54,7 +54,7 @@ class OCFormUtilsMixin:
                 translated[index] = media_column
     
     def _adjust_content_media_column_before_standardize(self, content):
-        
+
         def _adjust_media_columns(survey, non_dc_cols):
             for survey_col_idx in range(len(survey)):
                 survey_col = survey[survey_col_idx]
@@ -63,22 +63,28 @@ class OCFormUtilsMixin:
                     if survey_col_key in non_dc_cols:
                         survey_col["oc_{}".format(survey_col_key)] = survey_col[survey_col_key]
                         del survey_col[survey_col_key]
-        
-        survey = content.get('survey', [])
 
-        survey_col_key_list = []
-        for survey_col_idx in range(len(survey)):
-            survey_col = survey[survey_col_idx]
-            survey_col_key_list = survey_col_key_list + list(survey_col.keys())
+        # `choices` needs the same hiding as `survey`, or a media column there
+        # (e.g. an image list for a select) reaches formpack unhidden and
+        # revives the untranslated/translated language mismatch (OC-28513).
+        for sheet_name in ('survey', 'choices'):
+            sheet = content.get(sheet_name, [])
 
-        media_columns = {"audio": "media::audio", "image": "media::image", "video": 'media::video'}
+            sheet_col_key_list = []
+            for sheet_col_idx in range(len(sheet)):
+                sheet_col = sheet[sheet_col_idx]
+                sheet_col_key_list = sheet_col_key_list + list(sheet_col.keys())
 
-        for media_column_key in media_columns.keys():
-            non_dc_col = media_column_key
-            non_dc_cols = [s for s in survey_col_key_list if s.startswith(non_dc_col)]
+            for non_dc_col in ('audio', 'image', 'video'):
+                # Exact name or `name::language`, not any prefix match, so an
+                # arbitrary column like `image_url` is left alone.
+                non_dc_cols = [
+                    s for s in sheet_col_key_list
+                    if s == non_dc_col or s.startswith(f'{non_dc_col}::')
+                ]
 
-            if len(non_dc_cols) > 0:
-                _adjust_media_columns(survey, non_dc_cols)
+                if len(non_dc_cols) > 0:
+                    _adjust_media_columns(sheet, non_dc_cols)
 
         if 'translations' in content:
             translated = content.get('translated', [])

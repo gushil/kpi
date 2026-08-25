@@ -444,6 +444,41 @@ class AssetContentTests(AssetsTestCase):
         self.assertEqual(q1['image'], 'photo.png')
         self.assertEqual(q1['video'], 'v.mp4')
 
+    def test_first_upload_keeps_oc_media_columns_untranslated_in_choices(self):
+        """
+        OC-28513: a `choices`-sheet media column must be hidden too, or it
+        stays untranslated while `label`/`hint` are named, reviving the error.
+        """
+        content = {
+            'survey': [
+                {
+                    'name': 'q1',
+                    'type': 'select_one faces',
+                    'label': 'Question 1',
+                },
+            ],
+            'choices': [
+                {'list_name': 'faces', 'name': '0', 'label': 'None', 'image': '0.jpg'},
+                {'list_name': 'faces', 'name': '1', 'label': 'Mild', 'image': '1.jpg'},
+            ],
+            'settings': {'default_language': 'English (en)'},
+        }
+
+        asset = Asset.objects.create(
+            owner=self.user, asset_type='survey', content=content
+        )
+
+        self.assertEqual(asset.content['translations'], ['English (en)'])
+        self.assertNotIn(None, asset.content['translations'])
+        self.assertNotIn('image', asset.content['translated'])
+        choice = asset.content['choices'][0]
+        self.assertEqual(choice['image'], '0.jpg')
+
+        snapshot = asset.snapshot(regenerate=True)
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertIn('0.jpg', snapshot.xml)
+        self.assertIn('1.jpg', snapshot.xml)
+
     def test_naming_primary_language_keeps_media_and_preview(self):
         """
         OC-28513: upload a form with one unnamed language and an `image`
