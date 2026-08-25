@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import socket
 import string
 import subprocess
 import warnings
@@ -1658,6 +1659,27 @@ if STRIPE_ENABLED:
         'options': {'queue': 'kpi_low_priority_queue'},
     }
 
+# OC-28295: TCP keepalive for the broker connection.
+# When a Redis connection dies without a clean close (no FIN/RST — e.g. the
+# Redis pod is replaced mid-flight), the worker blocks forever on its pending
+# BRPOP read and silently stops consuming. Nothing in the stack notices on its
+# own: kombu's `health_check_interval` only pings the pub/sub subclient, and
+# redis-py's health check runs when a command is *sent*, which never happens
+# while that read is outstanding. Kernel keepalives are the only mechanism that
+# can tear down the socket, after which kombu reconnects normally.
+# TCP_KEEPIDLE/TCP_KEEPCNT/TCP_USER_TIMEOUT are Linux-only; probe for each so
+# this stays importable on macOS development machines.
+_redis_keepalive_options = {
+    getattr(socket, option): value
+    for option, value in (
+        ('TCP_KEEPIDLE', 60),  # seconds of idle before the first probe
+        ('TCP_KEEPINTVL', 10),  # seconds between probes
+        ('TCP_KEEPCNT', 3),  # unanswered probes before the socket is dead
+        ('TCP_USER_TIMEOUT', 90 * 1000),  # ms; also covers un-ACKed data
+    )
+    if hasattr(socket, option)
+}
+
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'fanout_patterns': True,
     'fanout_prefix': True,
@@ -1665,6 +1687,8 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     # TODO figure out how to pass `Constance.HOOK_MAX_RETRIES` or `HookLog.get_remaining_seconds()
     # Otherwise hardcode `HOOK_MAX_RETRIES` in Settings
     'visibility_timeout': 60 * (10**2),  # Longest ETA for RestService (seconds)
+    'socket_keepalive': True,
+    'socket_keepalive_options': _redis_keepalive_options,
 }
 
 CELERY_TASK_DEFAULT_QUEUE = 'kpi_queue'
