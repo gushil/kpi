@@ -501,3 +501,11 @@ $s-form-builder-content-width: 1024px;
     }
   }
 }
+
+// OC-28489: focus ring for the Search Library "Add to form" button.
+// _base.scss suppresses :focus-visible outlines globally with !important,
+// so we use box-shadow (unaffected by outline:none) to restore visibility.
+.asset-navigator-card__add-btn:focus-visible {
+  box-shadow: 0 0 0 2px colors.$kobo-mid-blue !important;
+  border-radius: 4px;
+}

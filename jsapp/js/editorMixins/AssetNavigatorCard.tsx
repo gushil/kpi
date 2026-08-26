@@ -1,4 +1,4 @@
-import { Card, Group, Pill, Stack, Text } from '@mantine/core'
+import { ActionIcon, Card, Group, Pill, Stack, Text } from '@mantine/core'
 import React from 'react'
 import type { Asset } from '#/api/models/asset'
 import { AssetTypeEnum } from '#/api/models/assetTypeEnum'
@@ -10,6 +10,7 @@ interface AssetNavigatorCardProps {
   asset: Asset
   className: string
   isExpanded: boolean
+  onAdd: (uid: string) => void
 }
 
 export default function AssetNavigatorCard(props: AssetNavigatorCardProps) {
@@ -63,6 +64,19 @@ export default function AssetNavigatorCard(props: AssetNavigatorCardProps) {
             </Group>
           )}
         </Stack>
+
+        <ActionIcon
+          variant='subtle'
+          size='sm'
+          aria-label={t('Add to form')}
+          className='asset-navigator-card__add-btn'
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation()
+            props.onAdd(props.asset.uid)
+          }}
+        >
+          <Icon name='plus' size='xs' />
+        </ActionIcon>
       </Group>
     </Card>
   )
