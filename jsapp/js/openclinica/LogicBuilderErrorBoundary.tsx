@@ -24,7 +24,7 @@ export class LogicBuilderErrorBoundary extends React.Component<Props, State> {
     return { crashed: true }
   }
 
-  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('Logic Builder: AI Generator crashed; degrading to the plain expression field', error, info)
     this.props.onCrash()
   }

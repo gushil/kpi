@@ -33,6 +33,7 @@ describe('LogicBuilderErrorBoundary (P1.4 AC7)', () => {
     )
     chai.expect(container.innerHTML).to.equal('')
     chai.expect(onCrash.mock.calls.length).to.equal(1)
+    chai.expect(consoleError.mock.calls.some((args) => String(args[0]).includes('AI Generator crashed'))).to.equal(true)
   })
 
   it('does not let the crash propagate to the host tree', () => {
