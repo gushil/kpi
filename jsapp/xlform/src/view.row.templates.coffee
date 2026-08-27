@@ -39,7 +39,7 @@ module.exports = do ->
   # since this control unambiguously always adds inside this group.
   emptyGroupSpacerHtml = """
       <div class="survey__row__spacer  survey__row__spacer--empty-group  row clearfix expanding-spacer-between-rows expanding-spacer-between-rows--depr">
-        <button type="button" class="js-expand-row-selector js-add-row-button btn btn--addrow" aria-label="#{t('Add item inside this group')}"
+        <button type="button" class="js-expand-row-selector js-add-row-button btn btn--addrow" aria-label="#{t('Add item inside this group')}" title="#{t('Add item inside this group')}"
             ><i class="k-icon k-icon-plus"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
         <div class="survey__row__spacer-rule"></div>
         <div class="line">&nbsp;</div>

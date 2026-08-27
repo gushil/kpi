@@ -704,8 +704,11 @@ module.exports = do ->
 
     # OC-28572 AC5: distinguishes, via aria-label, a control that adds
     # inside a group from one that adds after/before it — without touching
-    # the visible "Add Item" label. A plain top-level row keeps the default
-    # (unset) aria-label, since there's nothing to disambiguate there.
+    # the visible "Add Item" label. The same text is also set as `title`,
+    # so hovering (not just screen readers) surfaces a native tooltip —
+    # handy since nested groups can stack several of these controls right
+    # next to each other. A plain top-level row keeps both attributes unset,
+    # since there's nothing to disambiguate there.
     ensureAddItemAccessibleNames: (row, view) ->
       $el = view.$el
       isGroup = row.constructor.kls is 'Group'
@@ -714,15 +717,25 @@ module.exports = do ->
       $trailing = $el.children('.survey__row__spacer').not('.survey__row__spacer--leading').find('.btn--addrow')
       $leading = $el.children('.survey__row__spacer--leading').find('.btn--addrow')
 
+      setLabel = ($btn, label) ->
+        $btn.attr('aria-label', label)
+        $btn.attr('title', label)
+        return
+
+      clearLabel = ($btn) ->
+        $btn.removeAttr('aria-label')
+        $btn.removeAttr('title')
+        return
+
       if isGroup
-        $trailing.attr('aria-label', t('Add item after this group'))
-        $leading.attr('aria-label', t('Add item before this group'))
+        setLabel($trailing, t('Add item after this group'))
+        setLabel($leading, t('Add item before this group'))
       else if parentIsGroup
-        $trailing.attr('aria-label', t('Add item inside this group'))
-        $leading.attr('aria-label', t('Add item inside this group'))
+        setLabel($trailing, t('Add item inside this group'))
+        setLabel($leading, t('Add item inside this group'))
       else
-        $trailing.removeAttr('aria-label')
-        $leading.removeAttr('aria-label')
+        clearLabel($trailing)
+        clearLabel($leading)
       return
 
     getViewForRow: (row)->

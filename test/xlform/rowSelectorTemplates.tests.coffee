@@ -353,3 +353,7 @@ do ->
     it 'gives the control a distinct accessible name that says it adds inside the group', ->
       html = $rowTemplates.emptyGroupSpacerHtml
       expect(/aria-label="[^"]*inside[^"]*group[^"]*"/i.test(html)).toBe(true)
+
+    it 'gives the control a matching title tooltip for sighted users', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(/title="[^"]*inside[^"]*group[^"]*"/i.test(html)).toBe(true)
