@@ -14,7 +14,7 @@
  * exported TYPES mirror the package's public surface faithfully so kpi's code is
  * still type-checked in CI; the runtime exports are inert — the two components
  * never render and the generate client never reaches the network.
- * Keep in sync with the pinned logic-builder version.
+ * Keep in sync with the pinned logic-builder version (0.4.0).
  */
 import type { RefObject } from 'react'
 
@@ -57,9 +57,11 @@ export interface GenerationSuccess {
   readonly expression: string
 }
 
+export type FailureReason = 'insufficient_detail' | 'invalid_reference' | 'other_prompt_issue' | 'unavailable'
+
 export interface GenerationFailure {
   readonly kind: 'failure'
-  readonly error: string
+  readonly reason: FailureReason
 }
 
 export type GenerationResult = GenerationSuccess | GenerationFailure
@@ -118,6 +120,6 @@ export interface HttpGenerateClientOptions {
 // Inert stand-in — CI never calls the network; the real package supplies the client.
 export function createHttpGenerateClient(_options: HttpGenerateClientOptions): GenerateClient {
   return {
-    generate: async () => ({ kind: 'failure', error: '' }),
+    generate: async () => ({ kind: 'failure', reason: 'unavailable' }),
   }
 }
