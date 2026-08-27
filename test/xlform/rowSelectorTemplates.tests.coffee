@@ -6,6 +6,7 @@ window.t ?= (str) -> str
 
 $rowSelectorTemplates = require('../../jsapp/xlform/src/view.rowSelector.templates')
 $surveyAppTemplates = require('../../jsapp/xlform/src/view.surveyApp.templates')
+$rowTemplates = require('../../jsapp/xlform/src/view.row.templates')
 
 do ->
 
@@ -177,7 +178,7 @@ do ->
 
     it 'renders the helper hint text for adding questions', ->
       html = @render(@emptyOpts)
-      expect(html.indexOf("clicking on the '+' sign below")).not.toBe(-1)
+      expect(html.indexOf('clicking on below')).not.toBe(-1)
 
     it 'renders the + button with js-expand-row-selector class', ->
       html = @render(@emptyOpts)
@@ -190,6 +191,18 @@ do ->
     it 'renders the k-icon-plus icon inside the + button', ->
       html = @render(@emptyOpts)
       expect(html.indexOf('k-icon-plus')).not.toBe(-1)
+
+    it 'renders the add-item control as a real <button> element (native keyboard activation)', ->
+      html = @render(@emptyOpts)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b[^"]*"[^>]*data-cy="plus"/.test(html)).toBe(true)
+
+    it 'renders the "Add Item" label text for the empty-state control', ->
+      html = @render(@emptyOpts)
+      expect(html.indexOf('Add Item')).not.toBe(-1)
+
+    it 'renders a dedicated full-width rule element alongside the empty-state control', ->
+      html = @render(@emptyOpts)
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
 
     it 'renders the survey-editor__null-top-row for the empty state', ->
       html = @render(@emptyOpts)
@@ -229,3 +242,48 @@ do ->
       opts = survey: {}
       html = @render(opts)
       expect(html.indexOf('survey-warnings')).toBe(-1)
+
+  ###############################################################
+  # view.row.templates: shared end-of-row add-item spacer
+  # (OC-28570: full-width "Add Item" control, replaces the small
+  # plus-icon spacer across rows, groups, matrices and error rows)
+  ###############################################################
+  describe 'view.row.templates: expandingSpacerHtml (shared add-item spacer)', ->
+
+    beforeEach ->
+      @surveyView = { features: { multipleQuestions: true }, canAddToLibrary: false }
+
+    it 'renders the add-item control as a real <button> element (native keyboard activation)', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'does not render the legacy tabIndex-based div for the add-item control', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(html.indexOf('tabIndex="0" class="js-expand-row-selector')).toBe(-1)
+
+    it 'renders the "Add Item" label text', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(html.indexOf('Add Item')).not.toBe(-1)
+
+    it 'renders a dedicated full-width rule element alongside the control', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+
+    it 'still renders the functional .line container used by RowSelector to host the namer/picker', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(html.indexOf('class="line"')).not.toBe(-1)
+
+    it 'renders the same add-item spacer for groupView', ->
+      html = $rowTemplates.groupView(@surveyView)
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'renders the same add-item spacer for koboMatrixView', ->
+      html = $rowTemplates.koboMatrixView()
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'renders the same add-item spacer for rowErrorView', ->
+      html = $rowTemplates.rowErrorView('<Row/>')
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)

@@ -66,6 +66,7 @@ module.exports = do ->
       "click .js-toggle-row-multioptions": "toggleRowMultioptions"
       "click .js-close-warning": "closeWarningBox"
       "click .js-expand-row-selector": "expandRowSelector"
+      "keydown .js-expand-row-selector": "addRowKeydown"
       # it is important to distinct these buttons from the group buttons
       "mouseenter .card__header .card__buttons__button": "buttonHoverIn"
       "mouseleave .card__header .card__buttons__button": "buttonHoverOut"
@@ -323,6 +324,18 @@ module.exports = do ->
           throw new Error('View for row was not found: ' + rowId)
 
         new $viewRowSelector.RowSelector(el: $spacer.get(0), ngScope: @ngScope, spawnedFromView: view, surveyView: @, reversible:true, survey: @survey).expand()
+
+    # Space doesn't need explicit handling for native <button> elements in
+    # most browsers, but Enter already gets special-cased globally (see the
+    # window keydown handler above, which preventDefaults it and re-triggers
+    # click manually). Space is given the same explicit treatment here so
+    # activation is guaranteed rather than left to implicit browser default
+    # behavior (OC-28570 testing feedback).
+    addRowKeydown: (evt) ->
+      if evt.which is 32
+        evt.preventDefault()
+        $(evt.currentTarget).trigger('click')
+      return
 
     _render_html: ->
       @$el.html $viewTemplates.$$render('surveyApp', @)

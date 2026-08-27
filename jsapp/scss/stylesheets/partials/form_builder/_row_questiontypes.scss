@@ -9,6 +9,8 @@
 // .expanding-spacer-between-rows BECOMES .survey__row__spacer
 .survey__row__spacer {
   position: relative;
+  // centers the .btn--addrow pill over the full-width .survey__row__spacer-rule
+  text-align: center;
 
   .line {
     height: 0;
