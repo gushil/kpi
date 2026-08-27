@@ -350,6 +350,99 @@ $s-form-builder-content-width: 1024px;
   }
 }
 
+// OC-28582: Form style card grid in the Layout & Settings aside panel
+.form-style-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.form-style-card {
+  --form-card-bg: #fff;
+  position: relative;
+  background: var(--form-card-bg);
+  border: 1.5px solid #d5d9dd;
+  border-radius: 3px;
+  padding: 12px 6px 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+
+  &:hover:not(:disabled) {
+    border-color: #a9b2bb;
+  }
+
+  // Focus ring: _base.scss globally suppresses outline with !important,
+  // so use box-shadow (unaffected by outline:none) for keyboard visibility.
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(55, 138, 221, 0.5);
+  }
+
+  &--default:not(&--selected) {
+    border-style: dashed;
+  }
+
+  &--selected {
+    border-color: #378add;
+    background: #e8f1fc;
+    box-shadow: inset 0 0 0 1px #378add;
+
+    .form-style-card__icon svg {
+      color: #378add;
+    }
+  }
+
+  &--disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.form-style-card__badge {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  background: #42526e;
+  color: #fff;
+  font-size: 8.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 8px;
+  padding: 1px 5px;
+}
+
+.form-style-card__icon {
+  svg {
+    display: block;
+    width: 42px;
+    height: 42px;
+    color: #42526e;
+  }
+}
+
+.form-style-card__label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+
+  b {
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  em {
+    font-size: 11.5px;
+    font-style: normal;
+    color: #5a6775;
+  }
+}
+
 // CASCADE MODAL CONTENTS
 
 .cascade-popup {

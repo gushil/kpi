@@ -11,7 +11,6 @@ import last from 'lodash.last'
 import DocumentTitle from 'react-document-title'
 import Markdown from 'react-markdown'
 import { useBeforeUnload, useBlocker, unstable_usePrompt as usePrompt } from 'react-router-dom'
-import Select from 'react-select'
 import type { AssetSnapshotResponse } from '#/api/models/assetSnapshotResponse'
 import { invalidateItem } from '#/api/mutation-defaults/common'
 import { getAssetsRetrieveQueryKey, useAssetsRetrieve } from '#/api/react-query/manage-projects-and-library-content'
@@ -86,6 +85,7 @@ import SurveyScope from '../models/surveyScope'
 import { type SurveyStateStoreData, stores } from '../stores'
 import { escapeHtml, recordKeys } from '../utils'
 import AssetNavigator from './AssetNavigator'
+import FormStyleCardGrid from './FormStyleCardGrid'
 
 const ErrorMessage = makeBem(null, 'error-message')
 const ErrorMessage__strong = makeBem(null, 'error-message__header', 'strong')
@@ -507,11 +507,8 @@ export default function EditableForm(props: EditableFormProps) {
     )
   }
 
-  function onStyleChange(newStyle: null | FormStyleDefinition) {
-    let settingsStyle: FormStyleName | undefined
-    if (newStyle !== null) {
-      settingsStyle = newStyle.value
-    }
+  function onStyleChange(newStyle: FormStyleDefinition) {
+    const settingsStyle: FormStyleName = newStyle.value
 
     setState((currentState) => ({
       ...currentState,
@@ -543,10 +540,6 @@ export default function EditableForm(props: EditableFormProps) {
       settings__form_id: val,
     }))
     onSurveyChangeDebounced()
-  }
-
-  function getStyleSelectVal(optionVal?: FormStyleName) {
-    return AVAILABLE_FORM_STYLES.find((option) => option.value === optionVal)
   }
 
   function onSurveyChange() {
@@ -1527,26 +1520,10 @@ export default function EditableForm(props: EditableFormProps) {
                   surfaces its own Form Designer help link in the header instead. */}
               <bem.FormBuilderAside__header>{t('Form style')}</bem.FormBuilderAside__header>
 
-              <label className='kobo-select__label' htmlFor='webform-style'>
-                {hasSettings
-                  ? t('Select the form style that you would like to use. This will only affect web forms.')
-                  : t(
-                      'Select the form style. This will only affect the Enketo preview, and it will not be saved with the question or block.',
-                    )}
-              </label>
-
-              <Select
-                className='kobo-select'
-                classNamePrefix='kobo-select'
-                id='webform-style'
-                name='webform-style'
-                value={getStyleSelectVal(styleValue)}
+              <FormStyleCardGrid
+                styleValue={styleValue}
                 onChange={onStyleChange}
-                placeholder={AVAILABLE_FORM_STYLES[0].label}
-                options={AVAILABLE_FORM_STYLES}
-                menuPlacement='bottom'
                 isDisabled={isChangingAppearanceRestricted()}
-                isSearchable={false}
               />
             </bem.FormBuilderAside__row>
 
