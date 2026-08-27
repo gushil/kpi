@@ -87,7 +87,7 @@ const FORM_STYLE_ARIA_LABELS: Record<string, string> = {
   'theme-grid pages': t('Grid – Multiple pages'),
 }
 
-// The default card (Simple – Single page) gets a "Default" badge when unselected
+// The default card (Simple – Single page) always shows a "Default" badge
 const DEFAULT_STYLE_VALUE: FormStyleName = ''
 
 interface FormStyleCardGridProps {
@@ -108,7 +108,7 @@ export default function FormStyleCardGrid(props: FormStyleCardGridProps) {
   }
 
   return (
-    <div className='form-style-card-grid'>
+    <div className='form-style-card-grid' role='radiogroup' aria-label={t('Form style')}>
       {AVAILABLE_FORM_STYLES.map((style) => {
         const isSelected = style.value === activeValue
         const isDefault = style.value === DEFAULT_STYLE_VALUE
@@ -119,6 +119,7 @@ export default function FormStyleCardGrid(props: FormStyleCardGridProps) {
           <button
             key={style.value}
             type='button'
+            role='radio'
             className={[
               'form-style-card',
               isSelected ? 'form-style-card--selected' : '',
@@ -127,7 +128,7 @@ export default function FormStyleCardGrid(props: FormStyleCardGridProps) {
             ]
               .filter(Boolean)
               .join(' ')}
-            aria-pressed={isSelected}
+            aria-checked={isSelected}
             aria-label={ariaLabel}
             disabled={props.isDisabled}
             onClick={() => handleSelect(style)}

@@ -41,7 +41,6 @@ import {
 import MetadataEditor from '#/components/metadataEditor'
 import {
   ASSET_TYPES,
-  AVAILABLE_FORM_STYLES,
   AssetTypeName,
   type FormStyleDefinition,
   type FormStyleName,

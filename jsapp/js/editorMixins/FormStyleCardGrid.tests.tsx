@@ -58,7 +58,7 @@ describe('FormStyleCardGrid — OC-28582 form style card grid', () => {
 
   it('shows the Default badge only on the Simple–Single page card', () => {
     renderGrid()
-    chai.expect(screen.getByText('Default')).to.exist
+    chai.expect(screen.getAllByText('Default')).to.have.length(1)
     // badge is inside the Simple–Single page button
     const btn = screen.getByLabelText('Simple – Single page')
     chai.expect(btn.querySelector('.form-style-card__badge')).to.not.equal(null)
