@@ -83,6 +83,19 @@ class SDLoginIdReAuthTestCase(TestCase):
 
         self.assertEqual(self.middleware(request), 'passed-through')
 
+    def test_login_id_without_sd_user_is_ignored(self):
+        """Only Study Designer sends both params. Acting on a login id on its
+        own would let any URL log a session out."""
+        request = self._request(
+            '?oc_sd_login_id=login-2',
+            session_data={'oc_sd_login_id': 'login-1'},
+        )
+
+        response = self.middleware(request)
+
+        self.assertEqual(response, 'passed-through')
+        self.assertEqual(request.session.get('oc_sd_login_id'), 'login-1')
+
     def test_anonymous_request_is_untouched(self):
         from django.contrib.auth.models import AnonymousUser
 
