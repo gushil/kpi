@@ -54,6 +54,7 @@ import {
   update_states,
 } from '#/constants'
 import envStore from '#/envStore'
+import { LogicBuilderErrorBoundary } from '#/openclinica/LogicBuilderErrorBoundary'
 import {
   applyExpressionToRow,
   focusGenerateButton,
@@ -485,25 +486,32 @@ export default function EditableForm(props: EditableFormProps) {
     // prompt's TARGET ITEM can never name different items (review Minor 2).
     const itemName = readItemName(request.row)
     return (
-      <AiGeneratorDialog
-        open
-        scope={{
-          itemName,
-          attribute: tab,
-          fields: buildFieldContext(request.row),
-          item: buildItemDefinition(request.row),
-        }}
-        client={logicBuilderClient}
-        // inertRoot deliberately NOT passed: the host owns the inert boundary
-        // (see the builder-inert effect) because inerting the whole wrapper
-        // would make the scroll container unhittable and break AC2's
-        // "scrollable but inert".
-        onApply={applyGeneratedExpression}
-        // P1.3 AC2: live raw read of the panel editor at Apply-click time —
-        // drives the dialog's inline overwrite confirmation.
-        getCurrentExpression={() => readCurrentExpression(request.row, request.attribute)}
-        onClose={closeGenerateDialog}
-      />
+      // P1.4 AC7: if the dialog crashes at render/runtime, degrade to no
+      // dialog instead of unwinding the Form Designer tree. onCrash rides
+      // the existing single close+focus site — closeGenerateDialog clears
+      // GENERATE_REQUEST_KEY, which unmounts this boundary too, so the crash
+      // latch naturally resets for the next Generate click.
+      <LogicBuilderErrorBoundary onCrash={closeGenerateDialog}>
+        <AiGeneratorDialog
+          open
+          scope={{
+            itemName,
+            attribute: tab,
+            fields: buildFieldContext(request.row),
+            item: buildItemDefinition(request.row),
+          }}
+          client={logicBuilderClient}
+          // inertRoot deliberately NOT passed: the host owns the inert boundary
+          // (see the builder-inert effect) because inerting the whole wrapper
+          // would make the scroll container unhittable and break AC2's
+          // "scrollable but inert".
+          onApply={applyGeneratedExpression}
+          // P1.3 AC2: live raw read of the panel editor at Apply-click time —
+          // drives the dialog's inline overwrite confirmation.
+          getCurrentExpression={() => readCurrentExpression(request.row, request.attribute)}
+          onClose={closeGenerateDialog}
+        />
+      </LogicBuilderErrorBoundary>
     )
   }
 
