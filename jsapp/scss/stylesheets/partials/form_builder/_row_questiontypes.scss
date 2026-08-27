@@ -8,9 +8,11 @@
 
 // .expanding-spacer-between-rows BECOMES .survey__row__spacer
 .survey__row__spacer {
+  // .btn--addrow and .survey__row__spacer-rule are both position: absolute
+  // and centered via left/top + transform, so this stays their containing
+  // block without needing any height of its own — it must not grow the gap
+  // between rows just because those got bigger.
   position: relative;
-  // centers the .btn--addrow pill over the full-width .survey__row__spacer-rule
-  text-align: center;
 
   .line {
     height: 0;
