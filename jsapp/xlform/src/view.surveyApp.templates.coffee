@@ -17,7 +17,7 @@ module.exports = do ->
           <li class="survey-editor__null-top-row empty">
             <p class="survey-editor__message well">
               <b>#{t("This form is currently empty.")}</b><br>
-              #{t("You can add questions, notes, prompts, or other fields by clicking on below.")}
+              #{t("You can add questions, notes, prompts, or other fields by clicking the Add Item button below.")}
             </p>
             <div class="survey__row__spacer  expanding-spacer-between-rows expanding-spacer-between-rows--depr">
               <button type="button" class="btn btn--addrow js-expand-row-selector" data-cy="plus">

@@ -54,10 +54,25 @@
 // Tab landing directly on the control — possible because it's hidden via
 // opacity, not visibility — reveals and colors it exactly like a hover, so
 // Enter or Space activates it immediately, matching the old plus icon.
+//
+// z-index is raised on the button only (not the rule below) here too: none
+// of .survey__row/.card/.group/.group__rows establish their own stacking
+// context, so this comparison reaches across nesting depth — with nested
+// groups, a question's own control, its innermost group's control, and
+// every ancestor group's control can all sit at nearly the same seam and
+// visually overlap. Without this, the outermost group's control always wins
+// (it's simply last in DOM order), permanently covering the inner ones.
+// Raising z-index on the one actually being hovered/focused — whichever it
+// is — makes that one surface on top instead. The rule intentionally keeps
+// its default (unset) z-index: giving it the same boosted value as the
+// button would tie them, and since the rule is later in DOM order than the
+// button, the tie would make the rule paint over the button instead of
+// staying behind it.
 .btn--addrow:focus {
   opacity: 1;
   pointer-events: auto;
   background-color: colors.$kobo-blue;
+  z-index: z-indexes.$z-form-builder-add-row;
 }
 
 .btn--addrow:focus ~ .survey__row__spacer-rule {
@@ -413,6 +428,9 @@ tr .scorecell__radio:hover {
   // &:hover, &.hover {
   &:hover {
     background-color: colors.$kobo-blue;
+    // see the comment on .btn--addrow:focus above — same nested-group
+    // overlap fix, mouse side.
+    z-index: z-indexes.$z-form-builder-add-row;
   }
 }
 
@@ -450,6 +468,11 @@ tr .scorecell__radio:hover {
 // to .btn--addrow matters — a plain descendant selector would also match
 // every nested row's button inside a group that happens to be the last
 // top-level item, since .survey__row--group is itself a .survey__row.
+// :not(.survey__row__spacer--leading) matters too: in a single-item survey,
+// that one row is both :last-child and holds the leading (OC-28571 AC4)
+// spacer as well as its own trailing one — only the trailing one is "the
+// true end of the list", so the leading one must stay hover-revealed like
+// every other leading control.
 //
 // Both also get their own vertical offset (transform / top) instead of the
 // ones tuned for the hover-revealed mid-list case above, since there's no
@@ -457,7 +480,7 @@ tr .scorecell__radio:hover {
 // view.surveyApp.coffee focuses this same control after inserting a row,
 // which is what gives it the .btn--addrow:focus blue treatment defined
 // earlier.)
-.survey-editor__list > .survey__row:last-child > .survey__row__spacer > .btn--addrow,
+.survey-editor__list > .survey__row:last-child > .survey__row__spacer:not(.survey__row__spacer--leading) > .btn--addrow,
 .survey-editor__null-top-row:not(.survey-editor__null-top-row--hidden) .btn--addrow {
   visibility: visible;
   opacity: 1;
@@ -465,12 +488,39 @@ tr .scorecell__radio:hover {
   transform: translate(-50%, -36%);
 }
 
-.survey-editor__list > .survey__row:last-child > .survey__row__spacer > .survey__row__spacer-rule,
+.survey-editor__list > .survey__row:last-child > .survey__row__spacer:not(.survey__row__spacer--leading) > .survey__row__spacer-rule,
 .survey-editor__null-top-row:not(.survey-editor__null-top-row--hidden) .survey__row__spacer-rule {
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
   top: 5px;
+}
+
+// OC-28572 AC4: an empty Layout Group's placeholder control. It isn't a
+// direct child of .survey__row (it lives inside .group__rows, nested one
+// level deeper than a row's own leading/trailing spacer), so neither the
+// hover-reveal rule nor the "always visible" rule above reaches it —
+// it needs its own copy of the same always-visible treatment. margin
+// (rather than padding/height) gives it breathing room inside the
+// otherwise-empty .group__rows without changing the spacer div's own
+// height, since .line's expand/collapse behavior (in view.rowSelector.coffee)
+// inherits that height and must stay consistent with every other spacer.
+.group__rows > .survey__row__spacer--empty-group {
+  margin: 16px 0;
+
+  > .btn--addrow {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -36%);
+  }
+
+  > .survey__row__spacer-rule {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    top: 5px;
+  }
 }
 
 // The empty-state control must stay fully inert once the form has items —

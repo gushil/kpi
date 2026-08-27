@@ -323,7 +323,16 @@ module.exports = do ->
           # hopefully, this error is never triggered
           throw new Error('View for row was not found: ' + rowId)
 
-        new $viewRowSelector.RowSelector(el: $spacer.get(0), ngScope: @ngScope, spawnedFromView: view, surveyView: @, reversible:true, survey: @survey).expand()
+        # OC-28571 AC4: a leading spacer inserts the new row before this
+        # row instead of after it.
+        insertBefore = $spacer.hasClass('survey__row__spacer--leading')
+        # OC-28572 AC4: an empty-group placeholder inserts the new row as
+        # this group's first child, not as a sibling before/after it —
+        # here `view` is the group's own view, since the placeholder has
+        # no row of its own to resolve to.
+        intoEmptyGroup = $spacer.hasClass('survey__row__spacer--empty-group')
+
+        new $viewRowSelector.RowSelector(el: $spacer.get(0), ngScope: @ngScope, spawnedFromView: view, surveyView: @, reversible:true, survey: @survey, insertBefore: insertBefore, intoEmptyGroup: intoEmptyGroup).expand()
 
     # Space doesn't need explicit handling for native <button> elements in
     # most browsers, but Enter already gets special-cased globally (see the
@@ -677,6 +686,45 @@ module.exports = do ->
           $el.appendTo($parentEl)
       view
 
+    # OC-28571 AC4: whichever row is currently first in its own collection
+    # (top-level survey, or a single group's own rows) gets a leading
+    # "Add Item" control prepended above it, so there's always an insertion
+    # point above the very first item too. Called after `view.render()` —
+    # render() only sets `@$el.html(...)` on a row's first-ever render, and
+    # that would wipe out anything prepended beforehand.
+    ensureLeadingSpacer: (row, view) ->
+      $el = view.$el
+      index = row._parent.indexOf(row)
+      if index is 0
+        if $el.children('.survey__row__spacer--leading').length is 0
+          $el.prepend($viewTemplates.row.leadingSpacerHtml)
+      else
+        $el.children('.survey__row__spacer--leading').remove()
+      return
+
+    # OC-28572 AC5: distinguishes, via aria-label, a control that adds
+    # inside a group from one that adds after/before it — without touching
+    # the visible "Add Item" label. A plain top-level row keeps the default
+    # (unset) aria-label, since there's nothing to disambiguate there.
+    ensureAddItemAccessibleNames: (row, view) ->
+      $el = view.$el
+      isGroup = row.constructor.kls is 'Group'
+      parentIsGroup = row._parent._parent?.constructor?.kls is 'Group'
+
+      $trailing = $el.children('.survey__row__spacer').not('.survey__row__spacer--leading').find('.btn--addrow')
+      $leading = $el.children('.survey__row__spacer--leading').find('.btn--addrow')
+
+      if isGroup
+        $trailing.attr('aria-label', t('Add item after this group'))
+        $leading.attr('aria-label', t('Add item before this group'))
+      else if parentIsGroup
+        $trailing.attr('aria-label', t('Add item inside this group'))
+        $leading.attr('aria-label', t('Add item inside this group'))
+      else
+        $trailing.removeAttr('aria-label')
+        $leading.removeAttr('aria-label')
+      return
+
     getViewForRow: (row)->
       unless (xlfrv = @__rowViews.get(row.cid))
         if row.getValue('type') is 'kobomatrix'
@@ -703,7 +751,10 @@ module.exports = do ->
           if !@features.skipLogic
             row.unset 'relevant'
           isEmpty = false
-          @ensureElInView(row, @, @formEditorEl).render()
+          view = @ensureElInView(row, @, @formEditorEl)
+          view.render()
+          @ensureLeadingSpacer(row, view)
+          @ensureAddItemAccessibleNames(row, view)
         ), {
           includeErrors: true,
           includeGroups: true,
@@ -727,8 +778,10 @@ module.exports = do ->
         # If newest question has choices then hightlight the first choice
         newlyAddedEl.find('input.option-view-input').eq(0).select()
       else if newlyAddedEl
-        # focus on the next add row button
-        closestAddrow = newlyAddedEl.find('.btn--addrow').eq(0)
+        # focus on the next (trailing) add row button — not the leading one
+        # (OC-28571 AC4), which may now also be present as the first child
+        # if this newly added row happens to be first in its collection.
+        closestAddrow = newlyAddedEl.children('.survey__row__spacer').not('.survey__row__spacer--leading').find('.btn--addrow').eq(0)
         closestAddrow.addClass('btn--addrow-force-show')
         closestAddrow.focus()
         $(document).one('keydown click', (evt) =>

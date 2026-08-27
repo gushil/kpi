@@ -18,6 +18,8 @@ module.exports = do ->
       @options = opts
       @ngScope = opts.ngScope
       @reversible = opts.reversible
+      @insertBefore = opts.insertBefore
+      @intoEmptyGroup = opts.intoEmptyGroup
       @button = @$el.find(".btn").eq(0)
       @line = @$el.find(".line")
       if opts.action is "click-add-row"
@@ -172,8 +174,15 @@ module.exports = do ->
 
       # These options are needed for `addRow` function, so that it knows where to put the row we're adding.
       options = {}
-      if (rowBefore = @options.spawnedFromView?.model)
-        options.after = rowBefore
+      if @intoEmptyGroup and (targetGroup = @options.spawnedFromView?.model)
+        # OC-28572 AC4: no sibling row to anchor `before`/`after` on — add
+        # directly into the empty group's own (empty) rows collection.
+        survey = targetGroup.getSurvey()
+      else if (rowBefore = @options.spawnedFromView?.model)
+        if @insertBefore
+          options.before = rowBefore
+        else
+          options.after = rowBefore
         survey = rowBefore.getSurvey()
       else
         survey = @options.survey
@@ -193,7 +202,10 @@ module.exports = do ->
       rowDetails.isNewRow = true
 
       # Here we add the row to the survey
-      newRow = survey.addRow(rowDetails, options)
+      if @intoEmptyGroup and targetGroup
+        newRow = targetGroup.rows.add(rowDetails, at: 0)
+      else
+        newRow = survey.addRow(rowDetails, options)
       # …and link it up (TODO what?)
       newRow.linkUp(warnings: [], errors: [])
       if rowType is 'econsent_signature'

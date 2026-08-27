@@ -178,7 +178,7 @@ do ->
 
     it 'renders the helper hint text for adding questions', ->
       html = @render(@emptyOpts)
-      expect(html.indexOf('clicking on below')).not.toBe(-1)
+      expect(html.indexOf('clicking the Add Item button below')).not.toBe(-1)
 
     it 'renders the + button with js-expand-row-selector class', ->
       html = @render(@emptyOpts)
@@ -287,3 +287,69 @@ do ->
       html = $rowTemplates.rowErrorView('<Row/>')
       expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
       expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+  ###############################################################
+  # view.row.templates: leadingSpacerHtml (add-item control above
+  # the first item in a list/group)
+  # (OC-28571 AC4: insertion point above the very first item)
+  ###############################################################
+  describe 'view.row.templates: leadingSpacerHtml (leading add-item spacer)', ->
+
+    it 'is a non-empty string', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(typeof html).toBe('string')
+      expect(html.length > 0).toBe(true)
+
+    it 'renders the add-item control as a real <button> element', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'is marked as a leading spacer, distinct from the trailing spacer', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(html.indexOf('survey__row__spacer--leading')).not.toBe(-1)
+
+    it 'reuses the js-expand-row-selector click hook', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(html.indexOf('js-expand-row-selector')).not.toBe(-1)
+
+    it 'renders the "Add Item" label text', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(html.indexOf('Add Item')).not.toBe(-1)
+
+    it 'renders a dedicated full-width rule element alongside the control', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+
+  ###############################################################
+  # view.row.templates: emptyGroupSpacerHtml (add-item control for
+  # a Layout Group with no children)
+  # (OC-28572 AC4: insertion control inside an empty group's
+  # boundary; AC5: distinct accessible name from the "after group"
+  # control)
+  ###############################################################
+  describe 'view.row.templates: emptyGroupSpacerHtml (empty-group add-item spacer)', ->
+
+    it 'is a non-empty string', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(typeof html).toBe('string')
+      expect(html.length > 0).toBe(true)
+
+    it 'renders the add-item control as a real <button> element', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'is marked as an empty-group spacer', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(html.indexOf('survey__row__spacer--empty-group')).not.toBe(-1)
+
+    it 'reuses the js-expand-row-selector click hook', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(html.indexOf('js-expand-row-selector')).not.toBe(-1)
+
+    it 'renders the "Add Item" visible label text (unchanged from other controls)', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(html.indexOf('Add Item')).not.toBe(-1)
+
+    it 'gives the control a distinct accessible name that says it adds inside the group', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(/aria-label="[^"]*inside[^"]*group[^"]*"/i.test(html)).toBe(true)
