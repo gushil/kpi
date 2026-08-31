@@ -192,6 +192,14 @@ do ->
       html = @render(@emptyOpts)
       expect(html.indexOf('k-icon-plus')).not.toBe(-1)
 
+    it 'marks the decorative plus icon as aria-hidden', ->
+      html = @render(@emptyOpts)
+      expect(/<i class="k-icon k-icon-plus" aria-hidden="true">/.test(html)).toBe(true)
+
+    it 'renders the + button with js-add-row-button class (used by applyLocking to hide add-item entry points)', ->
+      html = @render(@emptyOpts)
+      expect(html.indexOf('js-add-row-button')).not.toBe(-1)
+
     it 'renders the add-item control as a real <button> element (native keyboard activation)', ->
       html = @render(@emptyOpts)
       expect(/<button[^>]*class="[^"]*\bbtn--addrow\b[^"]*"[^>]*data-cy="plus"/.test(html)).toBe(true)
@@ -273,6 +281,10 @@ do ->
       html = $rowTemplates.xlfRowView(@surveyView)
       expect(html.indexOf('class="line"')).not.toBe(-1)
 
+    it 'marks the decorative plus icon as aria-hidden', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(/<i class="k-icon k-icon-plus" aria-hidden="true">/.test(html)).toBe(true)
+
     it 'renders the same add-item spacer for groupView', ->
       html = $rowTemplates.groupView(@surveyView)
       expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
@@ -320,6 +332,10 @@ do ->
       html = $rowTemplates.leadingSpacerHtml
       expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
 
+    it 'marks the decorative plus icon as aria-hidden', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(/<i class="k-icon k-icon-plus" aria-hidden="true">/.test(html)).toBe(true)
+
   ###############################################################
   # view.row.templates: emptyGroupSpacerHtml (add-item control for
   # a Layout Group with no children)
@@ -357,3 +373,7 @@ do ->
     it 'gives the control a matching title tooltip for sighted users', ->
       html = $rowTemplates.emptyGroupSpacerHtml
       expect(/title="[^"]*inside[^"]*group[^"]*"/i.test(html)).toBe(true)
+
+    it 'marks the decorative plus icon as aria-hidden', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(/<i class="k-icon k-icon-plus" aria-hidden="true">/.test(html)).toBe(true)

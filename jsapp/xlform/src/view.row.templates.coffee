@@ -9,7 +9,7 @@ module.exports = do ->
   expandingSpacerHtml = """
       <div class="survey__row__spacer  row clearfix expanding-spacer-between-rows expanding-spacer-between-rows--depr">
         <button type="button" class="js-expand-row-selector js-add-row-button btn btn--addrow"
-            ><i class="k-icon k-icon-plus"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
+            ><i class="k-icon k-icon-plus" aria-hidden="true"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
         <div class="survey__row__spacer-rule"></div>
         <div class="line">&nbsp;</div>
       </div>
@@ -25,7 +25,7 @@ module.exports = do ->
   leadingSpacerHtml = """
       <div class="survey__row__spacer  survey__row__spacer--leading  row clearfix expanding-spacer-between-rows expanding-spacer-between-rows--depr">
         <button type="button" class="js-expand-row-selector js-add-row-button btn btn--addrow"
-            ><i class="k-icon k-icon-plus"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
+            ><i class="k-icon k-icon-plus" aria-hidden="true"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
         <div class="survey__row__spacer-rule"></div>
         <div class="line">&nbsp;</div>
       </div>
@@ -40,7 +40,7 @@ module.exports = do ->
   emptyGroupSpacerHtml = """
       <div class="survey__row__spacer  survey__row__spacer--empty-group  row clearfix expanding-spacer-between-rows expanding-spacer-between-rows--depr">
         <button type="button" class="js-expand-row-selector js-add-row-button btn btn--addrow" aria-label="#{t('Add item inside this group')}" title="#{t('Add item inside this group')}"
-            ><i class="k-icon k-icon-plus"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
+            ><i class="k-icon k-icon-plus" aria-hidden="true"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
         <div class="survey__row__spacer-rule"></div>
         <div class="line">&nbsp;</div>
       </div>

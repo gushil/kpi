@@ -796,7 +796,11 @@ module.exports = do ->
         # if this newly added row happens to be first in its collection.
         closestAddrow = newlyAddedEl.children('.survey__row__spacer').not('.survey__row__spacer--leading').find('.btn--addrow').eq(0)
         closestAddrow.addClass('btn--addrow-force-show')
-        closestAddrow.focus()
+        if newlyAddedRow._skipScrollIntoView
+          delete newlyAddedRow._skipScrollIntoView
+          closestAddrow.get(0)?.focus(preventScroll: true)
+        else
+          closestAddrow.focus()
         $(document).one('keydown click', (evt) =>
           closestAddrow.removeClass('btn--addrow-force-show')
           # HACKFIX: previously it was `closestAddrow.blur()` but there was some weird race condition that causes UI
