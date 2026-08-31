@@ -6,6 +6,7 @@ window.t ?= (str) -> str
 
 $rowSelectorTemplates = require('../../jsapp/xlform/src/view.rowSelector.templates')
 $surveyAppTemplates = require('../../jsapp/xlform/src/view.surveyApp.templates')
+$rowTemplates = require('../../jsapp/xlform/src/view.row.templates')
 
 do ->
 
@@ -177,7 +178,7 @@ do ->
 
     it 'renders the helper hint text for adding questions', ->
       html = @render(@emptyOpts)
-      expect(html.indexOf("clicking on the '+' sign below")).not.toBe(-1)
+      expect(html.indexOf('clicking the Add Item button below')).not.toBe(-1)
 
     it 'renders the + button with js-expand-row-selector class', ->
       html = @render(@emptyOpts)
@@ -190,6 +191,26 @@ do ->
     it 'renders the k-icon-plus icon inside the + button', ->
       html = @render(@emptyOpts)
       expect(html.indexOf('k-icon-plus')).not.toBe(-1)
+
+    it 'marks the decorative plus icon as aria-hidden', ->
+      html = @render(@emptyOpts)
+      expect(/<i class="k-icon k-icon-plus" aria-hidden="true">/.test(html)).toBe(true)
+
+    it 'renders the + button with js-add-row-button class (used by applyLocking to hide add-item entry points)', ->
+      html = @render(@emptyOpts)
+      expect(html.indexOf('js-add-row-button')).not.toBe(-1)
+
+    it 'renders the add-item control as a real <button> element (native keyboard activation)', ->
+      html = @render(@emptyOpts)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b[^"]*"[^>]*data-cy="plus"/.test(html)).toBe(true)
+
+    it 'renders the "Add Item" label text for the empty-state control', ->
+      html = @render(@emptyOpts)
+      expect(html.indexOf('Add Item')).not.toBe(-1)
+
+    it 'renders a dedicated full-width rule element alongside the empty-state control', ->
+      html = @render(@emptyOpts)
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
 
     it 'renders the survey-editor__null-top-row for the empty state', ->
       html = @render(@emptyOpts)
@@ -229,3 +250,130 @@ do ->
       opts = survey: {}
       html = @render(opts)
       expect(html.indexOf('survey-warnings')).toBe(-1)
+
+  ###############################################################
+  # view.row.templates: shared end-of-row add-item spacer
+  # (OC-28570: full-width "Add Item" control, replaces the small
+  # plus-icon spacer across rows, groups, matrices and error rows)
+  ###############################################################
+  describe 'view.row.templates: expandingSpacerHtml (shared add-item spacer)', ->
+
+    beforeEach ->
+      @surveyView = { features: { multipleQuestions: true }, canAddToLibrary: false }
+
+    it 'renders the add-item control as a real <button> element (native keyboard activation)', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'does not render the legacy tabIndex-based div for the add-item control', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(html.indexOf('tabIndex="0" class="js-expand-row-selector')).toBe(-1)
+
+    it 'renders the "Add Item" label text', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(html.indexOf('Add Item')).not.toBe(-1)
+
+    it 'renders a dedicated full-width rule element alongside the control', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+
+    it 'still renders the functional .line container used by RowSelector to host the namer/picker', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(html.indexOf('class="line"')).not.toBe(-1)
+
+    it 'marks the decorative plus icon as aria-hidden', ->
+      html = $rowTemplates.xlfRowView(@surveyView)
+      expect(/<i class="k-icon k-icon-plus" aria-hidden="true">/.test(html)).toBe(true)
+
+    it 'renders the same add-item spacer for groupView', ->
+      html = $rowTemplates.groupView(@surveyView)
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'renders the same add-item spacer for koboMatrixView', ->
+      html = $rowTemplates.koboMatrixView()
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'renders the same add-item spacer for rowErrorView', ->
+      html = $rowTemplates.rowErrorView('<Row/>')
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+  ###############################################################
+  # view.row.templates: leadingSpacerHtml (add-item control above
+  # the first item in a list/group)
+  # (OC-28571 AC4: insertion point above the very first item)
+  ###############################################################
+  describe 'view.row.templates: leadingSpacerHtml (leading add-item spacer)', ->
+
+    it 'is a non-empty string', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(typeof html).toBe('string')
+      expect(html.length > 0).toBe(true)
+
+    it 'renders the add-item control as a real <button> element', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'is marked as a leading spacer, distinct from the trailing spacer', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(html.indexOf('survey__row__spacer--leading')).not.toBe(-1)
+
+    it 'reuses the js-expand-row-selector click hook', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(html.indexOf('js-expand-row-selector')).not.toBe(-1)
+
+    it 'renders the "Add Item" label text', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(html.indexOf('Add Item')).not.toBe(-1)
+
+    it 'renders a dedicated full-width rule element alongside the control', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(html.indexOf('survey__row__spacer-rule')).not.toBe(-1)
+
+    it 'marks the decorative plus icon as aria-hidden', ->
+      html = $rowTemplates.leadingSpacerHtml
+      expect(/<i class="k-icon k-icon-plus" aria-hidden="true">/.test(html)).toBe(true)
+
+  ###############################################################
+  # view.row.templates: emptyGroupSpacerHtml (add-item control for
+  # a Layout Group with no children)
+  # (OC-28572 AC4: insertion control inside an empty group's
+  # boundary; AC5: distinct accessible name from the "after group"
+  # control)
+  ###############################################################
+  describe 'view.row.templates: emptyGroupSpacerHtml (empty-group add-item spacer)', ->
+
+    it 'is a non-empty string', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(typeof html).toBe('string')
+      expect(html.length > 0).toBe(true)
+
+    it 'renders the add-item control as a real <button> element', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(/<button[^>]*class="[^"]*\bbtn--addrow\b/.test(html)).toBe(true)
+
+    it 'is marked as an empty-group spacer', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(html.indexOf('survey__row__spacer--empty-group')).not.toBe(-1)
+
+    it 'reuses the js-expand-row-selector click hook', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(html.indexOf('js-expand-row-selector')).not.toBe(-1)
+
+    it 'renders the "Add Item" visible label text (unchanged from other controls)', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(html.indexOf('Add Item')).not.toBe(-1)
+
+    it 'gives the control a distinct accessible name that says it adds inside the group', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(/aria-label="[^"]*inside[^"]*group[^"]*"/i.test(html)).toBe(true)
+
+    it 'gives the control a matching title tooltip for sighted users', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(/title="[^"]*inside[^"]*group[^"]*"/i.test(html)).toBe(true)
+
+    it 'marks the decorative plus icon as aria-hidden', ->
+      html = $rowTemplates.emptyGroupSpacerHtml
+      expect(/<i class="k-icon k-icon-plus" aria-hidden="true">/.test(html)).toBe(true)

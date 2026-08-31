@@ -230,6 +230,112 @@ do ->
 
   # -------------------------------------------------------------------------
 
+  describe 'view.rowSelector: RowSelector.onSelectNewQuestionType — insertBefore (OC-28571 AC4)', ->
+
+    beforeEach ->
+      window.xlfHideWarnings = true
+      @survey = new $model.Survey()
+      @survey.rows.add(type: 'text', name: 'existing_q', label: 'Existing Question')
+      @existingRow = @survey.rows.at(0)
+
+    afterEach ->
+      window.xlfHideWarnings = false
+
+    it 'inserts the new row before the spawned row, not after it', ->
+      spawnedFromView = {model: @existingRow}
+      selector = buildRowSelector(
+        survey: @survey
+        spawnedFromView: spawnedFromView
+        insertBefore: true
+      )
+      selector.hide = ->
+      selector.line = $('<div class="line"><input value="New First Question"/></div>')
+      selector.onSelectNewQuestionType(buildPickerEvent('text'))
+      expect(@survey.rows.length).toBe(2)
+      expect(@survey.rows.at(0).getValue('label')).toBe('New First Question')
+      expect(@survey.rows.at(1)).toBe(@existingRow)
+
+    it 'still inserts after the spawned row when insertBefore is falsy (default)', ->
+      spawnedFromView = {model: @existingRow}
+      selector = buildRowSelector(
+        survey: @survey
+        spawnedFromView: spawnedFromView
+      )
+      selector.hide = ->
+      selector.line = $('<div class="line"><input value="Appended Question"/></div>')
+      selector.onSelectNewQuestionType(buildPickerEvent('text'))
+      expect(@survey.rows.at(0)).toBe(@existingRow)
+      expect(@survey.rows.at(1).getValue('label')).toBe('Appended Question')
+
+  # -------------------------------------------------------------------------
+
+  describe 'view.rowSelector: RowSelector.onSelectNewQuestionType — intoEmptyGroup (OC-28572 AC4)', ->
+
+    beforeEach ->
+      window.xlfHideWarnings = true
+      @survey = new $model.Survey()
+      @survey.rows.add(type: 'group', name: 'g1', label: 'Group 1')
+      @group = @survey.rows.at(0)
+
+    afterEach ->
+      window.xlfHideWarnings = false
+
+    it 'adds the new row into the empty group, not as a sibling of the group', ->
+      spawnedFromView = {model: @group}
+      selector = buildRowSelector(
+        survey: @survey
+        spawnedFromView: spawnedFromView
+        intoEmptyGroup: true
+      )
+      selector.hide = ->
+      selector.line = $('<div class="line"><input value="First Child"/></div>')
+      selector.onSelectNewQuestionType(buildPickerEvent('text'))
+      expect(@survey.rows.length).toBe(1)
+      expect(@group.rows.length).toBe(1)
+      expect(@group.rows.at(0).getValue('label')).toBe('First Child')
+
+    it 'inserts at index 0 of the group directly (bypassing survey.addRow)', ->
+      addRowCalled = false
+      origAddRow = @survey.addRow.bind(@survey)
+      @survey.addRow = (details, opts) ->
+        addRowCalled = true
+        origAddRow(details, opts)
+      capturedOpts = null
+      origGroupRowsAdd = @group.rows.add.bind(@group.rows)
+      @group.rows.add = (details, opts) ->
+        capturedOpts = opts
+        origGroupRowsAdd(details, opts)
+      spawnedFromView = {model: @group}
+      selector = buildRowSelector(
+        survey: @survey
+        spawnedFromView: spawnedFromView
+        intoEmptyGroup: true
+      )
+      selector.hide = ->
+      selector.line = $('<div class="line"><input value="X"/></div>')
+      selector.onSelectNewQuestionType(buildPickerEvent('text'))
+      expect(capturedOpts.at).toBe(0)
+      expect(addRowCalled).toBe(false)
+
+    it 'marks the new row as isNewRow in the rowDetails for the empty-group path too', ->
+      capturedDetails = null
+      origGroupRowsAdd = @group.rows.add.bind(@group.rows)
+      @group.rows.add = (details, opts) ->
+        capturedDetails = details
+        origGroupRowsAdd(details, opts)
+      spawnedFromView = {model: @group}
+      selector = buildRowSelector(
+        survey: @survey
+        spawnedFromView: spawnedFromView
+        intoEmptyGroup: true
+      )
+      selector.hide = ->
+      selector.line = $('<div class="line"><input value="Second"/></div>')
+      selector.onSelectNewQuestionType(buildPickerEvent('note'))
+      expect(capturedDetails.isNewRow).toBe(true)
+
+  # -------------------------------------------------------------------------
+
   describe 'view.rowSelector: RowSelector name-slugification edge cases', ->
 
     beforeEach ->

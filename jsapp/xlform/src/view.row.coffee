@@ -576,8 +576,20 @@ module.exports = do ->
         name_detail = @model.get('name')
         name_detail.set 'value', name_detail.deduplicate(@model.getSurvey(), @model.getSurvey().rowItemNameMaxLength)
 
-      @model.rows.each (row)=>
-        @getApp().ensureElInView(row, @, @$rows).render()
+      # OC-28572 AC4: an empty group has no row of its own to attach a
+      # spacer to, so it gets a dedicated always-visible placeholder
+      # instead of the per-row leading/trailing spacers below.
+      if @model.rows.length is 0
+        if @$rows.children('.survey__row__spacer--empty-group').length is 0
+          @$rows.empty().append($viewTemplates.row.emptyGroupSpacerHtml)
+      else
+        @$rows.children('.survey__row__spacer--empty-group').remove()
+        @model.rows.each (row)=>
+          app = @getApp()
+          view = app.ensureElInView(row, @, @$rows)
+          view.render()
+          app.ensureLeadingSpacer(row, view)
+          app.ensureAddItemAccessibleNames(row, view)
 
       if !@already_rendered
         # only render the row details which are necessary for the initial view (ie 'label')

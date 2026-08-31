@@ -18,6 +18,8 @@ module.exports = do ->
       @options = opts
       @ngScope = opts.ngScope
       @reversible = opts.reversible
+      @insertBefore = opts.insertBefore
+      @intoEmptyGroup = opts.intoEmptyGroup
       @button = @$el.find(".btn").eq(0)
       @line = @$el.find(".line")
       if opts.action is "click-add-row"
@@ -47,7 +49,9 @@ module.exports = do ->
       @line.parents(".survey-editor__null-top-row").addClass "expanded"
       @line.css "height", "inherit"
       @line.html $viewTemplates.$$render('xlfRowSelector.namer')
-      @scrollFormBuilder('+=50')
+      # skip for a leading (insert-before) control: its content grows above
+      # the row, so scrolling down would push it further out of view.
+      @scrollFormBuilder('+=50') unless @insertBefore
 
       if (@options.surveyView.features.multipleQuestions)
         $(window).on 'keydown.cancel_add_question',  (evt) =>
@@ -93,7 +97,7 @@ module.exports = do ->
         menurow = $("<div>", class: "questiontypelist__row").appendTo $menu
         menurow.append $viewTemplates.$$render('xlfRowSelector.cell', econsentIcon.attributes)
 
-      @scrollFormBuilder('+=220')
+      @scrollFormBuilder('+=220') unless @insertBefore
       @$('.questiontypelist__item').click _.bind(@onSelectNewQuestionType, @)
       # OpenClinica: keyboard navigation (arrow keys + ENTER) intentionally removed
       return
@@ -172,8 +176,15 @@ module.exports = do ->
 
       # These options are needed for `addRow` function, so that it knows where to put the row we're adding.
       options = {}
-      if (rowBefore = @options.spawnedFromView?.model)
-        options.after = rowBefore
+      if @intoEmptyGroup and (targetGroup = @options.spawnedFromView?.model)
+        # OC-28572 AC4: no sibling row to anchor `before`/`after` on, and
+        # insertion below bypasses survey.addRow entirely (adds directly
+        # into the empty group's own rows collection) — nothing to set up.
+      else if (rowBefore = @options.spawnedFromView?.model)
+        if @insertBefore
+          options.before = rowBefore
+        else
+          options.after = rowBefore
         survey = rowBefore.getSurvey()
       else
         survey = @options.survey
@@ -193,7 +204,12 @@ module.exports = do ->
       rowDetails.isNewRow = true
 
       # Here we add the row to the survey
-      newRow = survey.addRow(rowDetails, options)
+      if @intoEmptyGroup and targetGroup
+        newRow = targetGroup.rows.add(rowDetails, at: 0)
+      else
+        newRow = survey.addRow(rowDetails, options)
+      # same reasoning as above: don't scroll-into-view on focus either.
+      newRow._skipScrollIntoView = true if @insertBefore
       # …and link it up (TODO what?)
       newRow.linkUp(warnings: [], errors: [])
       if rowType is 'econsent_signature'

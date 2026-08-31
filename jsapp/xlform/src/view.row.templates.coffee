@@ -8,8 +8,40 @@ module.exports = do ->
 
   expandingSpacerHtml = """
       <div class="survey__row__spacer  row clearfix expanding-spacer-between-rows expanding-spacer-between-rows--depr">
-        <div tabIndex="0" class="js-expand-row-selector js-add-row-button btn btn--addrow btn--block  btn-xs  btn-default"
-            ><i class="k-icon k-icon-plus"></i></div>
+        <button type="button" class="js-expand-row-selector js-add-row-button btn btn--addrow"
+            ><i class="k-icon k-icon-plus" aria-hidden="true"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
+        <div class="survey__row__spacer-rule"></div>
+        <div class="line">&nbsp;</div>
+      </div>
+  """
+
+  # OC-28571 AC4: an insertion point above the very first item in a list or
+  # group. Prepended (by view.surveyApp.coffee's ensureLeadingSpacer) as the
+  # first child of whichever row is currently first in its collection, so it
+  # shares the existing `.survey__row:hover > .survey__row__spacer` reveal
+  # rule and the `.js-expand-row-selector` click delegation for free. The
+  # `--leading` marker is what expandRowSelector uses to insert the new row
+  # before this one instead of after it.
+  leadingSpacerHtml = """
+      <div class="survey__row__spacer  survey__row__spacer--leading  row clearfix expanding-spacer-between-rows expanding-spacer-between-rows--depr">
+        <button type="button" class="js-expand-row-selector js-add-row-button btn btn--addrow"
+            ><i class="k-icon k-icon-plus" aria-hidden="true"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
+        <div class="survey__row__spacer-rule"></div>
+        <div class="line">&nbsp;</div>
+      </div>
+  """
+
+  # OC-28572 AC4: a Layout Group with no children has no row to attach a
+  # leading/trailing spacer to (GroupView's own render loop never runs), so
+  # this is the group's only content — rendered in place of that loop, and
+  # kept always visible (see CSS) since there's nothing to hover to reveal
+  # it. Its aria-label (AC5) is fixed rather than computed at render time,
+  # since this control unambiguously always adds inside this group.
+  emptyGroupSpacerHtml = """
+      <div class="survey__row__spacer  survey__row__spacer--empty-group  row clearfix expanding-spacer-between-rows expanding-spacer-between-rows--depr">
+        <button type="button" class="js-expand-row-selector js-add-row-button btn btn--addrow" aria-label="#{t('Add item inside this group')}" title="#{t('Add item inside this group')}"
+            ><i class="k-icon k-icon-plus" aria-hidden="true"></i><span class="btn--addrow-label">#{t("Add Item")}</span></button>
+        <div class="survey__row__spacer-rule"></div>
         <div class="line">&nbsp;</div>
       </div>
   """
@@ -548,6 +580,8 @@ module.exports = do ->
     selectQuestionExpansion: selectQuestionExpansion
     groupView: groupView
     rowErrorView: rowErrorView
+    leadingSpacerHtml: leadingSpacerHtml
+    emptyGroupSpacerHtml: emptyGroupSpacerHtml
     calculationPanel: calculationPanel
     koboMatrixView: koboMatrixView
     scoreView: scoreView

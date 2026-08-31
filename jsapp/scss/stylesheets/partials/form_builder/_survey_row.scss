@@ -28,26 +28,56 @@
     }
   }
 
-  .btn--addrow {
-    display: none;
+  // Hidden via opacity, not visibility: the control stays a real, reachable
+  // Tab stop even while invisible, so a keyboard user tabbing off the row's
+  // last field lands on it next, same as the old small plus icon did.
+  .btn--addrow,
+  .survey__row__spacer-rule {
+    opacity: 0;
+    pointer-events: none;
   }
 
-  // display button for adding row when hovering,
-  // or when an input inside has focus (useful for keyboard navigation)
+  // Reveals (grey) for as long as the mouse is anywhere over the row above
+  // it — its card, its inputs, its open settings panel — or while focus is
+  // within that row. Keyed to the whole row rather than just the gap
+  // itself, matching the old small plus icon's behavior.
   &:hover,
   &:focus-within {
-    > .survey__row__spacer > .btn--addrow {
-      display: block;
+    > .survey__row__spacer > .btn--addrow,
+    > .survey__row__spacer > .survey__row__spacer-rule {
+      opacity: 1;
+      pointer-events: auto;
     }
   }
+}
 
-  // for displaying after row was added
-  .btn--addrow-force-show {
-    // don't override when hidden by locking profile restriction
-    &:not(.locking__ui-hidden) {
-      display: block !important;
-    }
-  }
+// Tab landing directly on the control — possible because it's hidden via
+// opacity, not visibility — reveals and colors it exactly like a hover, so
+// Enter or Space activates it immediately, matching the old plus icon.
+//
+// z-index is raised on the button only (not the rule below) here too: none
+// of .survey__row/.card/.group/.group__rows establish their own stacking
+// context, so this comparison reaches across nesting depth — with nested
+// groups, a question's own control, its innermost group's control, and
+// every ancestor group's control can all sit at nearly the same seam and
+// visually overlap. Without this, the outermost group's control always wins
+// (it's simply last in DOM order), permanently covering the inner ones.
+// Raising z-index on the one actually being hovered/focused — whichever it
+// is — makes that one surface on top instead. The rule intentionally keeps
+// its default (unset) z-index: giving it the same boosted value as the
+// button would tie them, and since the rule is later in DOM order than the
+// button, the tie would make the rule paint over the button instead of
+// staying behind it.
+.btn--addrow:focus {
+  opacity: 1;
+  pointer-events: auto;
+  background-color: colors.$kobo-blue;
+  z-index: z-indexes.$z-form-builder-add-row;
+}
+
+.btn--addrow:focus ~ .survey__row__spacer-rule {
+  opacity: 1;
+  background-color: colors.$kobo-blue;
 }
 
 // duplicated inside .btn--addrow, where
@@ -341,8 +371,14 @@ tr .scorecell__radio:hover {
 }
 
 .insort {
-  .btn--addrow {
-    opacity: 0;
+  // !important: must win over the :hover/:focus-within reveal above even
+  // while the dragged row is still under the cursor — both toggle the same
+  // `opacity` property, so without this the more specific hover selector
+  // would take precedence during a drag.
+  .btn--addrow,
+  .survey__row__spacer-rule {
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 }
 
@@ -350,81 +386,70 @@ tr .scorecell__radio:hover {
 // Add new row button
 // ==========================================================================
 
-// these variables are mostly used in btn--addrow to determine
-// the clickable area of the add row buttons.
-$click-area-btn--addrow-padding-tb: 30px;
-$click-area-nested-btn--addrow-padding-tb: 15px;
-$btn--addrow-height: 24px;
-$nested-btn--addrow-height: 24px;
-$nested-last-inner-btn--addrow-Offset: 7px;
-$nested-btn--addrow-height: 24px;
-
+// Full-width "Add Item" control: a pill button centered on a full-width
+// rule, both absolutely positioned over the seam between two rows — like
+// the old small plus icon was — so .survey__row__spacer stays near-zero
+// height and the gap between rows doesn't grow just because this control
+// is bigger. The button ends up straddling the row above and the row
+// below.
 //== usage:
-//   div.btn--addrow
-//     i.k-icon.k-icon-plus ''
+//   div.survey__row__spacer
+//     button.btn.btn--addrow
+//       i.k-icon.k-icon-plus ''
+//       span.btn--addrow-label 'Add Item'
+//     div.survey__row__spacer-rule
 .btn--addrow {
-  background-color: transparent;
-  width: 52px;
-  height: $btn--addrow-height + 2 * $click-area-btn--addrow-padding-tb;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   position: absolute;
-  left: -50px;
-  top: -20px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  z-index: 1;
+  height: 34px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 4px;
+  background-color: colors.$kobo-gray-500;
+  color: colors.$kobo-white;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
 
   .k-icon {
-    background-color: colors.$kobo-gray-500;
-    display: block;
-    width: 24px;
-    font-size: 21px;
-    height: $btn--addrow-height;
-    line-height: $btn--addrow-height;
-    border-radius: 5px;
+    font-size: 16px;
   }
 
+  // :focus deliberately isn't included here — see the dedicated
+  // .btn--addrow:focus rule above, which also covers the always-visible
+  // end-of-list control below.
   // when debugging, it's helpful to mock :hover
   // &:hover, &.hover {
-  &:hover,
-  &:focus {
-    background-color: transparent;
-
-    .k-icon {
-      background-color: colors.$kobo-blue;
-    }
+  &:hover {
+    background-color: colors.$kobo-blue;
+    // see the comment on .btn--addrow:focus above — same nested-group
+    // overlap fix, mouse side.
+    z-index: z-indexes.$z-form-builder-add-row;
   }
 }
 
-.no-touch .btn--addrow {
-  padding: $click-area-btn--addrow-padding-tb 0 0 11px;
+.btn--addrow:hover ~ .survey__row__spacer-rule {
+  background-color: colors.$kobo-blue;
 }
 
-.touch .btn--addrow {
-  height: 36px;
-  margin-top: 5px;
-  padding-left: 10px;
-}
-
-// inside group, the btn--addrow must be placed slightly differently
-// note: this compiles to
-// .group__rows .btn--addrow {...}
-.group__rows .btn--addrow {
-  left: -30px;
-  width: 40px;
-  height: $nested-btn--addrow-height + 2 * $click-area-nested-btn--addrow-padding-tb;
-  top: -30px;
-  padding: $click-area-nested-btn--addrow-padding-tb 0 0 3px;
-  z-index: z-indexes.$z-form-builder-add-row;
-
-  // 101 so it is above .btn--addrow when last item in group
-  .k-icon {
-    width: 22px;
-    height: 22px;
-    line-height: 22px;
-  }
-}
-
-.group__rows .group__rows .btn--addrow {
-  left: -24px;
-  z-index: z-indexes.$z-form-builder-add-row + 1;
-  width: 30px;
+.survey__row__spacer-rule {
+  position: absolute;
+  // Tuned by inspecting in the browser to line up with the seam for the
+  // hover-revealed mid-list case; the always-visible end-of-list control
+  // uses its own offset instead (further down), since it has no row below
+  // to straddle into.
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: colors.$kobo-gray-500;
+  transform: translateY(-50%);
 }
 
 // not specific enough for all :hover cases
@@ -437,9 +462,76 @@ $nested-btn--addrow-height: 24px;
   display: none;
 }
 
-// display last row's button, but not for groups
-.survey-editor__list > .survey__row:not(.survey__row--group):last-child .btn--addrow {
-  display: block;
+// Exactly one control on the whole page stays visible without hover or
+// focus: the true end of the top-level list, and the empty-state control
+// when the form has no items. The direct-child combinator all the way down
+// to .btn--addrow matters — a plain descendant selector would also match
+// every nested row's button inside a group that happens to be the last
+// top-level item, since .survey__row--group is itself a .survey__row.
+// :not(.survey__row__spacer--leading) matters too: in a single-item survey,
+// that one row is both :last-child and holds the leading (OC-28571 AC4)
+// spacer as well as its own trailing one — only the trailing one is "the
+// true end of the list", so the leading one must stay hover-revealed like
+// every other leading control.
+//
+// Both also get their own vertical offset (transform / top) instead of the
+// ones tuned for the hover-revealed mid-list case above, since there's no
+// row below this control to straddle into. (_reset() in
+// view.surveyApp.coffee focuses this same control after inserting a row,
+// which is what gives it the .btn--addrow:focus blue treatment defined
+// earlier.)
+.survey-editor__list > .survey__row:last-child > .survey__row__spacer:not(.survey__row__spacer--leading) > .btn--addrow,
+.survey-editor__null-top-row:not(.survey-editor__null-top-row--hidden) .btn--addrow {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -36%);
+}
+
+.survey-editor__list > .survey__row:last-child > .survey__row__spacer:not(.survey__row__spacer--leading) > .survey__row__spacer-rule,
+.survey-editor__null-top-row:not(.survey-editor__null-top-row--hidden) .survey__row__spacer-rule {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  top: 5px;
+}
+
+// OC-28572 AC4: an empty Layout Group's placeholder control. It isn't a
+// direct child of .survey__row (it lives inside .group__rows, nested one
+// level deeper than a row's own leading/trailing spacer), so neither the
+// hover-reveal rule nor the "always visible" rule above reaches it —
+// it needs its own copy of the same always-visible treatment. margin
+// (rather than padding/height) gives it breathing room inside the
+// otherwise-empty .group__rows without changing the spacer div's own
+// height, since .line's expand/collapse behavior (in view.rowSelector.coffee)
+// inherits that height and must stay consistent with every other spacer.
+.group__rows > .survey__row__spacer--empty-group {
+  margin: 16px 0;
+
+  > .btn--addrow {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -36%);
+  }
+
+  > .survey__row__spacer-rule {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    top: 5px;
+  }
+}
+
+// The empty-state control must stay fully inert once the form has items —
+// otherwise hovering the (invisible but still laid-out) null-top-row area
+// above the first item resurfaces it via the legacy opacity-on-hover rule
+// in _misc.scss.
+.survey-editor__null-top-row.survey-editor__null-top-row--hidden .btn--addrow,
+.survey-editor__null-top-row.survey-editor__null-top-row--hidden .survey__row__spacer-rule {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .survey-editor__list > .survey__row:last-child {
@@ -450,4 +542,11 @@ $nested-btn--addrow-height: 24px;
 .btn--hidden {
   // https://github.com/csswizardry/CSS-Guidelines#important
   display: none !important;
+}
+
+// The namer/picker takes over .line while open, and .btn--addrow gets
+// .btn--hidden — the rule sitting beside it must disappear too, or it's
+// left showing on its own.
+.btn--addrow.btn--hidden ~ .survey__row__spacer-rule {
+  display: none;
 }
