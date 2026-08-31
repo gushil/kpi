@@ -11,24 +11,24 @@ function renderGrid(props: Parameters<typeof FormStyleCardGrid>[0] = { onChange:
 describe('FormStyleCardGrid — OC-28582 form style card grid', () => {
   it('renders all 4 cards', () => {
     renderGrid()
-    chai.expect(screen.getAllByRole('radio')).to.have.length(4)
+    chai.expect(screen.getAllByRole('button')).to.have.length(4)
   })
 
   it('selects Simple–Single page by default when styleValue is undefined (AC8)', () => {
     renderGrid()
     const btn = screen.getByLabelText('Simple – Single page')
-    chai.expect(btn.getAttribute('aria-checked')).to.equal('true')
+    chai.expect(btn.getAttribute('aria-pressed')).to.equal('true')
   })
 
   it('selects the card matching the stored style value (AC4)', () => {
     renderGrid({ styleValue: 'theme-grid', onChange: () => undefined })
-    chai.expect(screen.getByLabelText('Grid – Single page').getAttribute('aria-checked')).to.equal('true')
-    chai.expect(screen.getByLabelText('Simple – Single page').getAttribute('aria-checked')).to.equal('false')
+    chai.expect(screen.getByLabelText('Grid – Single page').getAttribute('aria-pressed')).to.equal('true')
+    chai.expect(screen.getByLabelText('Simple – Single page').getAttribute('aria-pressed')).to.equal('false')
   })
 
   it('falls back to Simple–Single page for an unrecognised value (AC5)', () => {
     renderGrid({ styleValue: 'unknown-token' as any, onChange: () => undefined })
-    chai.expect(screen.getByLabelText('Simple – Single page').getAttribute('aria-checked')).to.equal('true')
+    chai.expect(screen.getByLabelText('Simple – Single page').getAttribute('aria-pressed')).to.equal('true')
   })
 
   it('calls onChange with the correct FormStyleDefinition when a card is clicked (AC3)', () => {
@@ -50,9 +50,9 @@ describe('FormStyleCardGrid — OC-28582 form style card grid', () => {
         called = true
       },
     })
-    // disabled buttons don't fire click events
     const btn = screen.getByLabelText('Simple – Multiple pages')
     chai.expect(btn).to.have.property('disabled', true)
+    fireEvent.click(btn)
     chai.expect(called).to.equal(false)
   })
 

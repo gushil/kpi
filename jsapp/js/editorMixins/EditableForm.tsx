@@ -1506,7 +1506,7 @@ export default function EditableForm(props: EditableFormProps) {
   }
 
   function renderAside() {
-    const { styleValue, versionValue, formIdValue, hasSettings } = buttonStates()
+    const { styleValue, versionValue, formIdValue } = buttonStates()
 
     const isAsideVisible = state.asideLayoutSettingsVisible || state.asideLibrarySearchVisible
 

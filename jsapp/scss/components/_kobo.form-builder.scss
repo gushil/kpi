@@ -358,10 +358,10 @@ $s-form-builder-content-width: 1024px;
 }
 
 .form-style-card {
-  --form-card-bg: #fff;
+  --form-card-bg: #{colors.$kobo-white};
   position: relative;
   background: var(--form-card-bg);
-  border: 1.5px solid #d5d9dd;
+  border: 1.5px solid colors.$kobo-gray-400;
   border-radius: 3px;
   padding: 12px 6px 9px;
   display: flex;
@@ -373,15 +373,15 @@ $s-form-builder-content-width: 1024px;
   color: inherit;
   text-align: center;
 
-  &:hover:not(:disabled) {
-    border-color: #a9b2bb;
+  &:hover:not(:disabled):not(.form-style-card--selected) {
+    border-color: colors.$kobo-gray-500;
   }
 
   // Focus ring: _base.scss globally suppresses outline with !important,
   // so use box-shadow (unaffected by outline:none) for keyboard visibility.
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(55, 138, 221, 0.5);
+    box-shadow: 0 0 0 2px color.change(colors.$kobo-blue, $alpha: 0.5);
   }
 
   &--default:not(&--selected) {
@@ -389,12 +389,13 @@ $s-form-builder-content-width: 1024px;
   }
 
   &--selected {
-    border-color: #378add;
-    background: #e8f1fc;
-    box-shadow: inset 0 0 0 1px #378add;
+    --form-card-bg: #{colors.$kobo-bg-blue};
+    border-color: colors.$kobo-blue;
+    background: colors.$kobo-bg-blue;
+    box-shadow: inset 0 0 0 1px colors.$kobo-blue;
 
     .form-style-card__icon svg {
-      color: #378add;
+      color: colors.$kobo-blue;
     }
   }
 
@@ -408,8 +409,8 @@ $s-form-builder-content-width: 1024px;
   position: absolute;
   top: -7px;
   right: -5px;
-  background: #42526e;
-  color: #fff;
+  background: colors.$kobo-gray-800;
+  color: colors.$kobo-white;
   font-size: 8.5px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -422,7 +423,7 @@ $s-form-builder-content-width: 1024px;
     display: block;
     width: 42px;
     height: 42px;
-    color: #42526e;
+    color: colors.$kobo-gray-800;
   }
 }
 
@@ -439,7 +440,7 @@ $s-form-builder-content-width: 1024px;
   em {
     font-size: 11.5px;
     font-style: normal;
-    color: #5a6775;
+    color: colors.$kobo-gray-700;
   }
 }
 

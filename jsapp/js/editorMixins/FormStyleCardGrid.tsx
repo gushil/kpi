@@ -104,11 +104,12 @@ export default function FormStyleCardGrid(props: FormStyleCardGridProps) {
 
   function handleSelect(style: FormStyleDefinition) {
     if (props.isDisabled) return
+    if (style.value === activeValue) return
     props.onChange(style)
   }
 
   return (
-    <div className='form-style-card-grid' role='radiogroup' aria-label={t('Form style')}>
+    <div className='form-style-card-grid' aria-label={t('Form style')}>
       {AVAILABLE_FORM_STYLES.map((style) => {
         const isSelected = style.value === activeValue
         const isDefault = style.value === DEFAULT_STYLE_VALUE
@@ -119,7 +120,6 @@ export default function FormStyleCardGrid(props: FormStyleCardGridProps) {
           <button
             key={style.value}
             type='button'
-            role='radio'
             className={[
               'form-style-card',
               isSelected ? 'form-style-card--selected' : '',
@@ -128,7 +128,7 @@ export default function FormStyleCardGrid(props: FormStyleCardGridProps) {
             ]
               .filter(Boolean)
               .join(' ')}
-            aria-checked={isSelected}
+            aria-pressed={isSelected}
             aria-label={ariaLabel}
             disabled={props.isDisabled}
             onClick={() => handleSelect(style)}
