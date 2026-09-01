@@ -795,17 +795,8 @@ module.exports = do ->
           $toggle.attr('aria-expanded', 'true')
           $pill.hide()
       questionType = @model.get('type').get('typeId')
-      externalValue = @model.get('bind::oc:external')?.get('value')
-      # An old consent item has no bind::oc:external saved, so mark it as a
-      # signature row here, before the settings below are built.
-      if (
-        !externalValue and
-        questionType is 'select_multiple' and
-        @model.isConsentItem()
-      )
-        externalValue = econsentSignature.ECONSENT_SIGNATURE_EXTERNAL_VALUE
-        @model.get('bind::oc:external')?.set('value', externalValue)
       isEConsentSig = econsentSignature.isEConsentSignatureRow(@model)
+      externalValue = @model.get('bind::oc:external')?.get('value')
       isPiiExternalValue = externalValue in ['contactdata', 'identifier', 'clinicaldata', 'signature']
 
       # don't display columns that start with a $
