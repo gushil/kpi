@@ -870,6 +870,9 @@ module.exports = do ->
               # DetailViews are still rendered so their afterRender can hide+clear values
               new $viewRowDetail.DetailView(model: val, rowView: @).render().insertInDOM(@)
 
+      if isEConsentSig
+        @cardSettingsWrap.find('.js-card-settings-appearance').hide()
+
       typesWithoutDefault = ['note', 'image', 'audio', 'video', 'file']
       defaultModel = @model.get('default')
       if questionType not in typesWithoutDefault and not isEConsentSig and defaultModel
