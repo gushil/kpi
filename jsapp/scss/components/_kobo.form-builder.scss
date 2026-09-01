@@ -381,7 +381,7 @@ $s-form-builder-content-width: 1024px;
   // so use box-shadow (unaffected by outline:none) for keyboard visibility.
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color.change(colors.$kobo-blue, $alpha: 0.5);
+    box-shadow: 0 0 0 2px rgb(55 138 221 / 50%);
   }
 
   &--default:not(&--selected) {
@@ -390,12 +390,12 @@ $s-form-builder-content-width: 1024px;
 
   &--selected {
     --form-card-bg: #{colors.$kobo-bg-blue};
-    border-color: colors.$kobo-blue;
+    border-color: #378ADD;
     background: colors.$kobo-bg-blue;
-    box-shadow: inset 0 0 0 1px colors.$kobo-blue;
+    box-shadow: inset 0 0 0 1px #378ADD;
 
     .form-style-card__icon svg {
-      color: colors.$kobo-blue;
+      color: #378ADD;
     }
   }
 
