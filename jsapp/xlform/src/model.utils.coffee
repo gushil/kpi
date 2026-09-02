@@ -149,4 +149,24 @@ module.exports = do ->
 
     return str
 
+  # OC (OC-28464): decide whether to prompt the user to make an item
+  # read-only. A non-Calculate item that carries a calculation must be
+  # read-only (otherwise it errors when the form is added to a study),
+  # unless it has a trigger selected or is already read-only.
+  utils.shouldShowCalculationReadonlyHint = (opts = {}) ->
+    questionType = opts.questionType
+    calculation = opts.calculation or ''
+    trigger = opts.trigger or ''
+    readonly = opts.readonly
+
+    if questionType is 'calculate'
+      return false
+    if ("#{calculation}").trim() is ''
+      return false
+    if ("#{trigger}").trim() isnt ''
+      return false
+    if readonly is true or "#{readonly}".toLowerCase() is 'true'
+      return false
+    return true
+
   return utils
