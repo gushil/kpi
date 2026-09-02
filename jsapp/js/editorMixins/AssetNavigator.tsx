@@ -5,6 +5,7 @@ import ReactDOM from 'react-dom'
 import type { Asset } from '#/api/models/asset'
 import { useAssetsList } from '#/api/react-query/manage-projects-and-library-content'
 import Icon from '#/components/common/icon'
+import { LOCKING_UI_CLASSNAMES } from '#/components/locking/lockingConstants'
 import { COMMON_QUERIES } from '#/constants'
 import AssetNavigatorCard from './AssetNavigatorCard'
 
@@ -62,9 +63,16 @@ export default function AssetNavigator(props: AssetNavigatorProps) {
   })
 
   const searchInputRef = useRef<HTMLInputElement>(null)
-  // Focus the search box after the aside slides in (200 ms CSS transition)
+  // Focus the search box after the aside slides in (200 ms CSS transition).
+  // Skip when the panel is inside a locked container — CSS pointer-events are
+  // disabled there but programmatic focus would still allow keyboard interaction.
   useEffect(() => {
-    const timer = setTimeout(() => searchInputRef.current?.focus(), 210)
+    const timer = setTimeout(() => {
+      const input = searchInputRef.current
+      if (input && !input.closest(`.${LOCKING_UI_CLASSNAMES.DISABLED}`)) {
+        input.focus()
+      }
+    }, 210)
     return () => clearTimeout(timer)
   }, [])
 
