@@ -222,10 +222,21 @@ do ->
       ).toBe(false)
       return
 
-    it 'clarified: hidden when read-only is the string "true"', ->
+    it 'clarified: hidden for all truthy readonly string values', ->
+      for ro in ['true', 'TRUE', 'true()', 'yes', 'YES']
+        expect(
+          $utils.shouldShowCalculationReadonlyHint(base(readonly: ro))
+        ).toBe(false)
+      return
+
+    it 'shown when readonly is a falsy string like "no"', ->
       expect(
-        $utils.shouldShowCalculationReadonlyHint(base(readonly: 'true'))
-      ).toBe(false)
+        $utils.shouldShowCalculationReadonlyHint(base(readonly: 'no'))
+      ).toBe(true)
+      return
+
+    it 'returns false safely when called with no opts', ->
+      expect($utils.shouldShowCalculationReadonlyHint()).toBe(false)
       return
 
     it 'handles null/undefined calculation and trigger safely', ->

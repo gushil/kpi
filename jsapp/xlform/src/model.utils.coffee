@@ -1,6 +1,7 @@
 _ = require 'underscore'
 $skipLogicParser = require './model.skipLogicParser'
 $validationLogicParser = require './model.validationLogicParser'
+$configs = require './model.configs'
 
 module.exports = do ->
 
@@ -165,7 +166,7 @@ module.exports = do ->
       return false
     if ("#{trigger}").trim() isnt ''
       return false
-    if readonly is true or "#{readonly}".toLowerCase() is 'true'
+    if readonly is true or ("#{readonly}" in $configs.truthyValues)
       return false
     return true
 
