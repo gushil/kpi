@@ -264,3 +264,101 @@ class MediaColumnLanguageTestCase(TestCase):
         self.assertIn('photo.png', snapshot.xml)
         self.assertIn('photo_fr.png', snapshot.xml)
         self.assertNotIn('photo.pngphoto_fr.png', snapshot.xml)
+
+    def test_prefixed_translated_name_unnamed_language_generates_xml(self):
+        """
+        OC-28640: a form mixing bare (`image`) and pre-prefixed
+        (`media::video`) media headers can end up with `translated` tracking
+        the column under its prefixed name while the row still holds a bare
+        scalar. With a single unnamed language, that used to fail with
+        '"media::image" column is not translated'.
+        """
+        source = self._source(None)
+        source['translated'] = ['label', 'media::image']
+        snapshot = self._snapshot(source)
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertIn('photo.png', snapshot.xml)
+
+    def test_prefixed_translated_name_named_languages_generates_xml(self):
+        """
+        Same mismatch as above, but with two named languages: the scalar
+        value must be padded to one entry per language, not just wrapped.
+        """
+        source = {
+            'survey': [
+                {
+                    'type': 'text',
+                    'name': 'q1',
+                    '$kuid': 'k1',
+                    'label': ['Question 1', 'Question 1 (fr)'],
+                },
+                {
+                    'type': 'text',
+                    'name': 'q2',
+                    '$kuid': 'k2',
+                    'label': ['Question 2', 'Question 2 (fr)'],
+                    'image': 'photo.png',
+                },
+            ],
+            'choices': [],
+            'translated': ['label', 'media::image'],
+            'translations': ['English (en)', 'French (fr)'],
+            'settings': {
+                'id_string': 'media_language',
+                'form_title': 'Media language',
+            },
+        }
+        snapshot = self._snapshot(source)
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertIn('photo.png', snapshot.xml)
+
+
+class TableListGroupLabelTestCase(TestCase):
+    """
+    OC-28640: pyxform synthesizes an auto-label note for a `table-list`
+    group whenever it merely has a `label`/`hint` key, even an empty one,
+    then rejects that note for being blank.
+    """
+
+    fixtures = ['test_data']
+
+    def setUp(self):
+        self.user = User.objects.get(username='someuser')
+
+    def _source(self, group_label):
+        group = {
+            'type': 'begin_group',
+            'name': 'grp',
+            'appearance': 'table-list',
+        }
+        if group_label is not None:
+            group['label'] = group_label
+        return {
+            'survey': [
+                group,
+                {'type': 'text', 'name': 'q1', 'label': 'Question 1'},
+                {'type': 'end_group'},
+            ],
+            'choices': [],
+            'settings': {
+                'id_string': 'table_list_group',
+                'form_title': 'Table list group',
+            },
+        }
+
+    def _snapshot(self, source):
+        return AssetSnapshot.objects.create(owner=self.user, source=source)
+
+    def test_empty_label_no_longer_fails(self):
+        snapshot = self._snapshot(self._source(''))
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertNotIn('generated_table_list_label', snapshot.xml)
+
+    def test_no_label_key_still_generates_xml(self):
+        snapshot = self._snapshot(self._source(None))
+        self.assertEqual(snapshot.details['status'], 'success')
+
+    def test_real_label_is_preserved(self):
+        snapshot = self._snapshot(self._source('Real Group Label'))
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertIn('Real Group Label', snapshot.xml)
