@@ -1016,11 +1016,12 @@ module.exports = do ->
               $field.removeClass('input-error')
               $field.find('.js-calculation-readonly-hint').remove()
             return
-          @_updateCalcReadonlyHint = updateCalcReadonlyHint
           $calcTextarea.on('blur input', updateCalcReadonlyHint)
           @listenTo(calculationModel, 'change:value', updateCalcReadonlyHint)
           if readonlyModel
             @listenTo(readonlyModel, 'change:value', updateCalcReadonlyHint)
+          if triggerModel
+            @listenTo(triggerModel, 'change:value', updateCalcReadonlyHint)
           updateCalcReadonlyHint()
 
         if triggerModel
@@ -1050,7 +1051,6 @@ module.exports = do ->
 
           $select.on 'change', =>
             triggerModel.set('value', $select.val())
-            @_updateCalcReadonlyHint?()
             return
 
       if isEConsentSig

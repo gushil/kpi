@@ -185,7 +185,7 @@ do ->
       expect($utils.shouldShowCalculationReadonlyHint(base())).toBe(true)
       return
 
-    it 'AC1: works for other allowed types (select_one, date, integer, decimal)', ->
+    it 'AC1: works for other allowed types (select_one, select_multiple, date, integer, decimal)', ->
       for qt in ['select_one', 'select_multiple', 'date', 'integer', 'decimal']
         expect(
           $utils.shouldShowCalculationReadonlyHint(base(questionType: qt))
