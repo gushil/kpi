@@ -1681,3 +1681,50 @@ do ->
       val = @detail.get('value')
       expect(val.indexOf('w2')).not.toBe(-1)
       expect(val.indexOf('w3')).toBe(-1)
+
+  ###############################################################
+  # OC-28645: group settings drawer must survive the OC per-item
+  # mixins — a Group row has no bind::oc:external detail, and the
+  # strict getValue() throws "Could not get value", which aborts
+  # GroupView._expandedRender and strands the whole drawer
+  # (including the Repeat Count panel and its Generate button).
+  ###############################################################
+  describe 'OC item mixins on a group row (no bind::oc:external detail)', ->
+    beforeEach ->
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      # Faithful stand-in for a Group row: Backbone get() of a missing
+      # detail is undefined; xlform's keyed getValue() throws on it.
+      @groupParent =
+        cid: 'cid_group1'
+        get: (k) -> undefined
+        getValue: (k) ->
+          if k? then throw new Error('Could not get value') else undefined
+      @buildCtx = (mixinName) ->
+        mixin = @viewRowDetail.DetailViewMixins[mixinName]
+        $el = $('<div><span class="settings__input"><input/></span></div>')
+        calls = { makeRequired: 0, removeFieldCheckCondition: 0 }
+        ctx = $.extend({}, Backbone.Events, mixin, {
+          cid: 'cid_g_detail'
+          $el: $el
+          $: (sel) -> $el.find(sel)
+          model: { _parent: @groupParent, key: 'bind::oc:x', set: -> }
+          listenForInputChange: ->
+          makeRequired: -> calls.makeRequired += 1
+          removeFieldCheckCondition: -> calls.removeFieldCheckCondition += 1
+        })
+        { ctx, $el, calls }
+
+    it 'oc_item_group afterRender does not throw and stays required', ->
+      { ctx, calls } = @buildCtx('oc_item_group')
+      expect(-> ctx.afterRender.call(ctx)).not.toThrow()
+      expect(calls.makeRequired).toBe(1)
+
+    it 'oc_briefdescription afterRender does not throw and stays visible', ->
+      { ctx, $el } = @buildCtx('oc_briefdescription')
+      expect(-> ctx.afterRender.call(ctx)).not.toThrow()
+      expect($el.hasClass('hidden')).toBe(false)
+
+    it 'oc_description afterRender does not throw and stays visible', ->
+      { ctx, $el } = @buildCtx('oc_description')
+      expect(-> ctx.afterRender.call(ctx)).not.toThrow()
+      expect($el.hasClass('hidden')).toBe(false)
