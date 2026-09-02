@@ -244,17 +244,55 @@ class AssetSnapshot(
                     base_column in OC_UNTRANSLATED_MEDIA_COLUMNS
                     and not column.startswith('media::')
                 ):
+                    # `translated` may list this column under its prefixed
+                    # name (e.g. `media::image`) instead of the bare one, so
+                    # check both before assuming it still needs the suffix.
                     already_translated = (
                         base_column in translated
+                        or f'media::{base_column}' in translated
                         or isinstance(row[column], list)
                     )
                     new_suffix = '' if already_translated else suffix
-                    row[f'media::{base_column}{new_suffix}'] = row.pop(column)
+                    value = row.pop(column)
+                    if already_translated and not isinstance(value, list):
+                        # A translated column needs one entry per language,
+                        # or formpack's flattener rejects it; keep the value
+                        # on the first language only.
+                        value = [value] + [None] * (len(translations) - 1)
+                    row[f'media::{base_column}{new_suffix}'] = value
 
         if 'translations' in content:
             for index, column in enumerate(translated):
                 if column in OC_UNTRANSLATED_MEDIA_COLUMNS:
                     translated[index] = f'media::{column}'
+
+    def _strip_empty_table_list_group_labels(self, content):
+        """
+        Drop empty `label`/`hint` keys from `table-list` groups (OC-28640).
+        pyxform treats `label: ''` as having a label, adds a
+        `generated_table_list_label_<n>` note for it, then rejects that
+        same note for being blank.
+        """
+
+        def _is_empty(value):
+            if isinstance(value, (list, tuple)):
+                return all(not item for item in value)
+            return not value
+
+        for row in content.get('survey', []):
+            row_type = str(row.get('type', '')).replace(' ', '_')
+            if row_type not in ('begin_group', 'begin_repeat'):
+                continue
+            if 'table-list' not in str(row.get('appearance', '')):
+                continue
+            for key in list(row.keys()):
+                if (
+                    key == 'label'
+                    or key == 'hint'
+                    or key.startswith('label::')
+                    or key.startswith('hint::')
+                ) and _is_empty(row[key]):
+                    del row[key]
 
     def _prepare_for_xml_pyxform_generation(self, content, id_string):
         if 'settings' in content:
@@ -388,6 +426,7 @@ class AssetSnapshot(
 
         self._settings_ensure_required_columns(source_copy)
         self._adjust_content_media_column_before_generate_xml(source_copy)
+        self._strip_empty_table_list_group_labels(source_copy)
 
         warnings = []
         details = {}
