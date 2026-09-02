@@ -61,6 +61,13 @@ export default function AssetNavigator(props: AssetNavigatorProps) {
     ordering: '-date_modified',
   })
 
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  // Focus the search box after the aside slides in (200 ms CSS transition)
+  useEffect(() => {
+    const timer = setTimeout(() => searchInputRef.current?.focus(), 210)
+    return () => clearTimeout(timer)
+  }, [])
+
   // Step 4. Setup drag and drop of found assets
   const assetsListRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -91,6 +98,7 @@ export default function AssetNavigator(props: AssetNavigatorProps) {
     <Stack gap='sm' h='100%'>
       {/* Searchbox */}
       <TextInput
+        ref={searchInputRef}
         placeholder='Search…'
         leftSection={<Icon name='search' />}
         value={searchQuery}
