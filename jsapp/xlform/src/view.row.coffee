@@ -991,9 +991,10 @@ module.exports = do ->
 
         else
           # OC (OC-28464): non-Calculate items with a calculation must be
-          # read-only. Prompt the user unless a trigger is set or the item
-          # is already read-only. Mirrors the makeRequiredCheck pattern above
-          # and reuses the .calculation-panel__field.input-error .message CSS.
+          # read-only. Renders a red hint (its own .js-calculation-readonly-hint
+          # element, reusing the .calculation-panel__field.input-error .message
+          # CSS) when a non-Calculate item has a calculation but no trigger and
+          # is not read-only.
           readonlyModel = @model.get('readonly')
           hintText = t('Items of this type with a calculation must be read-only. Set this item to read-only in Advanced Options under "Edit".')
           updateCalcReadonlyHint = =>
@@ -1017,6 +1018,7 @@ module.exports = do ->
             return
           @_updateCalcReadonlyHint = updateCalcReadonlyHint
           $calcTextarea.on('blur input', updateCalcReadonlyHint)
+          @listenTo(calculationModel, 'change:value', updateCalcReadonlyHint)
           if readonlyModel
             @listenTo(readonlyModel, 'change:value', updateCalcReadonlyHint)
           updateCalcReadonlyHint()
