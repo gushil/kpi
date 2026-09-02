@@ -796,11 +796,13 @@ module.exports = do ->
         # if this newly added row happens to be first in its collection.
         closestAddrow = newlyAddedEl.children('.survey__row__spacer').not('.survey__row__spacer--leading').find('.btn--addrow').eq(0)
         closestAddrow.addClass('btn--addrow-force-show')
+        # Consume the one-shot flag unconditionally so it never persists past this render.
+        skipScroll = newlyAddedRow._skipScrollIntoView
+        delete newlyAddedRow._skipScrollIntoView if skipScroll
         # OC-28664: if the add originated from the Library panel, focus is already
         # on the Add button there — don't displace it.
         unless $(document.activeElement).closest('.form-builder-aside').length
-          if newlyAddedRow._skipScrollIntoView
-            delete newlyAddedRow._skipScrollIntoView
+          if skipScroll
             closestAddrow.get(0)?.focus(preventScroll: true)
           else
             closestAddrow.focus()
