@@ -350,6 +350,100 @@ $s-form-builder-content-width: 1024px;
   }
 }
 
+// OC-28582: Form style card grid in the Layout & Settings aside panel
+.form-style-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.form-style-card {
+  --form-card-bg: #{colors.$kobo-white};
+  position: relative;
+  background: var(--form-card-bg);
+  border: 1.5px solid colors.$kobo-gray-400;
+  border-radius: 3px;
+  padding: 12px 6px 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+
+  &:hover:not(:disabled):not(.form-style-card--selected) {
+    border-color: colors.$kobo-gray-500;
+  }
+
+  // Focus ring: _base.scss globally suppresses outline with !important,
+  // so use box-shadow (unaffected by outline:none) for keyboard visibility.
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(55 138 221 / 50%);
+  }
+
+  &--default:not(&--selected) {
+    border-style: dashed;
+  }
+
+  &--selected {
+    --form-card-bg: #{colors.$kobo-bg-blue};
+    border-color: #378ADD;
+    background: colors.$kobo-bg-blue;
+    box-shadow: inset 0 0 0 1px #378ADD;
+
+    .form-style-card__icon svg {
+      color: #378ADD;
+    }
+  }
+
+  &--disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.form-style-card__badge {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  background: colors.$kobo-gray-800;
+  color: colors.$kobo-white;
+  font-size: 8.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 8px;
+  padding: 1px 5px;
+}
+
+.form-style-card__icon {
+  svg {
+    display: block;
+    width: 42px;
+    height: 42px;
+    color: colors.$kobo-gray-800;
+  }
+}
+
+.form-style-card__label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+
+  b {
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  em {
+    font-size: 11.5px;
+    font-style: normal;
+    color: colors.$kobo-gray-700;
+  }
+}
+
 // CASCADE MODAL CONTENTS
 
 .cascade-popup {
