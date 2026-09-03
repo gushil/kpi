@@ -789,7 +789,10 @@ module.exports = do ->
         )
       )
         # If newest question has choices then hightlight the first choice
-        newlyAddedEl.find('input.option-view-input').eq(0).select()
+        # OC-28664: if the add originated from the Library panel, focus is already
+        # on the Add button there — don't displace it to the first choice input.
+        unless $(document.activeElement).closest('.form-builder-aside').length
+          newlyAddedEl.find('input.option-view-input').eq(0).select()
       else if newlyAddedEl
         # focus on the next (trailing) add row button — not the leading one
         # (OC-28571 AC4), which may now also be present as the first child
