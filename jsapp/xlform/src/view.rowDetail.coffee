@@ -2181,7 +2181,11 @@ module.exports = do ->
     afterRender: ->
       @listenForInputChange()
       $('<p/>', { class: 'item-group-helper' }).text(t('The Item Group is the data set this item is stored in. Items that share an Item Group are kept together in the data model and in data extracts.')).insertAfter(@$el.find('.settings__input'))
-      externalValue = @model._parent.getValue('bind::oc:external')
+      # OC fork (OC-28645): group rows render this mixin too (a repeat group's
+      # Item Group is meaningful) but have no bind::oc:external detail — the
+      # strict getValue() would throw and abort the whole group settings
+      # drawer, stranding every panel after this one (incl. Repeat Count).
+      externalValue = @model._parent.get('bind::oc:external')?.get('value')
       if externalValue in ['clinicaldata', 'contactdata', 'identifier', 'signature']
         @removeFieldCheckCondition()
         @model.set('value', '')
@@ -2211,8 +2215,10 @@ module.exports = do ->
       viewRowDetail.Templates.textbox @cid, @model.key, t("Short Display Name"), 'text', t('Optional column header in configurable tables'), '40'
     afterRender: ->
       @listenForInputChange()
-      # Hide and clear field if this is a PII (Encrypted) item
-      externalValue = @model._parent.getValue('bind::oc:external')
+      # Hide and clear field if this is a PII (Encrypted) item.
+      # Soft read (OC-28645): see the matching note in oc_item_group — group
+      # rows lack bind::oc:external and the strict getValue() would throw.
+      externalValue = @model._parent.get('bind::oc:external')?.get('value')
       if externalValue is 'contactdata'
         @$el.addClass('hidden')
         @$('input').val('')
@@ -2239,8 +2245,10 @@ module.exports = do ->
       viewRowDetail.Templates.textbox @cid, @model.key, t("Item Description"), 'text', t('Optional item definition for metadata and extracts'), '3999'
     afterRender: ->
       @listenForInputChange()
-      # Hide and clear field if this is a PII (Encrypted) item
-      externalValue = @model._parent.getValue('bind::oc:external')
+      # Hide and clear field if this is a PII (Encrypted) item.
+      # Soft read (OC-28645): see the matching note in oc_item_group — group
+      # rows lack bind::oc:external and the strict getValue() would throw.
+      externalValue = @model._parent.get('bind::oc:external')?.get('value')
       if externalValue is 'contactdata'
         @$el.addClass('hidden')
         @$('input').val('')
