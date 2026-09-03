@@ -283,7 +283,7 @@ class AssetSnapshot(
             row_type = str(row.get('type', '')).replace(' ', '_')
             if row_type not in ('begin_group', 'begin_repeat'):
                 continue
-            if 'table-list' not in str(row.get('appearance', '')):
+            if 'table-list' not in str(row.get('appearance', '')).split():
                 continue
             for key in list(row.keys()):
                 if (

@@ -325,26 +325,28 @@ class TableListGroupLabelTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.get(username='someuser')
 
-    def _source(self, group_label):
+    def _source_with_group_fields(self, group_fields, question_fields=None):
         group = {
             'type': 'begin_group',
             'name': 'grp',
             'appearance': 'table-list',
         }
-        if group_label is not None:
-            group['label'] = group_label
+        group.update(group_fields)
+        question = {'type': 'text', 'name': 'q1'}
+        question.update(question_fields or {'label': 'Question 1'})
         return {
-            'survey': [
-                group,
-                {'type': 'text', 'name': 'q1', 'label': 'Question 1'},
-                {'type': 'end_group'},
-            ],
+            'survey': [group, question, {'type': 'end_group'}],
             'choices': [],
             'settings': {
                 'id_string': 'table_list_group',
                 'form_title': 'Table list group',
             },
         }
+
+    def _source(self, group_label):
+        return self._source_with_group_fields(
+            {} if group_label is None else {'label': group_label}
+        )
 
     def _snapshot(self, source):
         return AssetSnapshot.objects.create(owner=self.user, source=source)
@@ -362,3 +364,21 @@ class TableListGroupLabelTestCase(TestCase):
         snapshot = self._snapshot(self._source('Real Group Label'))
         self.assertEqual(snapshot.details['status'], 'success')
         self.assertIn('Real Group Label', snapshot.xml)
+
+    def test_empty_hint_only_group_no_longer_fails(self):
+        snapshot = self._snapshot(self._source_with_group_fields({'hint': ''}))
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertNotIn('generated_table_list_label', snapshot.xml)
+
+    def test_empty_prefixed_label_and_hint_are_stripped(self):
+        """
+        The per-language `label::<lang>` / `hint::<lang>` keys are separate
+        branches in the strip condition and need their own coverage.
+        """
+        source = self._source_with_group_fields(
+            {'label::English (en)': '', 'hint::English (en)': ''},
+            question_fields={'label::English (en)': 'Question 1'},
+        )
+        snapshot = self._snapshot(source)
+        self.assertEqual(snapshot.details['status'], 'success')
+        self.assertNotIn('generated_table_list_label', snapshot.xml)
