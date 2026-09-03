@@ -1692,8 +1692,11 @@ do ->
   describe 'OC item mixins on a group row (no bind::oc:external detail)', ->
     beforeEach ->
       @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
-      # Faithful stand-in for a Group row: Backbone get() of a missing
-      # detail is undefined; xlform's keyed getValue() throws on it.
+      # Faithful stand-in for a Group row's MISSING-detail case only:
+      # Backbone get() of a missing detail is undefined; xlform's keyed
+      # getValue() throws on it. Real groups do carry some details (e.g.
+      # 'type'), so a mixin that legitimately reads an existing group
+      # detail needs a richer stand-in than this one.
       @groupParent =
         cid: 'cid_group1'
         get: (k) -> undefined
@@ -1728,3 +1731,55 @@ do ->
       { ctx, $el } = @buildCtx('oc_description')
       expect(-> ctx.afterRender.call(ctx)).not.toThrow()
       expect($el.hasClass('hidden')).toBe(false)
+
+  ###############################################################
+  # OC-28645 companion: the soft bind::oc:external read must keep
+  # the question-row PII behaviour — a real row whose external is
+  # 'contactdata' still hides + clears these fields on afterRender.
+  ###############################################################
+  describe 'OC item mixins on a question row (PII afterRender preserved)', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @survey = new $model.Survey()
+      @survey.rows.add(type: 'text', name: 'pii_q', label: 'Patient Name')
+      @row = @survey.rows.at(0)
+      @row.get('bind::oc:external').set('value', 'contactdata')
+      @buildCtx = (mixinName, detailKey) ->
+        detail = @row.get(detailKey)
+        detail.set('value', 'some value')
+        $el = $('<div><span class="settings__input"><input type="text" value="x"/></span></div>')
+        calls = { makeRequired: 0, removeFieldCheckCondition: 0 }
+        ctx = $.extend({}, Backbone.Events, @viewRowDetail.DetailViewMixins[mixinName], {
+          cid: "cid_#{mixinName}_pii"
+          $el: $el
+          $: (sel) -> $el.find(sel)
+          model: detail
+          listenForInputChange: ->
+          makeRequired: -> calls.makeRequired += 1
+          removeFieldCheckCondition: -> calls.removeFieldCheckCondition += 1
+        })
+        { ctx, $el, calls, detail }
+    afterEach ->
+      window.xlfHideWarnings = false
+
+    it 'oc_item_group afterRender hides, clears and drops required', ->
+      { ctx, $el, calls, detail } = @buildCtx('oc_item_group', 'bind::oc:itemgroup')
+      ctx.afterRender.call(ctx)
+      expect($el.hasClass('hidden')).toBe(true)
+      expect(detail.get('value')).toBe('')
+      expect(calls.removeFieldCheckCondition).toBe(1)
+      expect(calls.makeRequired).toBe(0)
+
+    it 'oc_briefdescription afterRender hides and clears', ->
+      { ctx, $el, detail } = @buildCtx('oc_briefdescription', 'bind::oc:briefdescription')
+      ctx.afterRender.call(ctx)
+      expect($el.hasClass('hidden')).toBe(true)
+      expect(detail.get('value')).toBe('')
+
+    it 'oc_description afterRender hides and clears', ->
+      { ctx, $el, detail } = @buildCtx('oc_description', 'bind::oc:description')
+      ctx.afterRender.call(ctx)
+      expect($el.hasClass('hidden')).toBe(true)
+      expect(detail.get('value')).toBe('')
