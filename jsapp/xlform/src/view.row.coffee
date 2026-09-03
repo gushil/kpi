@@ -983,6 +983,41 @@ module.exports = do ->
               $calcTextarea.siblings('.message').remove()
           $calcTextarea.on('blur input', makeRequiredCheck)
 
+        else
+          # OC (OC-28464): non-Calculate items with a calculation must be
+          # read-only. Renders a red hint (its own .js-calculation-readonly-hint
+          # element, reusing the .calculation-panel__field.input-error .message
+          # CSS) when a non-Calculate item has a calculation but no trigger and
+          # is not read-only.
+          readonlyModel = @model.get('readonly')
+          hintText = t('Items of this type with a calculation must be read-only. Set this item to read-only in Advanced Options under "Edit".')
+          updateCalcReadonlyHint = =>
+            $field = $calcTextarea.closest('.calculation-panel__field')
+            show = $modelUtils.shouldShowCalculationReadonlyHint(
+              questionType: questionType
+              calculation: $calcTextarea.val()
+              trigger: (triggerModel and triggerModel.get('value')) or ''
+              readonly: (readonlyModel and readonlyModel.get('value'))
+            )
+            if show
+              $field.addClass('input-error')
+              if $field.find('.js-calculation-readonly-hint').length is 0
+                $hint = $('<div/>')
+                  .addClass('message js-calculation-readonly-hint')
+                  .text(hintText)
+                $calcTextarea.after($hint)
+            else
+              $field.removeClass('input-error')
+              $field.find('.js-calculation-readonly-hint').remove()
+            return
+          $calcTextarea.on('blur input', updateCalcReadonlyHint)
+          @listenTo(calculationModel, 'change:value', updateCalcReadonlyHint)
+          if readonlyModel
+            @listenTo(readonlyModel, 'change:value', updateCalcReadonlyHint)
+          if triggerModel
+            @listenTo(triggerModel, 'change:value', updateCalcReadonlyHint)
+          updateCalcReadonlyHint()
+
         if triggerModel
           $select = $calcPanel.find('.js-calculation-trigger-select')
           non_selectable = ['datetime', 'time', 'note', 'group', 'kobomatrix', 'repeat', 'rank', 'score', 'calculate']
@@ -1010,6 +1045,7 @@ module.exports = do ->
 
           $select.on 'change', =>
             triggerModel.set('value', $select.val())
+            return
 
       if isEConsentSig
         # Hide the entire Response List pane (if present in DOM)

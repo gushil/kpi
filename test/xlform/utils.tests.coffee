@@ -170,3 +170,81 @@ do ->
           expect(_out).toBe(exps)
         return
 
+do ->
+  describe 'model.utils: shouldShowCalculationReadonlyHint', ->
+    base = (overrides = {}) ->
+      opts =
+        questionType: 'text'
+        calculation: 'x + 1'
+        trigger: ''
+        readonly: false
+      opts[k] = v for k, v of overrides
+      return opts
+
+    it 'AC1: shows for non-calculate item with calc and no trigger', ->
+      expect($utils.shouldShowCalculationReadonlyHint(base())).toBe(true)
+      return
+
+    it 'AC1: works for other allowed types (select_one, select_multiple, date, integer, decimal)', ->
+      for qt in ['select_one', 'select_multiple', 'date', 'integer', 'decimal']
+        expect(
+          $utils.shouldShowCalculationReadonlyHint(base(questionType: qt))
+        ).toBe(true)
+      return
+
+    it 'AC1: hidden when calculation is empty', ->
+      expect(
+        $utils.shouldShowCalculationReadonlyHint(base(calculation: ''))
+      ).toBe(false)
+      return
+
+    it 'AC1: hidden when calculation is only whitespace', ->
+      expect(
+        $utils.shouldShowCalculationReadonlyHint(base(calculation: '   '))
+      ).toBe(false)
+      return
+
+    it 'AC2: hidden for calculate type', ->
+      expect(
+        $utils.shouldShowCalculationReadonlyHint(base(questionType: 'calculate'))
+      ).toBe(false)
+      return
+
+    it 'AC3: hidden when a trigger is selected', ->
+      expect(
+        $utils.shouldShowCalculationReadonlyHint(base(trigger: '${weight}'))
+      ).toBe(false)
+      return
+
+    it 'clarified: hidden when item is already read-only (boolean true)', ->
+      expect(
+        $utils.shouldShowCalculationReadonlyHint(base(readonly: true))
+      ).toBe(false)
+      return
+
+    it 'clarified: hidden for all truthy readonly string values', ->
+      for ro in ['true', 'TRUE', 'true()', 'yes', 'YES']
+        expect(
+          $utils.shouldShowCalculationReadonlyHint(base(readonly: ro))
+        ).toBe(false)
+      return
+
+    it 'shown when readonly is a falsy string like "no"', ->
+      expect(
+        $utils.shouldShowCalculationReadonlyHint(base(readonly: 'no'))
+      ).toBe(true)
+      return
+
+    it 'returns false safely when called with no opts', ->
+      expect($utils.shouldShowCalculationReadonlyHint()).toBe(false)
+      return
+
+    it 'handles null/undefined calculation and trigger safely', ->
+      expect(
+        $utils.shouldShowCalculationReadonlyHint(
+          base(calculation: null, trigger: null)
+        )
+      ).toBe(false)
+      return
+    return
+  return

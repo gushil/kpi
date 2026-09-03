@@ -1,6 +1,7 @@
 _ = require 'underscore'
 $skipLogicParser = require './model.skipLogicParser'
 $validationLogicParser = require './model.validationLogicParser'
+$configs = require './model.configs'
 
 module.exports = do ->
 
@@ -148,5 +149,25 @@ module.exports = do ->
         return attempt
 
     return str
+
+  # OC (OC-28464): decide whether to prompt the user to make an item
+  # read-only. A non-Calculate item that carries a calculation must be
+  # read-only (otherwise it errors when the form is added to a study),
+  # unless it has a trigger selected or is already read-only.
+  utils.shouldShowCalculationReadonlyHint = (opts = {}) ->
+    questionType = opts.questionType
+    calculation = opts.calculation or ''
+    trigger = opts.trigger or ''
+    readonly = opts.readonly
+
+    if questionType is 'calculate'
+      return false
+    if ("#{calculation}").trim() is ''
+      return false
+    if ("#{trigger}").trim() isnt ''
+      return false
+    if readonly is true or ("#{readonly}" in $configs.truthyValues)
+      return false
+    return true
 
   return utils
