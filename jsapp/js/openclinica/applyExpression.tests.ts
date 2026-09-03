@@ -72,6 +72,12 @@ describe('applyExpressionToRow (P1.3)', () => {
     chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1 and ${B} = 2')
   })
 
+  it('strips newlines for repeat_count too — its panel input is single-line (OC-28645, deferred from PR#300)', () => {
+    const { row, detail } = makeRow()
+    applyExpressionToRow(row, 'repeat_count', '${A} = 1\nand ${B} = 2')
+    chai.expect(detail.set.mock.calls[0][1]).to.equal('${A} = 1 and ${B} = 2')
+  })
+
   it('joins newline-separated tokens with a space, never concatenating them (PR#273 deferred)', () => {
     const { row, detail } = makeRow()
     applyExpressionToRow(row, 'calculation', '${A} = 1\nand ${B} = 2')
@@ -372,9 +378,10 @@ describe('readCurrentExpression (P1.3 AC2)', () => {
 })
 
 describe('P1.3 AC guards — pass-through fidelity, no provenance, round-trip', () => {
-  it('AC3: writes the applied expression byte-identical for a non-stripping attribute', () => {
-    // repeat_count is neither newline-stripping nor facade-backed, so the
-    // string must land in RowDetail exactly as the dialog sent it.
+  it('AC3: writes a newline-free expression byte-identical — internal spacing and quotes survive', () => {
+    // Every attribute is now newline-stripping or facade-backed, so pass-through
+    // fidelity means: without newlines, the string lands in RowDetail exactly as
+    // the dialog sent it (double spaces, mixed quotes and all).
     const { row, detail } = makeRow()
     const expr = 'concat(\'a\', "b")  + ${W}'
     const outcome = applyExpressionToRow(row, 'repeat_count', expr)

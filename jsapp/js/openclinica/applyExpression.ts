@@ -9,13 +9,15 @@
 import { ATTRIBUTE_LABELS } from '@openclinica/logic-builder'
 import { columnToTab } from './logicBuilderTabs'
 
-// Attributes whose manual input strips newlines (single-line fields / Enter is
-// suppressed), so an applied AI result is normalized to match: Calculation and
-// Default (PR#273 round-1 #3) plus Required, whose panel input is single-line —
-// a multi-line value would write fine but become uneditable there (round-5 #7).
-// Newlines are replaced with a space (not stripped) to keep adjacent tokens
-// separated and prevent syntax errors like `${A}=1and${B}=2` (PR#273 deferred).
-const NEWLINE_STRIPPING_ATTRIBUTES = new Set(['calculation', 'default', 'required'])
+// Attributes edited in single-line inputs (Enter suppressed), which cannot hold
+// a line break: Calculation and Default (PR#273 round-1 #3), Required (round-5
+// #7), and Repeat Count (OC-28645, deferred from PR#300). An applied multi-line
+// value would otherwise be welded by the input's own sanitization and saved
+// broken on the next edit. Newlines are replaced with a space (not with
+// nothing) to keep adjacent tokens separated and prevent syntax errors like
+// `${A}=1and${B}=2` — note manual typing/paste still joins with nothing
+// (view.row.coffee), tracked separately.
+const NEWLINE_STRIPPING_ATTRIBUTES = new Set(['calculation', 'default', 'required', 'repeat_count'])
 
 // Facade-backed attributes: RowDetail.getValue() for these returns
 // `facade.serialize()`, NOT the raw stored string — and the skip-logic builder
