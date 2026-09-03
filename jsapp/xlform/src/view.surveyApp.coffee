@@ -789,18 +789,26 @@ module.exports = do ->
         )
       )
         # If newest question has choices then hightlight the first choice
-        newlyAddedEl.find('input.option-view-input').eq(0).select()
+        # OC-28664: if the add originated from the Library panel, focus is already
+        # on the Add button there — don't displace it to the first choice input.
+        unless $(document.activeElement).closest('.form-builder-aside').length
+          newlyAddedEl.find('input.option-view-input').eq(0).select()
       else if newlyAddedEl
         # focus on the next (trailing) add row button — not the leading one
         # (OC-28571 AC4), which may now also be present as the first child
         # if this newly added row happens to be first in its collection.
         closestAddrow = newlyAddedEl.children('.survey__row__spacer').not('.survey__row__spacer--leading').find('.btn--addrow').eq(0)
         closestAddrow.addClass('btn--addrow-force-show')
-        if newlyAddedRow._skipScrollIntoView
-          delete newlyAddedRow._skipScrollIntoView
-          closestAddrow.get(0)?.focus(preventScroll: true)
-        else
-          closestAddrow.focus()
+        # Consume the one-shot flag unconditionally so it never persists past this render.
+        skipScroll = newlyAddedRow._skipScrollIntoView
+        delete newlyAddedRow._skipScrollIntoView if skipScroll
+        # OC-28664: if the add originated from the Library panel, focus is already
+        # on the Add button there — don't displace it.
+        unless $(document.activeElement).closest('.form-builder-aside').length
+          if skipScroll
+            closestAddrow.get(0)?.focus(preventScroll: true)
+          else
+            closestAddrow.focus()
         $(document).one('keydown click', (evt) =>
           closestAddrow.removeClass('btn--addrow-force-show')
           # HACKFIX: previously it was `closestAddrow.blur()` but there was some weird race condition that causes UI
