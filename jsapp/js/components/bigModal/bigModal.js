@@ -282,7 +282,7 @@ class BigModal extends React.Component {
       title: title,
       message: message,
       labels: { ok: t('Close'), cancel: t('Cancel') },
-      onok: pageState.hideModal,
+      onok: () => pageState.hideModal(),
       oncancel: dialog.destroy,
     }
     dialog.set(opts).show()
@@ -294,6 +294,11 @@ class BigModal extends React.Component {
       stores.translations.state.isTranslationTableUnsaved
     ) {
       this.displaySafeCloseConfirm(t('Close Translations Table?'), t('You will lose all unsaved changes.'))
+    } else if (
+      this.props.params.type === MODAL_TYPES.FORM_LANGUAGES &&
+      stores.translations.state.isLanguageFormUnsaved
+    ) {
+      this.displaySafeCloseConfirm(t('Close Manage Languages?'), t('You will lose all unsaved changes.'))
     } else {
       pageState.hideModal()
     }

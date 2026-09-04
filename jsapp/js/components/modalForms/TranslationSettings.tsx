@@ -16,6 +16,7 @@ import LanguageForm from '#/components/modalForms/languageForm'
 import { MODAL_TYPES } from '#/constants'
 import type { AssetContent, AssetResponse, SureveyRowOrChoiceTranslatableProp, SurveyRow } from '#/dataInterface'
 import pageState from '#/pageState.store'
+import { stores } from '#/stores'
 import { type LangObject, escapeHtml, getLangString, notify } from '#/utils'
 
 interface TranslationSettingsProps {
@@ -33,6 +34,11 @@ interface TranslationSettingsState {
 
 export class TranslationSettings extends React.Component<TranslationSettingsProps, TranslationSettingsState> {
   private unlisteners: Function[] = []
+  // Multiple LanguageForm instances (add + rename) can be mounted at the same
+  // time, so track dirtiness per instance id rather than as one shared flag —
+  // otherwise one form unmounting (or being cleared) would wipe out another
+  // still-dirty form's unsaved-changes signal.
+  private dirtyFormIds: Set<string> = new Set()
 
   constructor(props: TranslationSettingsProps) {
     super(props)
@@ -48,12 +54,25 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
 
   componentDidMount() {
     this.unlisteners.push(assetStore.listen(this.onAssetsChange.bind(this), this))
+    this.dirtyFormIds.clear()
+    stores.translations.setLanguageFormUnsaved(false)
   }
 
   componentWillUnmount() {
     this.unlisteners.forEach((clb) => {
       clb()
     })
+    this.dirtyFormIds.clear()
+    stores.translations.setLanguageFormUnsaved(false)
+  }
+
+  onLanguageFormDirtyChange(formId: string, isDirty: boolean) {
+    if (isDirty) {
+      this.dirtyFormIds.add(formId)
+    } else {
+      this.dirtyFormIds.delete(formId)
+    }
+    stores.translations.setLanguageFormUnsaved(this.dirtyFormIds.size > 0)
   }
 
   onAssetChange(asset: AssetResponse) {
@@ -326,6 +345,7 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
             <LanguageForm
               isPending={this.state.isUpdatingAsset}
               onLanguageChange={this.onLanguageChange.bind(this)}
+              onDirtyChange={(isDirty: boolean) => this.onLanguageFormDirtyChange('primary', isDirty)}
               existingLanguages={this.getAllLanguages()}
               langString='English (en)'
               isDefault
@@ -420,6 +440,7 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
                     langString={l}
                     langIndex={i}
                     onLanguageChange={this.onLanguageChange.bind(this)}
+                    onDirtyChange={(isDirty: boolean) => this.onLanguageFormDirtyChange(`rename-${i}`, isDirty)}
                     existingLanguages={this.getAllLanguages()}
                   />
                 </bem.FormView__cell>
@@ -460,6 +481,7 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
               <LanguageForm
                 isPending={this.state.isUpdatingAsset}
                 onLanguageChange={this.onLanguageChange.bind(this)}
+                onDirtyChange={(isDirty: boolean) => this.onLanguageFormDirtyChange('add', isDirty)}
                 existingLanguages={this.getAllLanguages()}
               />
             </bem.FormView__cell>

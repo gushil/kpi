@@ -63,6 +63,7 @@ stores.translations = Reflux.createStore({
   init() {
     this.state = {
       isTranslationTableUnsaved: false,
+      isLanguageFormUnsaved: false,
     }
   },
   setState(change) {
@@ -75,6 +76,11 @@ stores.translations = Reflux.createStore({
   setTranslationTableUnsaved(isUnsaved) {
     this.setState({
       isTranslationTableUnsaved: isUnsaved,
+    })
+  },
+  setLanguageFormUnsaved(isUnsaved) {
+    this.setState({
+      isLanguageFormUnsaved: isUnsaved,
     })
   },
 })

@@ -15,6 +15,9 @@ Properties:
 - existingLanguages <langString[]>: for validation purposes
 - isDefault <boolean>: for default language only
 - isPending <boolean>: marks the submit button as pending
+- onDirtyChange <function>: optional, called with a boolean whenever typed
+  input differs from what was last submitted/loaded, so a parent can warn
+  before discarding it
 */
 class LanguageForm extends React.Component {
   constructor(props) {
@@ -43,7 +46,26 @@ class LanguageForm extends React.Component {
       }
     }
 
+    // baseline to diff typed input against, so we only report "dirty" once
+    // the user actually changes something
+    this.initialName = this.state.name
+    this.initialCode = this.state.code
+
     autoBind(this)
+  }
+
+  componentWillUnmount() {
+    // form is going away (submitted, cancelled, or modal closing) — whatever
+    // was tracked as dirty no longer applies
+    if (this.props.onDirtyChange) {
+      this.props.onDirtyChange(false)
+    }
+  }
+
+  reportDirtyState(name, code) {
+    if (this.props.onDirtyChange) {
+      this.props.onDirtyChange(name !== this.initialName || code !== this.initialCode)
+    }
   }
 
   isLanguageNameValid() {
@@ -113,21 +135,30 @@ class LanguageForm extends React.Component {
         },
         langIndex,
       )
+
+      // submitted values are now the new baseline; nothing unsaved anymore
+      this.initialName = this.state.name
+      this.initialCode = this.state.code
+      this.reportDirtyState(this.state.name, this.state.code)
     }
   }
 
   onNameChange(newName) {
+    const name = toTitleCase(newName.trim().toLowerCase())
     this.setState({
-      name: toTitleCase(newName.trim().toLowerCase()),
+      name: name,
       nameError: null,
     })
+    this.reportDirtyState(name, this.state.code)
   }
 
   onCodeChange(newCode) {
+    const code = newCode.trim().toLowerCase()
     this.setState({
-      code: newCode.trim().toLowerCase(),
+      code: code,
       codeError: null,
     })
+    this.reportDirtyState(this.state.name, code)
   }
 
   render() {
