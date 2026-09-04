@@ -373,6 +373,39 @@ do ->
 
   # -------------------------------------------------------------------------
 
+  describe 'view.rowSelector: RowSelector.show_picker — external list item visibility (OC-28120)', ->
+
+    buildEvent = ->
+      target: $('<input/>')[0]
+      preventDefault: -> return
+
+    itemIds = (selector) ->
+      selector.line.find('.questiontypelist__item').map(-> $(@).data('menuItem')).get()
+
+    beforeEach ->
+      window.xlfHideWarnings = true
+
+    afterEach ->
+      window.xlfHideWarnings = false
+
+    it 'includes select_one_from_file in the picker when the survey has no availableFiles', ->
+      survey = new $model.Survey()
+      survey.availableFiles = []
+      selector = buildRowSelector(survey: survey)
+      selector.scrollFormBuilder = -> return
+      selector.show_picker(buildEvent())
+      expect(itemIds(selector)).toContain('select_one_from_file')
+
+    it 'includes select_one_from_file in the picker when the survey has availableFiles', ->
+      survey = new $model.Survey()
+      survey.availableFiles = [{metadata: {filename: 'choices.csv'}}]
+      selector = buildRowSelector(survey: survey)
+      selector.scrollFormBuilder = -> return
+      selector.show_picker(buildEvent())
+      expect(itemIds(selector)).toContain('select_one_from_file')
+
+  # -------------------------------------------------------------------------
+
   describe 'view.rowSelector: RowSelector.onSelectNewQuestionType — pii_encrypted type', ->
 
     beforeEach ->

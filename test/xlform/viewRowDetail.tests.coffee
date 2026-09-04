@@ -223,6 +223,41 @@ do ->
       result = @mixin_ctx.html()
       expect(result.indexOf('maxlength')).not.toBe(-1)
 
+  describe 'view.rowDetail.DetailViewMixins: "file" html() (OC-28120)', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+      @viewRowDetail = require('../../jsapp/xlform/src/view.rowDetail')
+      $model = require('../../jsapp/xlform/src/_model')
+      @survey = new $model.Survey()
+      @survey.rows.add(type: 'text', name: 'sample_q', label: 'Sample')
+      @row = @survey.rows.at(0)
+      @detail = @row.get('name')
+      @mixin = @viewRowDetail.DetailViewMixins.file
+      @mixin_ctx = $.extend({}, @mixin, {
+        cid: 'test_cid'
+        $el: $('<div/>')
+        model: @detail
+        Templates: @viewRowDetail.Templates
+      })
+    afterEach ->
+      window.xlfHideWarnings = false
+
+    it 'does not throw when the survey has no availableFiles', ->
+      @survey.availableFiles = []
+      expect(=> @mixin_ctx.html()).not.toThrow()
+
+    it 'renders a textbox (not a <select>) when the survey has no availableFiles', ->
+      @survey.availableFiles = []
+      result = @mixin_ctx.html()
+      expect(result.indexOf('<input')).not.toBe(-1)
+      expect(result.indexOf('<select')).toBe(-1)
+
+    it 'renders a <select> of filenames when the survey has availableFiles', ->
+      @survey.availableFiles = [{metadata: {filename: 'choices.csv'}}]
+      result = @mixin_ctx.html()
+      expect(result.indexOf('<select')).not.toBe(-1)
+      expect(result.indexOf('choices.csv')).not.toBe(-1)
+
   describe 'view.rowDetail.DetailViewMixins: "readonly" html()', ->
     beforeEach ->
       window.xlfHideWarnings = true

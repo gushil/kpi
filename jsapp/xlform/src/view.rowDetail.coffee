@@ -516,14 +516,14 @@ module.exports = do ->
       @$el.addClass("card__settings__fields--file")
       available_files = this.model.getSurvey().availableFiles || []
       file = available_files[0]
+      tfile = t("Choices File")
       if available_files.length is 0
-        return viewRowDetail.Templates.textbox @cid, @model.key, label, 'text'
+        return viewRowDetail.Templates.textbox @cid, @model.key, tfile, 'text'
       else
         options = []
         for file in available_files
           options.push "<option>#{file.metadata.filename}</option>"
         uniq = "select-file-#{@cid}"
-        tfile = t("Choices File")
         return """
             <label for="#{uniq}">#{tfile}:</label>
             <div class="settings__input">
