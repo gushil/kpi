@@ -483,3 +483,51 @@ do ->
       q3 = result.survey.find (r) -> r.name is 'q3'
       expect(q3).toBeDefined()
       expect(q3['relevant']).toBeDefined()
+
+  ###############################################################
+  # P1.11 (OC-28699): a syntactically broken applied expression must
+  # survive the write path byte-for-byte, or the instant syntax checker
+  # (which reads getValue() right after Apply) could validate reformatted
+  # text instead of what was actually applied.
+  ###############################################################
+  describe 'skipLogic: getValue() after an applied broken expression', ->
+    beforeEach ->
+      window.xlfHideWarnings = true
+    afterEach ->
+      window.xlfHideWarnings = false
+
+    # Mirrors the write applyExpressionToRow does (detail.set('value', ...)),
+    # then postInitialize() to mirror the change:value listener
+    # (view.rowDetail.coffee) that rebuilds the facade from the row's live
+    # value after every external write, including Apply.
+    applyToRelevant = (value) ->
+      csv = """
+        survey,,,
+        ,type,name,label,relevant
+        ,text,q1,Question 1,
+        ,text,q2,Question 2,
+        """
+      survey = $model.Survey.load(csv)
+      row = survey.rows.at(1)
+      row.linkUp(warnings: [], errors: [])
+      detail = row.get('relevant')
+      detail.set('value', value)
+      survey.trigger('change')
+      detail.postInitialize()
+      detail.getValue()
+
+    it 'keeps an unbalanced parenthesis untouched (falls back to hand-code)', ->
+      broken = "${q1} = 'yes' and (${q1} = 'no'"
+      expect(applyToRelevant(broken)).toBe(broken)
+
+    it 'keeps an unterminated string untouched (falls back to hand-code)', ->
+      broken = "${q1} = 'yes"
+      expect(applyToRelevant(broken)).toBe(broken)
+
+    it 'keeps a missing closing item-reference brace untouched (falls back to hand-code)', ->
+      broken = "${q1 = 'yes'"
+      expect(applyToRelevant(broken)).toBe(broken)
+
+    it 'does reformat a well-formed expression (contrast: reformatting only happens on the success path)', ->
+      applied = "${q1}='yes'"
+      expect(applyToRelevant(applied)).not.toBe(applied)
