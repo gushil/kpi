@@ -10,6 +10,7 @@ $viewRowDetailSkipLogic = require './view.rowDetail.SkipLogic'
 $viewTemplates = require './view.templates'
 $rowTemplates = require './view.row.templates'
 generateButtonBridge = require '#/openclinica/generateButtonBridge'
+runSyntaxCheck = require('#/openclinica/syntaxCheckBridge').runSyntaxCheck
 
 module.exports = do ->
   viewRowDetail = {}
@@ -970,6 +971,9 @@ module.exports = do ->
       @$input.on 'blur', fireChange
       @$input.on 'change', fireChange
       @$input.on 'keyup', fireChange
+      # P1.11 AC1: on blur only, after the model write above, never on keystrokes.
+      @$input.on 'blur', =>
+        runSyntaxCheck(@model._parent, 'repeat_count', @$input.get(0))
       @$input.on 'keypress', (evt) =>
         if evt.key is 'Enter' or evt.keyCode is 13
           evt.preventDefault()

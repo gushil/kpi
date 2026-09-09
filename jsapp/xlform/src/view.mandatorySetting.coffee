@@ -4,6 +4,7 @@ $configs = require './model.configs'
 $baseView = require './view.pluggedIn.backboneView'
 $viewTemplates = require './view.templates'
 generateButtonBridge = require '#/openclinica/generateButtonBridge'
+runSyntaxCheck = require('#/openclinica/syntaxCheckBridge').runSyntaxCheck
 
 module.exports = do ->
   class MandatorySettingView extends $baseView
@@ -119,6 +120,8 @@ module.exports = do ->
       val = evt.currentTarget.value
       @setNewValue(val)
       @showOrHideCondition()
+      # P1.11 AC1: on blur only, after the model write above.
+      runSyntaxCheck(@model._parent, 'required', evt.currentTarget)
       return
 
     getChangedValue: ->

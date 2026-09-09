@@ -1,5 +1,6 @@
 $validationLogicParser = require './model.validationLogicParser'
 $skipLogicHelpers = require './mv.skipLogicHelpers'
+$syntaxCheckBridge = require '#/openclinica/syntaxCheckBridge'
 
 module.exports = do ->
   validationLogicHelpers = {}
@@ -90,6 +91,13 @@ module.exports = do ->
       @$handCode.on('change', () =>
         @criteria = @criteria_value.replace(/&quot;/g, '"');
         @context.view_factory.survey.trigger('change')
+        # P1.11 AC1: hand-code mode is the only place Constraint has a single
+        # free-text field to check; the row-based builder mode has none.
+        # Anchor is found by walking up from the field itself, not a
+        # document-wide query, so a second open drawer can't be hit.
+        row = @context.helper_factory.current_question
+        anchor = @textarea.closest('.skiplogic__main').get(0)
+        $syntaxCheckBridge.runSyntaxCheck(row, 'constraint', anchor)
       )
     serialize: () ->
       @textarea.val()

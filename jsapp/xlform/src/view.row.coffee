@@ -13,6 +13,7 @@ $acceptedFilesView = require('./view.acceptedFiles')
 $viewRowDetail = require('./view.rowDetail')
 renderKobomatrix = require('#/formbuild/renderInBackbone').renderKobomatrix
 generateButtonBridge = require('#/openclinica/generateButtonBridge')
+runSyntaxCheck = require('#/openclinica/syntaxCheckBridge').runSyntaxCheck
 hasRowRestriction = require('#/components/locking/lockingUtils').hasRowRestriction
 getRowLockingProfile = require('#/components/locking/lockingUtils').getRowLockingProfile
 isRowLocked = require('#/components/locking/lockingUtils').isRowLocked
@@ -889,6 +890,9 @@ module.exports = do ->
         $defaultTextarea.on('blur', updateDefaultModel)
         $defaultTextarea.on('change', updateDefaultModel)
         $defaultTextarea.on('keyup', updateDefaultModel)
+        # P1.11 AC1: on blur only, after the model write above, never on keystrokes.
+        $defaultTextarea.on 'blur', =>
+          runSyntaxCheck(@model, 'default', $defaultTextarea.get(0))
         $defaultTextarea.on 'keypress', (evt) ->
           if evt.key is 'Enter' or evt.keyCode is 13
             evt.preventDefault()
@@ -942,6 +946,9 @@ module.exports = do ->
         $calcTextarea.on('blur', updateCalculationModel)
         $calcTextarea.on('change', updateCalculationModel)
         $calcTextarea.on('keyup', updateCalculationModel)
+        # P1.11 AC1: on blur only, after the model write above, never on keystrokes.
+        $calcTextarea.on 'blur', =>
+          runSyntaxCheck(@model, 'calculation', $calcTextarea.get(0))
         $calcTextarea.on 'keypress', (evt) ->
           if evt.key is 'Enter' or evt.keyCode is 13
             evt.preventDefault()

@@ -63,6 +63,7 @@ import { unmountAll } from '#/openclinica/generateButtonBridge'
 import { logicBuilderClient } from '#/openclinica/logicBuilderClient'
 import { buildFormContext, readItemName } from '#/openclinica/logicBuilderContext'
 import { GENERATE_REQUEST_KEY, columnToTab } from '#/openclinica/logicBuilderTabs'
+import { findSyntaxCheckAnchor, runSyntaxCheck } from '#/openclinica/syntaxCheckBridge'
 import { useBuilderInert } from '#/openclinica/useBuilderInert'
 import pageState from '#/pageState.store'
 import type { RouterProp } from '#/router/legacy'
@@ -375,6 +376,7 @@ export default function EditableForm(props: EditableFormProps) {
     closingViaApplyRef.current = false
     const request = state[GENERATE_REQUEST_KEY]
     const attribute = request?.attribute
+    const row = request?.row
     // Scope the focus lookup to the row's own settings drawer so a second open
     // drawer — or a group + child row sharing a class — can't be hit (round-5 #2).
     const root: ParentNode = request?.settingsRoot instanceof HTMLElement ? request.settingsRoot : document
@@ -387,6 +389,8 @@ export default function EditableForm(props: EditableFormProps) {
     window.setTimeout(() => {
       if (wasApply) {
         focusPanelInput(attribute, root) // P1.3 AC4
+        // P1.11 AC1: instant syntax check right after an applied expression.
+        runSyntaxCheck(row, attribute, findSyntaxCheckAnchor(attribute, root))
       } else {
         focusGenerateButton(attribute, root) // P1.1 AC6
       }

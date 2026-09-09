@@ -1,6 +1,7 @@
 _ = require 'underscore'
 Backbone = require 'backbone'
 $skipLogicParser = require './model.skipLogicParser'
+$syntaxCheckBridge = require '#/openclinica/syntaxCheckBridge'
 
 module.exports = do ->
   skipLogicHelpers = {}
@@ -391,6 +392,15 @@ module.exports = do ->
       @textarea.bind_event('blur', () =>
         if @textarea.val() != @criteria
           @textarea_change_handler()
+      )
+      # P1.11 AC1: hand-code mode is the only place Relevant has a single
+      # free-text field to check; the row-based builder mode has none.
+      # Anchor is found by walking up from the field itself, not a
+      # document-wide query, so a second open drawer can't be hit.
+      @textarea.bind_event('blur', () =>
+        row = @context.helper_factory.current_question
+        anchor = @textarea.$el.closest('.skiplogic__main').get(0)
+        $syntaxCheckBridge.runSyntaxCheck(row, 'relevant', anchor)
       )
     serialize: () ->
       @textarea.$el.val() || @criteria
