@@ -656,3 +656,12 @@
   padding: 6px 10px;
   margin-top: 6px;
 }
+
+// P1.11 instant syntax check messages. Own class, deliberately not the shared
+// `.message` class some panels already toggle on blur — sharing it would let
+// their cleanup delete these, or vice versa.
+.js-syntax-check-message {
+  color: colors.$kobo-red;
+  font-size: 11px;
+  margin-top: 3px;
+}
