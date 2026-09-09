@@ -24,7 +24,7 @@ const NEWLINE_STRIPPING_ATTRIBUTES = new Set(['calculation', 'default', 'require
 // silently DROPS any clause whose field it cannot resolve, then re-serializes
 // only what is left. Save persists getValue(), so an applied expression can
 // lose clauses with no error (PR#273 round-3).
-const FACADE_ATTRIBUTES = new Set(['relevant', 'constraint'])
+export const FACADE_ATTRIBUTES = new Set(['relevant', 'constraint'])
 
 export type ApplyOutcome =
   | { status: 'applied' }
@@ -193,6 +193,20 @@ const PANEL_INPUT_FALLBACK_SELECTORS: Partial<Record<string, string>> = {
   constraint: '.js-card-settings-validation-criteria .skiplogic__main button',
 }
 
+/** The panel's live input element for `attribute`, or null when none is rendered. */
+export function findPanelInputElement(attribute: string, root: ParentNode = document): HTMLElement | null {
+  const selector = PANEL_INPUT_SELECTORS[attribute]
+  if (!selector) {
+    return null
+  }
+  return (
+    root.querySelector<HTMLElement>(selector) ??
+    (PANEL_INPUT_FALLBACK_SELECTORS[attribute]
+      ? root.querySelector<HTMLElement>(PANEL_INPUT_FALLBACK_SELECTORS[attribute] as string)
+      : null)
+  )
+}
+
 /**
  * Move focus to the panel's expression input after Apply (P1.3 AC4): "Apply
  * closes the dialog and moves focus to the panel's expression field". The
@@ -202,15 +216,7 @@ const PANEL_INPUT_FALLBACK_SELECTORS: Partial<Record<string, string>> = {
  * as `root` to disambiguate concurrently-open drawers (round-5 #2).
  */
 export function focusPanelInput(attribute: string, root: ParentNode = document): boolean {
-  const selector = PANEL_INPUT_SELECTORS[attribute]
-  if (!selector) {
-    return false
-  }
-  const el =
-    root.querySelector<HTMLElement>(selector) ??
-    (PANEL_INPUT_FALLBACK_SELECTORS[attribute]
-      ? root.querySelector<HTMLElement>(PANEL_INPUT_FALLBACK_SELECTORS[attribute] as string)
-      : null)
+  const el = findPanelInputElement(attribute, root)
   if (!el) {
     console.warn('Logic Builder: could not find the panel input to focus after Apply', attribute)
     return false
