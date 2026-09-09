@@ -390,7 +390,7 @@ module.exports = do ->
       @textarea.bind_event 'keyup', () => @textarea_change_handler()
       @textarea.bind_event('blur', () =>
         if @textarea.val() != @criteria
-          textarea_change_handler()
+          @textarea_change_handler()
       )
     serialize: () ->
       @textarea.$el.val() || @criteria
