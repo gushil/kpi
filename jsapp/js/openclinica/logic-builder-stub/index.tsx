@@ -14,8 +14,8 @@
  * exported TYPES mirror the package's public surface faithfully so kpi's code is
  * still type-checked in CI; the runtime exports are inert — the two components
  * never render and the generate client never reaches the network.
- * Keep in sync with the pinned logic-builder version (0.7.0 — its public
- * surface is unchanged from 0.6.0; only the server package changed).
+ * Keep in sync with the pinned logic-builder version (0.10.0 — adds the
+ * non_validated_function failure reason).
  */
 import type { RefObject } from 'react'
 
@@ -83,7 +83,12 @@ export interface GenerationSuccess {
   readonly expression: string
 }
 
-export type FailureReason = 'insufficient_detail' | 'invalid_reference' | 'other_prompt_issue' | 'unavailable'
+export type FailureReason =
+  | 'insufficient_detail'
+  | 'invalid_reference'
+  | 'other_prompt_issue'
+  | 'non_validated_function'
+  | 'unavailable'
 
 export interface GenerationFailure {
   readonly kind: 'failure'

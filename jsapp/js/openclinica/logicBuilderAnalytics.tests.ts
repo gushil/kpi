@@ -231,18 +231,21 @@ describe('withGenerationAnalytics (P1.12 AC1 request event, AC4 never alters the
     chai.expect(ids[0]).to.not.equal(ids[1])
   })
 
-  it.each(['insufficient_detail', 'invalid_reference', 'other_prompt_issue', 'unavailable'] as FailureReason[])(
-    'emits outcome %s for a failure and leaves the ledger empty',
-    async (reason) => {
-      clock(0, 10)
-      const failure: GenerationResult = { kind: 'failure', reason }
-      const out = await withGenerationAnalytics(resolving(failure)).generate(req)
-      chai.expect(out).to.equal(failure)
-      chai.expect(mockTrack.mock.calls[0][1]).to.include({ outcome: reason, latencyMs: 10, latencyBucket: '<1s' })
-      jest.spyOn(console, 'warn').mockImplementation(() => {})
-      chai.expect(emitGenerateApply({ itemName: 'BMI', attribute: 'calculation', expression: 'x' })).to.equal(undefined)
-    },
-  )
+  it.each([
+    'insufficient_detail',
+    'invalid_reference',
+    'other_prompt_issue',
+    'non_validated_function',
+    'unavailable',
+  ] as FailureReason[])('emits outcome %s for a failure and leaves the ledger empty', async (reason) => {
+    clock(0, 10)
+    const failure: GenerationResult = { kind: 'failure', reason }
+    const out = await withGenerationAnalytics(resolving(failure)).generate(req)
+    chai.expect(out).to.equal(failure)
+    chai.expect(mockTrack.mock.calls[0][1]).to.include({ outcome: reason, latencyMs: 10, latencyBucket: '<1s' })
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    chai.expect(emitGenerateApply({ itemName: 'BMI', attribute: 'calculation', expression: 'x' })).to.equal(undefined)
+  })
 
   it('clears a previous success from the ledger when the next generation fails', async () => {
     const client = withGenerationAnalytics(resolving(success))

@@ -159,6 +159,7 @@ const FAILURE_REASONS = {
   insufficient_detail: true,
   invalid_reference: true,
   other_prompt_issue: true,
+  non_validated_function: true,
   unavailable: true,
 } satisfies Record<FailureReason, true>
 
