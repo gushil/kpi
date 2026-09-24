@@ -163,7 +163,7 @@ RUN uv pip sync "${TMP_DIR}/pip_dependencies.txt" 1>/dev/null
 # .django submodule, which imports the parent package, whose own chain reaches
 # `import requests` — and that raise happens at URLconf import time, killing
 # every request. Fail the build here instead. Pinned by git sha, not dist version.
-ARG LOGIC_BUILDER_SERVER_REF=c7fd1067c6a3219ef849bb817b614044e91f6441
+ARG LOGIC_BUILDER_SERVER_REF=dfcd7e54c9bc7e8023061af8be60a0f16c2afd70
 RUN --mount=type=secret,id=gh_token \
     printf 'machine github.com\nlogin x-access-token\npassword %s\n' \
       "$(cat /run/secrets/gh_token)" > /tmp/netrc \
