@@ -187,6 +187,19 @@ class TestAssetSnapshotList(AssetSnapshotBase):
         response = self.client.get(snapshot_url.rstrip('/') + '.xml')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_snapshot_xml_forbidden_with_invalid_password(self):
+        creation_response = self._create_asset_snapshot_from_asset()
+        user = User.objects.get(username='someuser')
+        user.extra_details.validated_password = False
+        user.extra_details.save()
+        self.client.login(username='someuser', password='someuser')
+        snapshot_url = reverse(
+            self._get_endpoint('assetsnapshot-detail'),
+            args=(creation_response.data['uid'],),
+        )
+        response = self.client.get(snapshot_url.rstrip('/') + '.xml')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_head_requests_return_empty_responses(self):
         """
         HEAD requests sent to OpenRosa endpoints must return empty responses
