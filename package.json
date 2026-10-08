@@ -268,6 +268,6 @@
     ]
   },
   "optionalDependencies": {
-    "@openclinica/logic-builder": "github:OpenClinica/logic-builder#dfcd7e54c9bc7e8023061af8be60a0f16c2afd70"
+    "@openclinica/logic-builder": "github:OpenClinica/logic-builder#c2ef3d363bdead0d3cedb99778eacee5b4547edd"
   }
 }
