@@ -55,6 +55,15 @@ class SubdomainAwareAssetSnapshotPermission(AssetSnapshotPermission):
     subdomain.
     """
 
+    def has_permission(self, request, view):
+        # The snapshot XML is public (see AssetSnapshotPermission), so skip the
+        # model-level `view_asset` check that OC users, anonymous included,
+        # may not have. Without this, Enketo preview gets a 401 (OC-28936).
+        self.validate_password(request)
+        if view.action == 'retrieve' and request.accepted_renderer.format == 'xml':
+            return True
+        return super().has_permission(request, view)
+
     def has_object_permission(self, request, view, obj):
         if (
             request.user

@@ -175,6 +175,31 @@ class TestAssetSnapshotList(AssetSnapshotBase):
             detail_response = self.client.get(xml_url)
             self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
 
+    def test_anon_can_access_snapshot_xml_without_model_level_perms(self):
+        # OC-28936: deployed environments can lack the anonymous user's
+        # model-level `view_asset`, which made the snapshot XML return 401
+        creation_response = self._create_asset_snapshot_from_asset()
+        get_anonymous_user().user_permissions.clear()
+        snapshot_url = reverse(
+            self._get_endpoint('assetsnapshot-detail'),
+            args=(creation_response.data['uid'],),
+        )
+        response = self.client.get(snapshot_url.rstrip('/') + '.xml')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_snapshot_xml_forbidden_with_invalid_password(self):
+        creation_response = self._create_asset_snapshot_from_asset()
+        user = User.objects.get(username='someuser')
+        user.extra_details.validated_password = False
+        user.extra_details.save()
+        self.client.login(username='someuser', password='someuser')
+        snapshot_url = reverse(
+            self._get_endpoint('assetsnapshot-detail'),
+            args=(creation_response.data['uid'],),
+        )
+        response = self.client.get(snapshot_url.rstrip('/') + '.xml')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_head_requests_return_empty_responses(self):
         """
         HEAD requests sent to OpenRosa endpoints must return empty responses
