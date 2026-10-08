@@ -6,6 +6,7 @@ from kobo.apps.oc_tenant_auth.permissions import (
     AssetObjectPermission,
     SubdomainAwareAssetSnapshotPermission,
 )
+from kpi.exceptions import InvalidPasswordAPIException
 
 
 class AssetObjectPermissionTestCase(TestCase):
@@ -86,3 +87,42 @@ class SubdomainAwareAssetSnapshotPermissionTestCase(TestCase):
             self.permission.has_object_permission(self.request, self.view, self.obj)
         )
         mock_super.assert_called_once()
+
+    @patch('kpi.permissions.AssetSnapshotPermission.has_permission')
+    def test_snapshot_xml_skips_model_level_check(self, mock_super):
+        self.view.action = 'retrieve'
+        self.request.accepted_renderer.format = 'xml'
+        for is_authenticated in (True, False):
+            self.request.user.is_authenticated = is_authenticated
+            with patch.object(self.permission, 'validate_password') as mock_validate:
+                self.assertTrue(self.permission.has_permission(self.request, self.view))
+            mock_validate.assert_called_once_with(self.request)
+        mock_super.assert_not_called()
+
+    @patch('kpi.permissions.AssetSnapshotPermission.has_permission', return_value=False)
+    def test_other_requests_use_standard_check(self, mock_super):
+        for action, fmt in (
+            ('retrieve', 'json'),
+            ('list', 'xml'),
+            ('form_list', 'xml'),
+        ):
+            self.view.action = action
+            self.request.accepted_renderer.format = fmt
+            with patch.object(self.permission, 'validate_password'):
+                self.assertFalse(
+                    self.permission.has_permission(self.request, self.view)
+                )
+        self.assertEqual(mock_super.call_count, 3)
+
+    @patch('kpi.permissions.AssetSnapshotPermission.has_permission')
+    def test_invalid_password_raises_before_snapshot_xml_shortcut(self, mock_super):
+        self.view.action = 'retrieve'
+        self.request.accepted_renderer.format = 'xml'
+        with patch.object(
+            self.permission,
+            'validate_password',
+            side_effect=InvalidPasswordAPIException,
+        ):
+            with self.assertRaises(InvalidPasswordAPIException):
+                self.permission.has_permission(self.request, self.view)
+        mock_super.assert_not_called()
