@@ -1,7 +1,8 @@
 /**
  * OC fork — P1.5 (OC-28702): serialise the WHOLE form for the AI Generator out
  * of the Backbone/xlform survey model (PRD P1.5 AC1–AC6). Mechanical and
- * best-effort: raw stored values, every optional key omitted when empty, every
+ * best-effort: raw stored values (relevant/constraint: what Save writes, see
+ * readFacadeDetail), every optional key omitted when empty, every
  * read guarded so a hostile row is dropped rather than stranding Generate.
  *
  * The property set is an ALLOW-LIST. `SENT_COLUMNS` and `EXCLUDED_COLUMNS`
@@ -82,6 +83,32 @@ function readDetail(row: any, column: string): string {
   } catch (e) {
     console.warn('Logic Builder: failed to read a column for AI context', column, e)
     return ''
+  }
+}
+
+/**
+ * Relevant/constraint as Save would write it (OC-28965). Their stored `value`
+ * is only the facade's seed: hand edits in the panel update facade state, never
+ * the value, so the raw read sends the pre-edit expression. Read the facade's
+ * serialization instead. An empty serialization is a real clear only when the
+ * panel shows no conditions; visible conditions it cannot serialize fall back
+ * to the raw value (same rule as readCurrentExpression). Raw on any throw.
+ */
+function readFacadeDetail(row: any, column: string): string {
+  const raw = readDetail(row, column)
+  try {
+    const detail = row?.get?.(column)
+    if (typeof detail?.getValue !== 'function') {
+      return raw
+    }
+    const live = String(detail.getValue() ?? '')
+    if (live.trim() !== '') {
+      return live
+    }
+    return (detail.facade?.context?.state?.presenters?.length ?? 0) === 0 ? '' : raw
+  } catch (e) {
+    console.warn('Logic Builder: failed to read the live expression for AI context', column, e)
+    return raw
   }
 }
 
@@ -201,8 +228,8 @@ function buildQuestionRow(row: any, name: string, isTarget: boolean): QuestionRo
       // '' is Never — must not be dropped by opt() like other empty fields.
       // Always send required so the AI sees the full tri-state (OC-28717).
       required: readDetail(row, 'required'),
-      ...opt('relevant', readDetail(row, 'relevant')),
-      ...opt('constraint', readDetail(row, 'constraint')),
+      ...opt('relevant', readFacadeDetail(row, 'relevant')),
+      ...opt('constraint', readFacadeDetail(row, 'constraint')),
       ...opt('constraintMessage', readDetail(row, 'constraint_message')),
       ...opt('default', readDetail(row, 'default')),
       ...opt('calculation', readDetail(row, 'calculation')),
@@ -233,7 +260,7 @@ function buildGroupRow(row: any, name: string, isTarget: boolean, targetRow: any
     ...opt('width', parseWidthToken(appearance)),
     ...(isTarget ? { isTarget: true as const } : {}),
     logic: {
-      ...opt('relevant', readDetail(row, 'relevant')),
+      ...opt('relevant', readFacadeDetail(row, 'relevant')),
       ...(isRepeatRow(row) ? opt('repeatCount', readDetail(row, 'repeat_count')) : {}),
     },
     rows: walk(row.rows?.models, targetRow, depth + 1),

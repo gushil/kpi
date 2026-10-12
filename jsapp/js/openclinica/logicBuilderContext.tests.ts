@@ -18,6 +18,9 @@ interface FakeRowSpec {
   walker?: boolean
   repeat?: boolean
   error?: boolean
+  // relevant/constraint facade: what getValue() serializes, and how many conditions the condition
+  // builder shows. No `presenters` = a helper without a condition list (hand-code or mode selector).
+  facade?: Record<string, { serialized: string; presenters?: number }>
 }
 
 function fakeRow(spec: FakeRowSpec): any {
@@ -26,6 +29,16 @@ function fakeRow(spec: FakeRowSpec): any {
     get: (col: string) => {
       if (col === 'type' && spec.typeId !== undefined) {
         return { get: (k: string) => (k === 'typeId' ? spec.typeId : k === 'value' ? columns.type : undefined) }
+      }
+      const facade = spec.facade?.[col]
+      if (facade) {
+        return {
+          get: (k: string) => (k === 'value' ? columns[col] : undefined),
+          getValue: () => facade.serialized,
+          facade: {
+            context: { state: facade.presenters === undefined ? {} : { presenters: new Array(facade.presenters) } },
+          },
+        }
       }
       return col in columns ? { get: (k: string) => (k === 'value' ? columns[col] : undefined) } : undefined
     },
@@ -243,6 +256,58 @@ describe('buildFormContext (P1.5)', () => {
     const rows = buildFormContext(target).rows
     chai.expect(rows[0].logic).to.deep.equal({ relevant: '${X}', repeatCount: '${N}' })
     chai.expect(rows[1].logic).to.deep.equal({})
+  })
+
+  it('sends relevant/constraint as Save would write them, not the stale stored value (OC-28965)', () => {
+    const edited = q('A', {
+      columns: { relevant: '${X} = 1 and ${Y} = 2', constraint: '. > 0 and . < 10' },
+      facade: { relevant: { serialized: '${X} = 1', presenters: 1 }, constraint: { serialized: '. > 0' } },
+    })
+    const group = fakeRow({
+      columns: { name: 'G', type: 'group', relevant: '${OLD}' },
+      facade: { relevant: { serialized: '${NEW}', presenters: 1 } },
+      children: [],
+    })
+    surveyOf([edited, group])
+    const rows = buildFormContext(edited).rows
+    chai.expect(rows[0].logic).to.deep.equal({ required: '', relevant: '${X} = 1', constraint: '. > 0' })
+    chai.expect(rows[1].logic).to.deep.equal({ relevant: '${NEW}' })
+  })
+
+  it('sends a hand-code panel edit, not the stored value (OC-28965)', () => {
+    const row = q('A', {
+      columns: { relevant: '${X} = 1 or ${Y} = 2' },
+      facade: { relevant: { serialized: '${X} = 1' } },
+    })
+    surveyOf([row])
+    chai.expect(buildFormContext(row).rows[0].logic).to.deep.equal({ required: '', relevant: '${X} = 1' })
+  })
+
+  it('sends a hand edit made after Apply, not the applied expression (OC-28965)', () => {
+    // Apply writes the stored value and reseeds the panel; the later hand edit changes only the panel.
+    const row = q('A', {
+      columns: { constraint: ". != 'dev' and . != 'test' and . != 'prod'" },
+      facade: { constraint: { serialized: ". != 'test' and . != 'prod'", presenters: 2 } },
+    })
+    surveyOf([row])
+    chai
+      .expect(buildFormContext(row).rows[0].logic)
+      .to.deep.equal({ required: '', constraint: ". != 'test' and . != 'prod'" })
+  })
+
+  it('omits relevant cleared by hand in the panel (OC-28965)', () => {
+    const row = q('A', { columns: { relevant: '${X} = 1' }, facade: { relevant: { serialized: '' } } })
+    surveyOf([row])
+    chai.expect(buildFormContext(row).rows[0].logic).to.deep.equal({ required: '' })
+  })
+
+  it('keeps the stored value when the panel shows conditions it cannot serialize (OC-28965)', () => {
+    const row = q('A', {
+      columns: { relevant: '${GONE} = 1' },
+      facade: { relevant: { serialized: '', presenters: 1 } },
+    })
+    surveyOf([row])
+    chai.expect(buildFormContext(row).rows[0].logic).to.deep.equal({ required: '', relevant: '${GONE} = 1' })
   })
 
   it("derives a group's type from its live repeat switch, not the stored type", () => {
