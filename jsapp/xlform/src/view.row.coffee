@@ -977,17 +977,22 @@ module.exports = do ->
 
         if questionType is 'calculate'
           $calcTabError = @cardSettingsWrap.find('.js-calculation-tab-error')
+          # OC (OC-28966): same rule as the converter, so an empty calculation
+          # with a dynamic Default Value (e.g. today()) is not flagged.
+          isCalcMissing = ->
+            return $modelUtils.isCalculationMissing(
+              $calcTextarea.val()
+              defaultModel and defaultModel.get('value')
+            )
           updateCalcTabError = ->
-            if ($calcTextarea.val() or '').trim() is ''
-              $calcTabError.removeClass('calculation-tab__error--hidden')
-            else
-              $calcTabError.addClass('calculation-tab__error--hidden')
+            $calcTabError.toggleClass('calculation-tab__error--hidden', not isCalcMissing())
+            return
           $calcTextarea.on('blur input', updateCalcTabError)
           updateCalcTabError()
 
           makeRequiredCheck = ->
             $field = $calcTextarea.closest('.calculation-panel__field')
-            if ($calcTextarea.val() or '').trim() is ''
+            if isCalcMissing()
               $field.addClass('input-error')
               if $calcTextarea.siblings('.message').length is 0
                 $message = $('<div/>').addClass('message').text(t('This field is required'))
@@ -996,6 +1001,17 @@ module.exports = do ->
               $field.removeClass('input-error')
               $calcTextarea.siblings('.message').remove()
           $calcTextarea.on('blur input', makeRequiredCheck)
+
+          # OC (OC-28966): Default Value edits change the default model without
+          # an input event on this field. Refresh the !, and re-check the
+          # message only if it is already shown (never show it on a field the
+          # author has not touched).
+          refreshCalcRequired = ->
+            updateCalcTabError()
+            makeRequiredCheck() if $calcTextarea.siblings('.message').length
+            return
+          if defaultModel
+            @listenTo(defaultModel, 'change:value', refreshCalcRequired)
 
         else
           # OC (OC-28464): non-Calculate items with a calculation must be

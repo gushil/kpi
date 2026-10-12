@@ -56,6 +56,12 @@ export interface CalculationReadonlyHintOptions {
 /** Whether to prompt the user to make an item with a calculation read-only */
 export function shouldShowCalculationReadonlyHint(opts?: CalculationReadonlyHintOptions): boolean
 
+/** OC-28966: port of pyxform's default_is_dynamic for a Calculate item */
+export function isDefaultDynamic(value: unknown): boolean
+
+/** OC-28966: does the converter reject this Calculate item with "Missing calculation"? */
+export function isCalculationMissing(calculation?: string, defaultValue?: string): boolean
+
 declare const utils: {
   split_paste: typeof split_paste
   parseHelper: typeof parseHelper
@@ -64,6 +70,8 @@ declare const utils: {
   sluggify: typeof sluggify
   isHiddenField: typeof isHiddenField
   shouldShowCalculationReadonlyHint: typeof shouldShowCalculationReadonlyHint
+  isDefaultDynamic: typeof isDefaultDynamic
+  isCalculationMissing: typeof isCalculationMissing
   Validator: any
   skipLogicParser: any
   validationLogicParser: any

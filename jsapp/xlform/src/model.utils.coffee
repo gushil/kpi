@@ -188,4 +188,71 @@ module.exports = do ->
       return false
     return true
 
+  # OC (OC-28966): port of pyxform's expression lexer (get_expression_lexer
+  # in pyxform utils.py, pinned c1ffe27). Rule order is significant: like
+  # re.Scanner, the first rule that matches at a position wins, so `-5` is
+  # a NUMBER (not an operator), `5-3` is two NUMBERs, and `divide` starts
+  # with the `div` operator.
+  # `\xc0-\xd6\]` copies a pyxform typo (missing `[`) so both agree.
+  _ncStart = /([A-Z]|_|[a-z]|\xc0-\xd6\]|[\xd8-\xf6]|[\xf8-˿]|[Ͱ-ͽ]|[Ϳ-῿]|[‌-‍]|[⁰-↏]|[Ⰰ-⿯]|[、-퟿]|[豈-﷏]|[ﷰ-�]|[\u{10000}-\u{effff}])/u.source
+  _ncChar = /[-.0-9\xb7̀-ͯ‿-⁀]/u.source
+  _ncname = "(#{_ncStart})(#{_ncStart}|#{_ncChar})*"
+  _ncname = "#{_ncname}(:#{_ncname})?"
+  _date = /-?\d{4}-\d{2}-\d{2}/.source
+  _time = /\d{2}:\d{2}:\d{2}(\.\s+)?(((\+|-)\d{2}:\d{2})|Z)?/.source
+  _lexerRules = _.map([
+    ['DATETIME', "#{_date}T#{_time}"]
+    ['DATE', _date]
+    ['TIME', _time]
+    ['NUMBER', /-?\d+\.\d*|-?\.\d+|-?\d+/.source]
+    ['OPS_MATH', /[*+\-]|mod|div/.source]
+    ['OPS_COMP', /=|!=|<|>|<=|>=/.source]
+    ['OPS_BOOL', /and|or/.source]
+    ['OPS_UNION', /\|/.source]
+    ['OPEN_PAREN', /\(/.source]
+    ['CLOSE_PAREN', /\)/.source]
+    ['BRACKET', /\[\]\{\}/.source]
+    ['PARENT_REF', /\.\./.source]
+    ['SELF_REF', /\./.source]
+    ['PATH_SEP', /\//.source]
+    ['SYSTEM_LITERAL', /"[^"]*"|'[^']*'/.source]
+    ['COMMA', /,/.source]
+    ['WHITESPACE', /\s+/.source]
+    ['PYXFORM_REF', "\\$\\{#{_ncname}(##{_ncname})?\\}"]
+    ['FUNC_CALL', "#{_ncname}\\("]
+    ['XPATH_PRED', "#{_ncname}\\["]
+    ['URI_SCHEME', "#{_ncname}://"]
+    ['NAME', _ncname]
+    ['OTHER', /.+?/.source]
+  ], ([name, source]) -> return [name, new RegExp(source, 'uy')])
+  _dynamicTokens = ['OPS_MATH', 'OPS_UNION', 'XPATH_PRED', 'PYXFORM_REF', 'FUNC_CALL']
+
+  # OC (OC-28966): port of pyxform's default_is_dynamic for a Calculate item
+  # (the date/geo hyphen exception does not apply to that type). True when
+  # the default contains a math operator, a union, a ${ref}, a function
+  # call or a predicate.
+  utils.isDefaultDynamic = (value) ->
+    return false unless typeof value is 'string'
+    pos = 0
+    while pos < value.length
+      token = null
+      for [name, re] in _lexerRules
+        re.lastIndex = pos
+        if re.exec(value)
+          token = name
+          pos = re.lastIndex
+          break
+      # like re.Scanner, stop at text no rule matches
+      return false unless token
+      return true if token in _dynamicTokens
+    return false
+
+  # OC (OC-28966): the converter rejects a Calculate item with "Missing
+  # calculation" only when the calculation is empty and the default is not
+  # dynamic (xls2json.py). Drives the Calculation tab's red ! and
+  # "This field is required" message.
+  utils.isCalculationMissing = (calculation, defaultValue) ->
+    return false if ("#{calculation or ''}").trim() isnt ''
+    return not utils.isDefaultDynamic(defaultValue)
+
   return utils
