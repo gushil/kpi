@@ -310,6 +310,24 @@ describe('buildFormContext (P1.5)', () => {
     chai.expect(buildFormContext(row).rows[0].logic).to.deep.equal({ required: '', relevant: '${GONE} = 1' })
   })
 
+  it('applies the same empty-serialization rule to group relevant (OC-28965)', () => {
+    const unserializable = fakeRow({
+      columns: { name: 'G1', type: 'group', relevant: '${GONE} = 1' },
+      facade: { relevant: { serialized: '', presenters: 1 } },
+      children: [],
+    })
+    const clearedByHand = fakeRow({
+      columns: { name: 'G2', type: 'group', relevant: '${X} = 1' },
+      facade: { relevant: { serialized: '' } },
+      children: [],
+    })
+    const target = q('T')
+    surveyOf([unserializable, clearedByHand, target])
+    const rows = buildFormContext(target).rows
+    chai.expect(rows[0].logic).to.deep.equal({ relevant: '${GONE} = 1' })
+    chai.expect(rows[1].logic).to.deep.equal({})
+  })
+
   it("derives a group's type from its live repeat switch, not the stored type", () => {
     // The stored `type` flips to 'repeat' only after save + reload; the UI's
     // switch is the `_isRepeat` detail, which xlform's export also relies on.

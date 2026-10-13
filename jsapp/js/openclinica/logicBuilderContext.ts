@@ -93,6 +93,13 @@ function readDetail(row: any, column: string): string {
  * serialization instead. An empty serialization is a real clear only when the
  * panel shows no conditions; visible conditions it cannot serialize fall back
  * to the raw value (same rule as readCurrentExpression). Raw on any throw.
+ *
+ * Live wins over raw here, the reverse of readCurrentExpression, on purpose:
+ * this context must match what Save writes, and Save writes getValue(). The two
+ * differ only while a hand edit is unsaved. readCurrentExpression only decides
+ * whether Apply confirms an overwrite. Do not change one to match the other.
+ * Groups share the facade: serialize() builds its context on first use, so a
+ * group whose linkUp never ran still serializes its stored value.
  */
 function readFacadeDetail(row: any, column: string): string {
   const raw = readDetail(row, column)
