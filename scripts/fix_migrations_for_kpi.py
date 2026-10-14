@@ -34,8 +34,12 @@ def run():
     fix_organizations_for_kpi_0044()
     # The KoboCAT DB records kpi.0044 too (Django records every migration on
     # every DB, even when the router skips its operations), so it needs the
-    # same records or `migrate --database=kobocat` fails.
-    if are_migrations_already_applied(settings.OPENROSA_DB_ALIAS):
+    # same records or `migrate --database=kobocat` fails. The alias only exists
+    # when KC_DATABASE_URL is set.
+    if (
+        settings.OPENROSA_DB_ALIAS in settings.DATABASES
+        and are_migrations_already_applied(settings.OPENROSA_DB_ALIAS)
+    ):
         fix_organizations_for_kpi_0044(settings.OPENROSA_DB_ALIAS)
 
     # OpenClinica: repair migration/schema drift introduced by the Keycloak/SSO
