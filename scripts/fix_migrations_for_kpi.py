@@ -1,5 +1,6 @@
+from django.conf import settings
 from django.contrib.auth.management import DEFAULT_DB_ALIAS
-from django.db import connection
+from django.db import connection, connections
 
 from .fix_migrations_for_kobocat import are_migrations_already_applied
 
@@ -31,6 +32,15 @@ def run():
     # user.organization access is safe; existing DBs that ran kpi.0044 before
     # organizations.0009 existed need the missing records inserted.
     fix_organizations_for_kpi_0044()
+    # The KoboCAT DB records kpi.0044 too (Django records every migration on
+    # every DB, even when the router skips its operations), so it needs the
+    # same records or `migrate --database=kobocat` fails. The alias only exists
+    # when KC_DATABASE_URL is set.
+    if (
+        settings.OPENROSA_DB_ALIAS in settings.DATABASES
+        and are_migrations_already_applied(settings.OPENROSA_DB_ALIAS)
+    ):
+        fix_organizations_for_kpi_0044(settings.OPENROSA_DB_ALIAS)
 
     # OpenClinica: repair migration/schema drift introduced by the Keycloak/SSO
     # upgrades before `manage.py migrate` runs later in scripts/migrate.sh.
@@ -196,7 +206,7 @@ def fix_auth_migration_for_kobo_auth():
             )
 
 
-def fix_organizations_for_kpi_0044():
+def fix_organizations_for_kpi_0044(db_alias=DEFAULT_DB_ALIAS):
     """
     OpenClinica: fix InconsistentMigrationHistory when upgrading from a DB where
     kpi.0044_standardize_searchable_fields was applied before organizations.0009 existed.
@@ -212,7 +222,7 @@ def fix_organizations_for_kpi_0044():
     four individual migrations it replaces are all recorded — so we only insert the
     squash name when neither it nor all four replaces entries are present.
     """
-    with connection.cursor() as cursor:
+    with connections[db_alias].cursor() as cursor:
         cursor.execute(
             "SELECT id FROM django_migrations "
             "WHERE app = 'kpi' AND name = '0044_standardize_searchable_fields'"
@@ -285,7 +295,7 @@ def fix_organizations_for_kpi_0044():
 
         print(
             f'Fake-applying {len(needed)} missing organizations migrations to satisfy '
-            f'kpi.0044 dependency: {needed}'
+            f'kpi.0044 dependency on {db_alias}: {needed}'
         )
         for name in needed:
             cursor.execute(
