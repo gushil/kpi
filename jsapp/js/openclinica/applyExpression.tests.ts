@@ -126,12 +126,24 @@ describe('applyExpressionToRow (P1.3)', () => {
       intended: '${A} = 1 and ${NOPE} = 2',
       stored: '${A} = 1',
       unresolved: ['${NOPE}'],
+      missing: ['${NOPE}'],
     })
     // Wrote the attempt, then restored the previous value (revert).
     chai.expect(detail.set.mock.calls).to.deep.equal([
       ['value', '${A} = 1 and ${NOPE} = 2'],
       ['value', previous],
     ])
+  })
+
+  it('does not report a dropped ref as missing when the form has that item (OC-29108)', () => {
+    // The builder cut `. < 2 * ${int}` to `. < 2`: ${int} is unresolved, but the
+    // item exists, so the toast must not say it does not exist.
+    const { row, survey } = makeFacadeRow({ serialize: () => '. < 2' })
+    survey.findRowByName = jest.fn((name: string) => (name === 'int' ? {} : false))
+    const outcome = applyExpressionToRow(row, 'constraint', '. < 2 * ${int} and . != ${gone}')
+    chai.expect(outcome).to.include({ status: 'rejected' })
+    chai.expect((outcome as any).unresolved).to.deep.equal(['${int}', '${gone}'])
+    chai.expect((outcome as any).missing).to.deep.equal(['${gone}'])
   })
 
   it('refuses and reverts a total clause-drop', () => {
@@ -198,7 +210,7 @@ describe('applyExpressionToRow (P1.3)', () => {
     const outcome = applyExpressionToRow(row, 'constraint', '. >= 0 and . <= 200')
     chai
       .expect(outcome)
-      .to.deep.equal({ status: 'rejected', intended: '. >= 0 and . <= 200', stored: '', unresolved: [] })
+      .to.deep.equal({ status: 'rejected', intended: '. >= 0 and . <= 200', stored: '', unresolved: [], missing: [] })
     chai.expect(rawValue()).to.equal("${OLD} = '1'")
   })
 

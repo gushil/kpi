@@ -31,7 +31,9 @@ export type ApplyOutcome =
   // The facade could not represent every clause (it dropped one or more field
   // references it can't resolve). The attempted write is reverted — nothing is
   // persisted — and the unresolved references are reported (round-5 #5).
-  | { status: 'rejected'; intended: string; stored: string; unresolved: string[] }
+  // `missing` is the subset with no row of that name on the form; the rest exist
+  // but the builder could not hold the clause that uses them (OC-29108).
+  | { status: 'rejected'; intended: string; stored: string; unresolved: string[]; missing: string[] }
   | { status: 'error'; reason: 'missing-detail' | 'detached-row' | 'write-failed' }
 
 /**
@@ -110,7 +112,8 @@ export function applyExpressionToRow(row: any, attribute: string, expression: st
         // Revert: never persist a silently-reduced expression.
         detail.set('value', previous)
         survey.trigger?.('change')
-        return { status: 'rejected', intended: value, stored, unresolved }
+        const missing = unresolved.filter((ref) => !survey.findRowByName?.(ref.slice(2, -1)))
+        return { status: 'rejected', intended: value, stored, unresolved, missing }
       }
       return { status: 'applied' }
     }
