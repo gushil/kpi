@@ -174,6 +174,43 @@ do ->
       fn = -> $validationParser(". > 0 and . < 10 or . = 5")
       expect(fn).toThrow()
 
+  # OC-29108: a criterion the builder cannot hold must throw (the builder then
+  # falls back to hand code) instead of matching a prefix and dropping the rest.
+  describe 'validationCriteria: parser — trailing text', ->
+
+    it 'throws on arithmetic with another item', ->
+      fn = -> $validationParser('. < 2 * ${int}')
+      expect(fn).toThrow()
+
+    it 'throws on arithmetic with a constant', ->
+      fn = -> $validationParser('. < 2 * 3')
+      expect(fn).toThrow()
+
+    it 'throws on a stray character after a number', ->
+      fn = -> $validationParser('. < 2)')
+      expect(fn).toThrow()
+
+    it 'throws on trailing text in one criterion of a compound', ->
+      fn = -> $validationParser('. > 0 and . < 2 * ${int}')
+      expect(fn).toThrow()
+
+    it 'throws on a comparison after selected()', ->
+      fn = -> $validationParser("selected(., 'red') = false()")
+      expect(fn).toThrow()
+
+    it 'throws on arithmetic around selected()', ->
+      fn = -> $validationParser("count-selected(.) > 1 + selected(., 'a')")
+      expect(fn).toThrow()
+
+    it 'throws on an unbalanced not(selected())', ->
+      expect(-> $validationParser("selected(., 'red'))")).toThrow()
+      expect(-> $validationParser("not(selected(., 'red')")).toThrow()
+
+    it 'ignores surrounding whitespace', ->
+      result = $validationParser(' . > 18 ')
+      expect(result.criteria[0].operator).toBe('resp_greater')
+      expect(result.criteria[0].response_value).toBe('18')
+
   ###############################################################
   # RowDetail: "constraint" (validation criteria) on a survey row
   ###############################################################

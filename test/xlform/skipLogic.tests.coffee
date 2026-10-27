@@ -268,6 +268,34 @@ do ->
       fn = -> $skipLogicParser("${a} = '1' and ${b} = '2' or ${c} = '3'")
       expect(fn).toThrow()
 
+  # OC-29108: a criterion the builder cannot hold must throw (the builder then
+  # falls back to hand code) instead of matching a prefix and dropping the rest.
+  describe 'skipLogic: parser — trailing text', ->
+
+    it 'throws on arithmetic with another item', ->
+      fn = -> $skipLogicParser('${int} > 2 * ${dec}')
+      expect(fn).toThrow()
+
+    it 'throws on arithmetic with a constant', ->
+      fn = -> $skipLogicParser('${int} > 2 * 3')
+      expect(fn).toThrow()
+
+    it 'throws on trailing text in one criterion of a compound', ->
+      fn = -> $skipLogicParser("${a} = '1' and ${b} > 2 * 3")
+      expect(fn).toThrow()
+
+    it 'throws on a comparison after selected()', ->
+      fn = -> $skipLogicParser("selected(${q}, 'red') = false()")
+      expect(fn).toThrow()
+
+    it 'throws on arithmetic around selected()', ->
+      fn = -> $skipLogicParser("count-selected(${q}) > 1 + selected(${q}, 'a')")
+      expect(fn).toThrow()
+
+    it 'throws on an unbalanced not(selected())', ->
+      expect(-> $skipLogicParser("selected(${q}, 'red'))")).toThrow()
+      expect(-> $skipLogicParser("not(selected(${q}, 'red')")).toThrow()
+
   ###############################################################
   # mv.skipLogicHelpers: operator_types catalog
   ###############################################################

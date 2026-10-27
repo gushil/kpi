@@ -480,8 +480,8 @@ export default function EditableForm(props: EditableFormProps) {
       // persisted (round-5 #5, PR#273 deferred). Return false so the dialog
       // stays open for the user to adjust the prompt and retry.
       console.warn('Logic Builder: refused a lossy apply and reverted', outcome, request.attribute)
-      if (outcome.unresolved.length > 0) {
-        const names = outcome.unresolved.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
+      if (outcome.missing.length > 0) {
+        const names = outcome.missing.map((ref) => ref.replace(/^\$\{|\}$/g, '')).join(', ')
         alertify.error(
           t(
             'The generated expression references ##refs## which do not exist on this form, so it was not applied. Nothing was changed.',
