@@ -12,21 +12,22 @@ log_equiv = (i1, i2, i3)->
 
 module.exports = do ->
   equalityCriterionPattern = ///
-      ^\${(\w+)}\s*                      # question reference in the format of ${name}
+      ^\s*\${(\w+)}\s*                   # question reference in the format of ${name}
       (!=|<=|>=|=|<|>)\s*                # operator (careful: if < is listed before <=, the = will be treated as part of the value)
       (                                  # start of the value group
         (?:                              #   start of a non-matching group
           date\(\'\d{4}-\d{2}-\d{2}\'\)) #     something resembling a date: date('xxxx-xx-xx')
         |                                #   or
-          (?:-?(?:\d+\.\d+|\.\d+|\d+.?)) #     a signed integer or decimal
+          (?:-?(?:\d+\.\d+|\.\d+|\d+\.?)) #    a signed integer or decimal
         |                                #   or
           (?:\'[^']+\')                  #     a string surrounded by single quotes (careful: the quotes are included in the match!)
       )                                  # end of the value group
+      \s*$                               # nothing after the value (OC-29108)
     ///
 
   # /\${(\w+)}\s*((?:=|!=)\s*(?:NULL|''))/i
   existenceCriterionPattern = ///
-      \${
+      ^\s*\${
         (\w+)
       }\s*
       (
@@ -34,6 +35,7 @@ module.exports = do ->
         \s*
         (?:NULL|'')
       )
+      \s*$
     ///i
 
   # / and | or /gi
