@@ -284,6 +284,18 @@ do ->
       fn = -> $skipLogicParser("${a} = '1' and ${b} > 2 * 3")
       expect(fn).toThrow()
 
+    it 'throws on a comparison after selected()', ->
+      fn = -> $skipLogicParser("selected(${q}, 'red') = false()")
+      expect(fn).toThrow()
+
+    it 'throws on arithmetic around selected()', ->
+      fn = -> $skipLogicParser("count-selected(${q}) > 1 + selected(${q}, 'a')")
+      expect(fn).toThrow()
+
+    it 'throws on an unbalanced not(selected())', ->
+      expect(-> $skipLogicParser("selected(${q}, 'red'))")).toThrow()
+      expect(-> $skipLogicParser("not(selected(${q}, 'red')")).toThrow()
+
   ###############################################################
   # mv.skipLogicHelpers: operator_types catalog
   ###############################################################

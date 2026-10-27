@@ -44,14 +44,15 @@ module.exports = (
     function parseMultiselectCriterion(text) {
       var matches = text.match(selectMultiplePattern)
 
-      if (!matches) {
+      // not( and its closing ) must come together (OC-29108)
+      if (!matches || !matches[1] !== !matches[4]) {
         throw new Error('criterion not recognized: "' + text + '"')
       }
 
       return {
-        name: matches[1],
-        operator: text.indexOf('not(') == -1 ? 'multiplechoice_selected' : 'multiplechoice_notselected',
-        response_value: matches[2],
+        name: matches[2],
+        operator: matches[1] ? 'multiplechoice_notselected' : 'multiplechoice_selected',
+        response_value: matches[3],
       }
     }
 

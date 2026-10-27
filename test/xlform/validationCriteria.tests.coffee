@@ -194,6 +194,18 @@ do ->
       fn = -> $validationParser('. > 0 and . < 2 * ${int}')
       expect(fn).toThrow()
 
+    it 'throws on a comparison after selected()', ->
+      fn = -> $validationParser("selected(., 'red') = false()")
+      expect(fn).toThrow()
+
+    it 'throws on arithmetic around selected()', ->
+      fn = -> $validationParser("count-selected(.) > 1 + selected(., 'a')")
+      expect(fn).toThrow()
+
+    it 'throws on an unbalanced not(selected())', ->
+      expect(-> $validationParser("selected(., 'red'))")).toThrow()
+      expect(-> $validationParser("not(selected(., 'red')")).toThrow()
+
     it 'ignores surrounding whitespace', ->
       result = $validationParser(' . > 18 ')
       expect(result.criteria[0].operator).toBe('resp_greater')

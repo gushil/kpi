@@ -30,13 +30,15 @@ module.exports = do ->
   criteriaJoinPattern =
     ///#{' and '}|#{' or '}///gi
 
-  # /selected\((\.)\s*,\s*\'(\w+)\'\)/
+  # /^\s*(not\(\s*)?selected\((\.)\s*,\s*\'(\w+)\'\)(\s*\))?\s*$/
   selectMultiplePattern = ///
+      ^\s*(not\(\s*)?                    # optional not( (the factory checks it is closed)
       selected\(
         (\.)\s*
         ,\s*\'
         (\w+)\'
       \)
+      (\s*\))?\s*$                       # closing ) of not(, then nothing else (OC-29108)
     ///
 
   return $factory(equalityCriterionPattern,
