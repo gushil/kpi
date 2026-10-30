@@ -555,6 +555,10 @@ $modal-custom-header-height: 60px;
     p {
       margin: 0;
     }
+
+    p + p {
+      margin-top: 1em;
+    }
   }
 
   .form-view__cell--translation {

@@ -363,8 +363,30 @@ export class TranslationSettings extends React.Component<TranslationSettingsProp
           {renderUnsavedDraftBanner(this.props.hasUnsavedChanges)}
           <bem.FormView__cell m='translation-note'>
             <p>
+              {t('Before you can add translations, let us know which language you’re writing this form in.')}
+              <br />
+              {t('That’s your')} <strong>{t('primary language')}</strong>{' '}
               {t(
-                'Setting a primary language is required. This is the language you have entered in the main Form Designer interface. Provide the official language code. For example, if this form is primarily authored in English, enter "English" and "en". It does not necessarily determine which language the form will use during data collection.',
+                '— the one you’ve been typing your question text in all along. It’s what you’ll see while you work in the editor, and it’s the language your form opens in when you preview it.',
+              )}
+            </p>
+            <p>
+              {t(
+                'We just need two things: the language’s name, and its code. The code is a short standard abbreviation —',
+              )}{' '}
+              <code>en</code> {t('for English,')} <code>es</code> {t('for Spanish,')} <code>fr</code>{' '}
+              {t(
+                'for French. Using the right one matters, because it’s how OpenClinica knows to open the form in someone’s own language.',
+              )}
+            </p>
+            <p>
+              {t('We’ve started you off with English and')} <code>en</code>
+              {t('. Change them if that’s not what you’re working in.')}
+            </p>
+            <p>
+              <strong>{t('What happens next:')}</strong>{' '}
+              {t(
+                'once you’ve set this, you can add as many other languages as you need, and fill in their translations side by side with your original text.',
               )}
             </p>
           </bem.FormView__cell>

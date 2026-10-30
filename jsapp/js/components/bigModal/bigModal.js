@@ -262,7 +262,7 @@ class BigModal extends React.Component {
       if (props.params.type === MODAL_TYPES.FORM_LANGUAGES) {
         const translations = props.params.asset?.content?.translations
         const isSettingPrimaryLanguage = translations?.length === 1 && translations[0] === null
-        newState.title = isSettingPrimaryLanguage ? t('Select a primary language') : t('Manage Languages')
+        newState.title = isSettingPrimaryLanguage ? t('Set your form’s primary language') : t('Manage Languages')
       }
 
       // store for later
