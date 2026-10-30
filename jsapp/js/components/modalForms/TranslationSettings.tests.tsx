@@ -108,3 +108,19 @@ describe('OC-28841 Manage Languages unsaved draft banner', () => {
     chai.expect(switchModal.mock.calls[0][0].hasUnsavedChanges).to.equal(hasUnsavedChanges)
   })
 })
+
+describe('OC-29270 primary language dialog text', () => {
+  it('shows the AC1 text with its bold and code markup', () => {
+    const { container } = render(<TranslationSettings asset={makeAsset([null])} />)
+    const note = container.querySelector('.form-view__cell--translation-note') as HTMLElement
+    const texts = (selector: string) => Array.from(note.querySelectorAll(selector), (el) => el.textContent)
+
+    chai.expect(note.querySelectorAll('p')).to.have.length(4)
+    chai
+      .expect(note.textContent)
+      .to.include('Before you can add translations, let us know which language you’re writing this form in.')
+    chai.expect(note.textContent).to.include('fill in their translations side by side with your original text.')
+    chai.expect(texts('strong')).to.deep.equal(['primary language', 'What happens next:'])
+    chai.expect(texts('code')).to.deep.equal(['en', 'es', 'fr', 'en'])
+  })
+})
